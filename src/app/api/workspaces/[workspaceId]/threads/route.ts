@@ -1,0 +1,72 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { commentThread, comment } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
+import { createThreadSchema } from "@/lib/validators/thread";
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ workspaceId: string }> }
+) {
+  const { workspaceId } = await params;
+  const searchParams = req.nextUrl.searchParams;
+  const entityId = searchParams.get("entityId");
+  const fieldMappingId = searchParams.get("fieldMappingId");
+  const status = searchParams.get("status");
+
+  const conditions = [eq(commentThread.workspaceId, workspaceId)];
+  if (entityId) conditions.push(eq(commentThread.entityId, entityId));
+  if (fieldMappingId) conditions.push(eq(commentThread.fieldMappingId, fieldMappingId));
+  if (status) conditions.push(eq(commentThread.status, status));
+
+  const threads = db
+    .select()
+    .from(commentThread)
+    .where(and(...conditions))
+    .orderBy(commentThread.createdAt)
+    .all();
+
+  return NextResponse.json(threads);
+}
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ workspaceId: string }> }
+) {
+  const { workspaceId } = await params;
+  const body = await req.json();
+  const parsed = createThreadSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.message }, { status: 400 });
+  }
+
+  const { createdBy, body: commentBody, bodyFormat, entityId, fieldMappingId, subject } = parsed.data;
+
+  // Create thread + first comment atomically
+  const [thread] = db
+    .insert(commentThread)
+    .values({
+      workspaceId,
+      entityId: entityId || null,
+      fieldMappingId: fieldMappingId || null,
+      subject: subject || null,
+      createdBy,
+      commentCount: 1,
+    })
+    .returning()
+    .all();
+
+  const [firstComment] = db
+    .insert(comment)
+    .values({
+      threadId: thread.id,
+      authorName: createdBy,
+      body: commentBody,
+      bodyFormat: bodyFormat || "markdown",
+    })
+    .returning()
+    .all();
+
+  return NextResponse.json({ ...thread, comments: [firstComment] }, { status: 201 });
+}

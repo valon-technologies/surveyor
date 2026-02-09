@@ -1,0 +1,139 @@
+import type { Context } from "@/types/context";
+
+export interface ContextTreeNode {
+  label: string;
+  path: string[];
+  fullPath: string;
+  children: ContextTreeNode[];
+  contexts: Context[];
+  totalCount: number;
+}
+
+/**
+ * Build a tree from contexts by splitting names on " > ".
+ * e.g. "Federal > CFPB > Escrow" becomes three nested levels.
+ */
+export function buildContextTree(contexts: Context[]): ContextTreeNode[] {
+  const root: ContextTreeNode[] = [];
+
+  for (const ctx of contexts) {
+    const segments = ctx.name.split(" > ").map((s) => s.trim());
+    let currentLevel = root;
+
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      const pathSoFar = segments.slice(0, i + 1);
+      const fullPath = pathSoFar.join(" > ");
+      const isLeaf = i === segments.length - 1;
+
+      let node = currentLevel.find((n) => n.label === segment);
+      if (!node) {
+        node = {
+          label: segment,
+          path: pathSoFar,
+          fullPath,
+          children: [],
+          contexts: [],
+          totalCount: 0,
+        };
+        currentLevel.push(node);
+      }
+
+      if (isLeaf) {
+        node.contexts.push(ctx);
+      }
+
+      currentLevel = node.children;
+    }
+  }
+
+  // Bubble up totalCount recursively
+  function computeCount(nodes: ContextTreeNode[]): number {
+    let sum = 0;
+    for (const node of nodes) {
+      const childCount = computeCount(node.children);
+      node.totalCount = node.contexts.length + childCount;
+      sum += node.totalCount;
+    }
+    return sum;
+  }
+  computeCount(root);
+
+  // Sort nodes alphabetically at each level
+  function sortNodes(nodes: ContextTreeNode[]) {
+    nodes.sort((a, b) => a.label.localeCompare(b.label));
+    for (const node of nodes) {
+      sortNodes(node.children);
+    }
+  }
+  sortNodes(root);
+
+  return root;
+}
+
+/**
+ * Filter tree nodes by query string. Returns a pruned copy of the tree
+ * containing only nodes whose label or any descendant label matches.
+ */
+export function searchTree(
+  nodes: ContextTreeNode[],
+  query: string
+): ContextTreeNode[] {
+  if (!query.trim()) return nodes;
+  const q = query.toLowerCase();
+
+  function matches(node: ContextTreeNode): boolean {
+    if (node.label.toLowerCase().includes(q)) return true;
+    if (node.contexts.some((c) => c.name.toLowerCase().includes(q))) return true;
+    return node.children.some(matches);
+  }
+
+  function prune(nodes: ContextTreeNode[]): ContextTreeNode[] {
+    const result: ContextTreeNode[] = [];
+    for (const node of nodes) {
+      if (!matches(node)) continue;
+      const prunedChildren = prune(node.children);
+      result.push({
+        ...node,
+        children: prunedChildren,
+      });
+    }
+    return result;
+  }
+
+  return prune(nodes);
+}
+
+/**
+ * Collect all expanded paths needed to show search results.
+ */
+export function getExpandedPathsForSearch(
+  nodes: ContextTreeNode[]
+): Set<string> {
+  const paths = new Set<string>();
+  function walk(nodes: ContextTreeNode[]) {
+    for (const node of nodes) {
+      if (node.children.length > 0) {
+        paths.add(node.fullPath);
+        walk(node.children);
+      }
+    }
+  }
+  walk(nodes);
+  return paths;
+}
+
+/**
+ * Find a specific node by its fullPath.
+ */
+export function findNode(
+  nodes: ContextTreeNode[],
+  fullPath: string
+): ContextTreeNode | null {
+  for (const node of nodes) {
+    if (node.fullPath === fullPath) return node;
+    const found = findNode(node.children, fullPath);
+    if (found) return found;
+  }
+  return null;
+}
