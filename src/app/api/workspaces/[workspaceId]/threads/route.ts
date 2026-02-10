@@ -1,14 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { commentThread, comment } from "@/lib/db/schema";
+import { commentThread, comment, userWorkspace, fieldMapping } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createThreadSchema } from "@/lib/validators/thread";
+import { logActivity } from "@/lib/activity/log-activity";
+import { computeStatusOnComment } from "@/lib/status/status-engine";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const searchParams = req.nextUrl.searchParams;
   const entityId = searchParams.get("entityId");
   const fieldMappingId = searchParams.get("fieldMappingId");
@@ -27,13 +26,9 @@ export async function GET(
     .all();
 
   return NextResponse.json(threads);
-}
+});
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
   const body = await req.json();
   const parsed = createThreadSchema.safeParse(body);
 
@@ -68,5 +63,76 @@ export async function POST(
     .returning()
     .all();
 
+  // Log thread_created activity
+  logActivity({
+    workspaceId,
+    fieldMappingId: fieldMappingId || null,
+    entityId: entityId || null,
+    actorId: userId,
+    actorName: createdBy,
+    action: "thread_created",
+    detail: { subject: subject || null, threadId: thread.id },
+  });
+
+  // Auto-transition mapping status based on commenter's team
+  if (fieldMappingId) {
+    const membership = db
+      .select({ team: userWorkspace.team })
+      .from(userWorkspace)
+      .where(
+        and(
+          eq(userWorkspace.userId, userId),
+          eq(userWorkspace.workspaceId, workspaceId)
+        )
+      )
+      .get();
+
+    if (membership?.team) {
+      const mapping = db
+        .select()
+        .from(fieldMapping)
+        .where(and(eq(fieldMapping.id, fieldMappingId), eq(fieldMapping.isLatest, true)))
+        .get();
+
+      if (mapping) {
+        const newStatus = computeStatusOnComment(mapping.status, membership.team as "SM" | "VT");
+        if (newStatus !== mapping.status) {
+          // Copy-on-write status change
+          db.update(fieldMapping)
+            .set({ isLatest: false, updatedAt: new Date().toISOString() })
+            .where(eq(fieldMapping.id, mapping.id))
+            .run();
+
+          const [newVersion] = db
+            .insert(fieldMapping)
+            .values({
+              ...mapping,
+              id: crypto.randomUUID(),
+              status: newStatus,
+              version: mapping.version + 1,
+              parentId: mapping.id,
+              isLatest: true,
+              editedBy: createdBy,
+              changeSummary: `status: ${mapping.status} → ${newStatus} (comment by ${membership.team} member)`,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            })
+            .returning()
+            .all();
+
+          logActivity({
+            workspaceId,
+            fieldMappingId: newVersion.id,
+            entityId: entityId || null,
+            actorId: userId,
+            actorName: createdBy,
+            action: "status_change",
+            detail: { from: mapping.status, to: newStatus, trigger: "comment" },
+          });
+        }
+      }
+    }
+  }
+
   return NextResponse.json({ ...thread, comments: [firstComment] }, { status: 201 });
-}
+}, { requiredRole: "editor" });

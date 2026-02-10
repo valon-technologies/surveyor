@@ -3,12 +3,11 @@ import { db } from "@/lib/db";
 import { skill, skillContext, context } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { updateSkillSchema } from "@/lib/validators/skill";
+import { withAuth } from "@/lib/auth/api-auth";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
+  const params = await ctx.params;
+  const { id } = params;
 
   const s = db
     .select()
@@ -29,18 +28,16 @@ export async function GET(
     .all();
 
   const contexts = scs.map((sc) => {
-    const ctx = db.select().from(context).where(eq(context.id, sc.contextId)).get();
-    return { ...sc, context: ctx };
+    const ctxRow = db.select().from(context).where(eq(context.id, sc.contextId)).get();
+    return { ...sc, context: ctxRow };
   });
 
   return NextResponse.json({ ...s, contexts });
-}
+});
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
+  const params = await ctx.params;
+  const { id } = params;
   const body = await req.json();
   const parsed = updateSkillSchema.safeParse(body);
 
@@ -60,17 +57,15 @@ export async function PATCH(
   }
 
   return NextResponse.json(updated);
-}
+}, { requiredRole: "editor" });
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+export const DELETE = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
+  const params = await ctx.params;
+  const { id } = params;
 
   db.delete(skill)
     .where(and(eq(skill.id, id), eq(skill.workspaceId, workspaceId)))
     .run();
 
   return NextResponse.json({ success: true });
-}
+}, { requiredRole: "editor" });

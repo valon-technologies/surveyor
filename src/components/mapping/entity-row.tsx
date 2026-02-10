@@ -1,17 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { Progress } from "@/components/ui/progress";
 import { EntityStatusBadge } from "@/components/shared/status-badge";
-import { TierBadge } from "@/components/shared/tier-badge";
+import {
+  MAPPING_STATUS_COLORS,
+  MAPPING_STATUS_LABELS,
+  type MappingStatus,
+} from "@/lib/constants";
 import type { Entity } from "@/types/entity";
+
+const STATUS_ORDER: MappingStatus[] = [
+  "fully_closed",
+  "pending",
+  "open_comment_sm",
+  "open_comment_vt",
+  "unmapped",
+];
 
 export function EntityRow({
   entity,
 }: {
-  entity: Entity & { fieldCount: number };
+  entity: Entity & { fieldCount: number; statusBreakdown: Record<string, number> };
 }) {
-  // Coverage estimate — not available at list level without mapping data, so show field count
   return (
     <tr className="border-t hover:bg-muted/30 transition-colors">
       <td className="px-4 py-3">
@@ -28,16 +38,32 @@ export function EntityRow({
         )}
       </td>
       <td className="px-4 py-3">
-        <TierBadge tier={entity.priorityTier} />
-      </td>
-      <td className="px-4 py-3">
         <EntityStatusBadge status={entity.status} />
       </td>
       <td className="px-4 py-3 text-right text-sm text-muted-foreground">
         {entity.fieldCount}
       </td>
       <td className="px-4 py-3">
-        <Progress value={0} indicatorClassName="bg-emerald-500" />
+        <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+          {entity.fieldCount > 0 &&
+            STATUS_ORDER.map((status) => {
+              const count = entity.statusBreakdown?.[status] || 0;
+              if (count === 0) return null;
+              const pct = (count / entity.fieldCount) * 100;
+              return (
+                <div
+                  key={status}
+                  className="h-full transition-all"
+                  style={{
+                    width: `${pct}%`,
+                    backgroundColor:
+                      MAPPING_STATUS_COLORS[status] || "#6b7280",
+                  }}
+                  title={`${MAPPING_STATUS_LABELS[status] || status}: ${count}`}
+                />
+              );
+            })}
+        </div>
       </td>
     </tr>
   );

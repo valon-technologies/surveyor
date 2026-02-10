@@ -1,4 +1,4 @@
-import type { EntityStatus, PriorityTier, SchemaSide } from "@/lib/constants";
+import type { EntityStatus, SchemaSide } from "@/lib/constants";
 
 export interface Entity {
   id: string;
@@ -9,7 +9,6 @@ export interface Entity {
   side: SchemaSide;
   description: string | null;
   status: EntityStatus;
-  priorityTier: PriorityTier | null;
   sortOrder: number;
   metadata: Record<string, unknown> | null;
   createdAt: string;
@@ -34,4 +33,5 @@ export interface EntityWithStats extends Entity {
   unmappedCount: number;
   coveragePercent: number;
   openQuestions: number;
+  statusBreakdown: Record<string, number>;
 }

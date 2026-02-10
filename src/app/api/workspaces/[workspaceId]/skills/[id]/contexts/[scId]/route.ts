@@ -3,12 +3,11 @@ import { db } from "@/lib/db";
 import { skillContext } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { updateSkillContextSchema } from "@/lib/validators/skill";
+import { withAuth } from "@/lib/auth/api-auth";
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string; scId: string }> }
-) {
-  const { scId } = await params;
+export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
+  const params = await ctx.params;
+  const { scId } = params;
   const body = await req.json();
   const parsed = updateSkillContextSchema.safeParse(body);
 
@@ -28,15 +27,13 @@ export async function PATCH(
   }
 
   return NextResponse.json(updated);
-}
+}, { requiredRole: "editor" });
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string; scId: string }> }
-) {
-  const { scId } = await params;
+export const DELETE = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
+  const params = await ctx.params;
+  const { scId } = params;
 
   db.delete(skillContext).where(eq(skillContext.id, scId)).run();
 
   return NextResponse.json({ success: true });
-}
+}, { requiredRole: "editor" });

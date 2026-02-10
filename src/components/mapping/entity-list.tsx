@@ -6,7 +6,7 @@ import type { Entity } from "@/types/entity";
 export function EntityList({
   entities,
 }: {
-  entities: (Entity & { fieldCount: number })[];
+  entities: (Entity & { fieldCount: number; statusBreakdown: Record<string, number> })[];
 }) {
   if (entities.length === 0) {
     return (
@@ -23,7 +23,6 @@ export function EntityList({
         <thead>
           <tr className="bg-muted/50 text-left text-xs font-medium text-muted-foreground">
             <th className="px-4 py-2.5">Entity</th>
-            <th className="px-4 py-2.5 w-20">Tier</th>
             <th className="px-4 py-2.5 w-28">Status</th>
             <th className="px-4 py-2.5 w-24 text-right">Fields</th>
             <th className="px-4 py-2.5 w-48">Progress</th>

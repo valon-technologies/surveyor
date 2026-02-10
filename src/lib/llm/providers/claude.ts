@@ -13,19 +13,22 @@ export class ClaudeProvider implements LLMProvider {
   name = "claude";
   private client: Anthropic;
 
-  constructor() {
-    this.client = new Anthropic();
+  constructor(apiKey?: string) {
+    this.client = new Anthropic(apiKey ? { apiKey } : undefined);
   }
 
   async generateCompletion(
     request: CompletionRequest
   ): Promise<CompletionResponse> {
+    const messages = request.messages ?? [
+      { role: "user" as const, content: request.userMessage! },
+    ];
     const response = await this.client.messages.create({
       model: request.model || DEFAULT_MODEL,
       max_tokens: request.maxTokens || 4096,
       temperature: request.temperature ?? 0,
       system: request.systemMessage,
-      messages: [{ role: "user", content: request.userMessage }],
+      messages,
     });
 
     const content = response.content
@@ -44,12 +47,15 @@ export class ClaudeProvider implements LLMProvider {
   async *generateStream(
     request: CompletionRequest
   ): AsyncIterable<StreamChunk> {
+    const messages = request.messages ?? [
+      { role: "user" as const, content: request.userMessage! },
+    ];
     const stream = this.client.messages.stream({
       model: request.model || DEFAULT_MODEL,
       max_tokens: request.maxTokens || 4096,
       temperature: request.temperature ?? 0,
       system: request.systemMessage,
-      messages: [{ role: "user", content: request.userMessage }],
+      messages,
     });
 
     for await (const event of stream) {

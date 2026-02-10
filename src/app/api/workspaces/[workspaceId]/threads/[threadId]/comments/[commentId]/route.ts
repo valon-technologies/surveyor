@@ -1,14 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { comment, commentThread } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { updateCommentSchema } from "@/lib/validators/thread";
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; threadId: string; commentId: string }> }
-) {
-  const { threadId, commentId } = await params;
+export const PATCH = withAuth(async (req, ctx, { workspaceId }) => {
+  const params = await ctx.params;
+  const { threadId, commentId } = params;
   const body = await req.json();
   const parsed = updateCommentSchema.safeParse(body);
 
@@ -31,13 +30,11 @@ export async function PATCH(
   }
 
   return NextResponse.json(updated);
-}
+}, { requiredRole: "editor" });
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; threadId: string; commentId: string }> }
-) {
-  const { workspaceId, threadId, commentId } = await params;
+export const DELETE = withAuth(async (_req, ctx, { workspaceId }) => {
+  const params = await ctx.params;
+  const { threadId, commentId } = params;
 
   // Delete comment
   db.delete(comment)
@@ -62,4 +59,4 @@ export async function DELETE(
   }
 
   return NextResponse.json({ success: true });
-}
+}, { requiredRole: "editor" });

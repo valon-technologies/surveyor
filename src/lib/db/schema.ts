@@ -4,6 +4,139 @@ import { relations, sql } from "drizzle-orm";
 // Helper defaults
 const nowDefault = sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`;
 
+// ─── Auth Tables ──────────────────────────────────────────────
+
+export const user = sqliteTable("user", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name"),
+  email: text("email").notNull().unique(),
+  emailVerified: text("email_verified"),
+  image: text("image"),
+  passwordHash: text("password_hash"),
+  createdAt: text("created_at").notNull().default(nowDefault),
+  updatedAt: text("updated_at").notNull().default(nowDefault),
+});
+
+export const account = sqliteTable(
+  "account",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    provider: text("provider").notNull(),
+    providerAccountId: text("provider_account_id").notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: text("token_type"),
+    scope: text("scope"),
+    id_token: text("id_token"),
+    session_state: text("session_state"),
+  },
+  (table) => [
+    index("account_user_idx").on(table.userId),
+  ]
+);
+
+export const verificationToken = sqliteTable(
+  "verification_token",
+  {
+    identifier: text("identifier").notNull(),
+    token: text("token").notNull(),
+    expires: text("expires").notNull(),
+  },
+  (table) => [
+    index("verification_token_idx").on(table.identifier, table.token),
+  ]
+);
+
+export const userWorkspace = sqliteTable(
+  "user_workspace",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("editor"), // owner | editor | viewer
+    team: text("team"), // SM | VT | null
+    createdAt: text("created_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("user_workspace_user_idx").on(table.userId),
+    index("user_workspace_workspace_idx").on(table.workspaceId),
+  ]
+);
+
+export const workspaceInvite = sqliteTable(
+  "workspace_invite",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: text("role").notNull().default("editor"),
+    status: text("status").notNull().default("pending"), // pending | accepted | revoked
+    invitedBy: text("invited_by")
+      .notNull()
+      .references(() => user.id),
+    acceptedBy: text("accepted_by").references(() => user.id),
+    acceptedAt: text("accepted_at"),
+    expiresAt: text("expires_at"),
+    createdAt: text("created_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("workspace_invite_workspace_idx").on(table.workspaceId),
+    index("workspace_invite_email_idx").on(table.email),
+  ]
+);
+
+export const userApiKey = sqliteTable(
+  "user_api_key",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(), // claude | openai
+    encryptedKey: text("encrypted_key").notNull(),
+    iv: text("iv").notNull(),
+    authTag: text("auth_tag").notNull(),
+    keyPrefix: text("key_prefix"), // first 8 chars for display
+    createdAt: text("created_at").notNull().default(nowDefault),
+    updatedAt: text("updated_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("user_api_key_user_idx").on(table.userId),
+    index("user_api_key_user_provider_idx").on(table.userId, table.provider),
+  ]
+);
+
+export const userBigqueryToken = sqliteTable(
+  "user_bigquery_token",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    email: text("email"),
+    encryptedRefreshToken: text("encrypted_refresh_token").notNull(),
+    iv: text("iv").notNull(),
+    authTag: text("auth_tag").notNull(),
+    scope: text("scope"),
+    createdAt: text("created_at").notNull().default(nowDefault),
+    updatedAt: text("updated_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("user_bq_token_user_idx").on(table.userId),
+  ]
+);
+
 // ─── Tables ───────────────────────────────────────────────────
 
 export const workspace = sqliteTable("workspace", {
@@ -13,6 +146,11 @@ export const workspace = sqliteTable("workspace", {
   settings: text("settings", { mode: "json" }).$type<{
     tokenLimit?: number;
     defaultProvider?: string;
+    bigquery?: {
+      projectId: string;
+      sourceDataset: string;
+      targetDataset?: string;
+    };
   }>(),
   createdAt: text("created_at").notNull().default(nowDefault),
   updatedAt: text("updated_at").notNull().default(nowDefault),
@@ -57,7 +195,6 @@ export const entity = sqliteTable(
     description: text("description"),
     // Target-only fields
     status: text("status").notNull().default("not_started"), // not_started | in_progress | review | blocked | complete
-    priorityTier: text("priority_tier"), // P0 | P1 | P2
     sortOrder: integer("sort_order").notNull().default(0),
     metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
     createdAt: text("created_at").notNull().default(nowDefault),
@@ -84,6 +221,7 @@ export const field = sqliteTable(
     isRequired: integer("is_required", { mode: "boolean" }).notNull().default(false),
     isKey: integer("is_key", { mode: "boolean" }).notNull().default(false),
     description: text("description"),
+    milestone: text("milestone"), // M1 | M2 | M3 | M4
     sampleValues: text("sample_values", { mode: "json" }).$type<string[]>(),
     enumValues: text("enum_values", { mode: "json" }).$type<string[]>(),
     sortOrder: integer("sort_order").notNull().default(0),
@@ -108,7 +246,10 @@ export const fieldMapping = sqliteTable(
       .notNull()
       .references(() => field.id, { onDelete: "cascade" }),
     status: text("status").notNull().default("unmapped"),
-    // unmapped | mapped | not_available | requires_clarification | derived | default | system_generated
+    // unmapped | pending | open_comment_sm | open_comment_vt | fully_closed
+    mappingType: text("mapping_type"),
+    // direct | rename | type_cast | enum | flatten_to_normalize | aggregate | join | derived | pivot | conditional
+    assigneeId: text("assignee_id").references(() => user.id, { onDelete: "set null" }),
     sourceEntityId: text("source_entity_id").references(() => entity.id),
     sourceFieldId: text("source_field_id").references(() => field.id),
     transform: text("transform"), // SQL expression
@@ -133,6 +274,7 @@ export const fieldMapping = sqliteTable(
     index("mapping_source_field_idx").on(table.sourceFieldId),
     index("mapping_status_idx").on(table.workspaceId, table.status),
     index("mapping_latest_idx").on(table.targetFieldId, table.isLatest),
+    index("mapping_assignee_idx").on(table.assigneeId),
   ]
 );
 
@@ -339,6 +481,53 @@ export const skillContext = sqliteTable(
   ]
 );
 
+export const activity = sqliteTable(
+  "activity",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    fieldMappingId: text("field_mapping_id"),
+    entityId: text("entity_id"),
+    actorId: text("actor_id"),
+    actorName: text("actor_name").notNull(),
+    action: text("action").notNull(), // status_change | comment_added | thread_created | thread_resolved | mapping_saved | validation_ran | case_closed | case_reopened
+    detail: text("detail", { mode: "json" }).$type<Record<string, unknown>>(),
+    createdAt: text("created_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("activity_field_mapping_idx").on(table.fieldMappingId),
+    index("activity_entity_idx").on(table.entityId),
+    index("activity_workspace_created_idx").on(table.workspaceId, table.createdAt),
+  ]
+);
+
+export const validation = sqliteTable(
+  "validation",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    fieldMappingId: text("field_mapping_id")
+      .notNull()
+      .references(() => fieldMapping.id, { onDelete: "cascade" }),
+    entityId: text("entity_id"),
+    status: text("status").notNull(), // passed | failed | error
+    input: text("input", { mode: "json" }).$type<Record<string, unknown>>(),
+    output: text("output", { mode: "json" }).$type<Record<string, unknown>>(),
+    errorMessage: text("error_message"),
+    durationMs: integer("duration_ms"),
+    ranBy: text("ran_by"),
+    createdAt: text("created_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("validation_field_mapping_idx").on(table.fieldMappingId),
+    index("validation_workspace_idx").on(table.workspaceId),
+  ]
+);
+
 // ─── Relations ────────────────────────────────────────────────
 
 export const workspaceRelations = relations(workspace, ({ many }) => ({
@@ -350,6 +539,7 @@ export const workspaceRelations = relations(workspace, ({ many }) => ({
   questions: many(question),
   generations: many(generation),
   commentThreads: many(commentThread),
+  userWorkspaces: many(userWorkspace),
 }));
 
 export const schemaAssetRelations = relations(schemaAsset, ({ one, many }) => ({
@@ -512,5 +702,53 @@ export const skillContextRelations = relations(skillContext, ({ one }) => ({
   context: one(context, {
     fields: [skillContext.contextId],
     references: [context.id],
+  }),
+}));
+
+// ─── Auth Relations ──────────────────────────────────────────
+
+export const userRelations = relations(user, ({ many }) => ({
+  accounts: many(account),
+  userWorkspaces: many(userWorkspace),
+  apiKeys: many(userApiKey),
+  bigqueryTokens: many(userBigqueryToken),
+}));
+
+export const accountRelations = relations(account, ({ one }) => ({
+  user: one(user, {
+    fields: [account.userId],
+    references: [user.id],
+  }),
+}));
+
+export const userWorkspaceRelations = relations(userWorkspace, ({ one }) => ({
+  user: one(user, {
+    fields: [userWorkspace.userId],
+    references: [user.id],
+  }),
+  workspace: one(workspace, {
+    fields: [userWorkspace.workspaceId],
+    references: [workspace.id],
+  }),
+}));
+
+export const userApiKeyRelations = relations(userApiKey, ({ one }) => ({
+  user: one(user, {
+    fields: [userApiKey.userId],
+    references: [user.id],
+  }),
+}));
+
+export const userBigqueryTokenRelations = relations(userBigqueryToken, ({ one }) => ({
+  user: one(user, {
+    fields: [userBigqueryToken.userId],
+    references: [user.id],
+  }),
+}));
+
+export const workspaceInviteRelations = relations(workspaceInvite, ({ one }) => ({
+  workspace: one(workspace, {
+    fields: [workspaceInvite.workspaceId],
+    references: [workspace.id],
   }),
 }));

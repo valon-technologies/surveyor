@@ -3,13 +3,9 @@ import { db } from "@/lib/db";
 import { skill, skillContext } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { createSkillSchema } from "@/lib/validators/skill";
+import { withAuth } from "@/lib/auth/api-auth";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
-
+export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const skills = db
     .select()
     .from(skill)
@@ -28,13 +24,9 @@ export async function GET(
   });
 
   return NextResponse.json(withCounts);
-}
+});
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const body = await req.json();
   const parsed = createSkillSchema.safeParse(body);
 
@@ -58,4 +50,4 @@ export async function POST(
     .all();
 
   return NextResponse.json({ ...created, contextCount: 0 }, { status: 201 });
-}
+}, { requiredRole: "editor" });

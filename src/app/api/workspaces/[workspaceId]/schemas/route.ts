@@ -1,16 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { schemaAsset, entity, field } from "@/lib/db/schema";
 import { eq, and, count } from "drizzle-orm";
 import { createSchemaAssetSchema } from "@/lib/validators/schema";
 import { parseCSVSchema } from "@/lib/import/schema-parser";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
-
+export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   // Exclude rawContent from list response (can be huge)
   const assets = db
     .select({
@@ -42,13 +38,9 @@ export async function GET(
   });
 
   return NextResponse.json(result);
-}
+});
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const POST = withAuth(async (req, ctx, { workspaceId }) => {
   const body = await req.json();
   const parsed = createSchemaAssetSchema.safeParse(body);
 
@@ -106,6 +98,7 @@ export async function POST(
             isRequired: f.isRequired ?? false,
             isKey: f.isKey ?? false,
             description: f.description,
+            milestone: f.milestone,
             sampleValues: f.sampleValues,
             enumValues: f.enumValues,
             sortOrder: j,
@@ -124,4 +117,4 @@ export async function POST(
   }
 
   return NextResponse.json(asset, { status: 201 });
-}
+}, { requiredRole: "editor" });

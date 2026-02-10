@@ -2,6 +2,8 @@
 
 import { cn } from "@/lib/utils";
 import { MappingStatusBadge } from "@/components/shared/status-badge";
+import { MilestoneBadge } from "@/components/shared/tier-badge";
+import { CONFIDENCE_COLORS, type ConfidenceLevel } from "@/lib/constants";
 import type { FieldWithMapping } from "@/types/field";
 
 interface FieldRowProps {
@@ -55,6 +57,9 @@ export function FieldRow({ field, isSelected, onClick, openThreadCount }: FieldR
       <td className="px-4 py-2.5 text-xs text-muted-foreground">
         {field.dataType || "--"}
       </td>
+      <td className="px-4 py-2.5">
+        <MilestoneBadge milestone={field.milestone} />
+      </td>
       <td className="px-4 py-2.5 text-xs">
         {field.isRequired ? (
           <span className="text-red-500 font-medium">*</span>
@@ -64,6 +69,21 @@ export function FieldRow({ field, isSelected, onClick, openThreadCount }: FieldR
       </td>
       <td className="px-4 py-2.5">
         <MappingStatusBadge status={status} />
+      </td>
+      <td className="px-4 py-2.5">
+        {mapping?.confidence ? (
+          <div className="flex items-center gap-1.5">
+            <div
+              className="h-2.5 w-2.5 rounded-full shrink-0"
+              style={{ backgroundColor: CONFIDENCE_COLORS[mapping.confidence as ConfidenceLevel] }}
+            />
+            <span className="text-xs text-muted-foreground capitalize">
+              {mapping.confidence}
+            </span>
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">--</span>
+        )}
       </td>
       <td className="px-4 py-2.5 text-xs text-muted-foreground font-mono truncate max-w-xs">
         {sourcePreview || "--"}

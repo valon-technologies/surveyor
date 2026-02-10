@@ -1,13 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { generation } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
+  const { id } = await ctx.params;
 
   const gen = db
     .select()
@@ -20,4 +18,4 @@ export async function GET(
   }
 
   return NextResponse.json(gen);
-}
+});

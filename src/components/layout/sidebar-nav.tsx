@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
+import { WorkspaceSwitcher } from "./workspace-switcher";
 import {
   LayoutDashboard,
   Map,
@@ -10,7 +12,10 @@ import {
   Database,
   BookOpen,
   PenTool,
+  Waypoints,
   Compass,
+  LogOut,
+  Settings,
 } from "lucide-react";
 
 const navItems = [
@@ -19,11 +24,13 @@ const navItems = [
   { href: "/schemas", label: "Schemas", icon: Database },
   { href: "/context", label: "Context", icon: BookOpen },
   { href: "/skills", label: "Skills", icon: PenTool },
+  { href: "/topology", label: "Topology", icon: Waypoints },
   { href: "/atlas", label: "Atlas", icon: Globe },
 ];
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const { data: session } = useSession();
 
   return (
     <aside className="w-56 border-r bg-sidebar h-screen flex flex-col shrink-0">
@@ -32,6 +39,9 @@ export function SidebarNav() {
         <Compass className="h-5 w-5 text-primary" />
         <span className="font-semibold text-sm">Surveyor</span>
       </div>
+
+      {/* Workspace switcher */}
+      <WorkspaceSwitcher />
 
       {/* Nav items */}
       <nav className="flex-1 p-2 space-y-0.5">
@@ -59,6 +69,47 @@ export function SidebarNav() {
           );
         })}
       </nav>
+
+      {/* User section */}
+      {session?.user && (
+        <div className="border-t p-3 space-y-1">
+          <Link
+            href="/settings"
+            className={cn(
+              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
+              pathname.startsWith("/settings")
+                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Link>
+          <div className="flex items-center gap-2.5 px-3 py-2">
+            {session.user.image ? (
+              <img
+                src={session.user.image}
+                alt=""
+                className="h-5 w-5 rounded-full"
+              />
+            ) : (
+              <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary">
+                {(session.user.name || session.user.email || "?")[0].toUpperCase()}
+              </div>
+            )}
+            <span className="text-xs text-sidebar-foreground/70 truncate flex-1">
+              {session.user.name || session.user.email}
+            </span>
+            <button
+              onClick={() => signOut({ callbackUrl: "/auth/signin" })}
+              className="text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

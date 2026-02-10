@@ -1,13 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { schemaAsset, entity, field } from "@/lib/db/schema";
 import { eq, and, count } from "drizzle-orm";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
+  const { id } = await ctx.params;
 
   const asset = db
     .select({
@@ -49,17 +47,14 @@ export async function GET(
   });
 
   return NextResponse.json({ ...asset, entities: entitiesWithFields });
-}
+});
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+export const DELETE = withAuth(async (_req, ctx, { workspaceId }) => {
+  const { id } = await ctx.params;
 
   db.delete(schemaAsset)
     .where(and(eq(schemaAsset.id, id), eq(schemaAsset.workspaceId, workspaceId)))
     .run();
 
   return NextResponse.json({ success: true });
-}
+}, { requiredRole: "editor" });

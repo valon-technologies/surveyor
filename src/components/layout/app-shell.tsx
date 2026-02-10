@@ -6,8 +6,8 @@ import { usePathname } from "next/navigation";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Mapping editor uses full-screen layout (no sidebar)
-  const isFullScreen = pathname.match(/^\/mapping\/[^/]+$/);
+  // Mapping editor and auth pages use full-screen layout (no sidebar)
+  const isFullScreen = pathname.match(/^\/mapping\/[^/]+$/) || pathname.startsWith("/auth");
 
   if (isFullScreen) {
     return <>{children}</>;

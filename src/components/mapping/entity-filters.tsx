@@ -3,14 +3,12 @@
 import { useMappingStore } from "@/stores/mapping-store";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { ENTITY_STATUSES, ENTITY_STATUS_LABELS, PRIORITY_TIERS } from "@/lib/constants";
+import { ENTITY_STATUSES, ENTITY_STATUS_LABELS } from "@/lib/constants";
 
 export function EntityFilters() {
   const {
     entityStatusFilter,
     setEntityStatusFilter,
-    tierFilter,
-    setTierFilter,
     searchQuery,
     setSearchQuery,
   } = useMappingStore();
@@ -31,15 +29,6 @@ export function EntityFilters() {
           ...ENTITY_STATUSES.map((s) => ({ value: s, label: ENTITY_STATUS_LABELS[s] })),
         ]}
         className="w-40"
-      />
-      <Select
-        value={tierFilter}
-        onChange={(e) => setTierFilter(e.target.value)}
-        options={[
-          { value: "all", label: "All Tiers" },
-          ...PRIORITY_TIERS.map((t) => ({ value: t, label: t })),
-        ]}
-        className="w-32"
       />
     </div>
   );

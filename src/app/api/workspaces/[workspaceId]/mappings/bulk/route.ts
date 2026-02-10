@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { fieldMapping } from "@/lib/db/schema";
+import { fieldMapping, field, commentThread, comment } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { bulkCreateMappingsSchema } from "@/lib/validators/mapping";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const body = await req.json();
   const parsed = bulkCreateMappingsSchema.safeParse(body);
 
@@ -37,6 +34,8 @@ export async function POST(
         workspaceId,
         targetFieldId: input.targetFieldId,
         status: input.status,
+        mappingType: input.mappingType,
+        assigneeId: input.assigneeId,
         sourceEntityId: input.sourceEntityId,
         sourceFieldId: input.sourceFieldId,
         transform: input.transform,
@@ -54,7 +53,34 @@ export async function POST(
       .all();
 
     created.push(mapping);
+
+    // Auto-create review thread for non-high-confidence mappings with reviewComment
+    if (input.reviewComment && input.confidence !== "high") {
+      const targetField = db.select().from(field).where(eq(field.id, input.targetFieldId)).get();
+
+      const [thread] = db
+        .insert(commentThread)
+        .values({
+          workspaceId,
+          entityId: targetField?.entityId || null,
+          fieldMappingId: mapping.id,
+          subject: `AI Review: ${input.confidence || "uncertain"} confidence mapping`,
+          createdBy: "AI Auto-Map",
+          commentCount: 1,
+        })
+        .returning()
+        .all();
+
+      db.insert(comment)
+        .values({
+          threadId: thread.id,
+          authorName: "AI Auto-Map",
+          body: input.reviewComment,
+          bodyFormat: "markdown",
+        })
+        .run();
+    }
   }
 
   return NextResponse.json(created, { status: 201 });
-}
+}, { requiredRole: "editor" });

@@ -1,21 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useEntity } from "@/queries/entity-queries";
 import { useThreads } from "@/queries/thread-queries";
 import { useMappingStore } from "@/stores/mapping-store";
 import { EntityHeader } from "@/components/mapping/entity-header";
 import { FieldTable } from "@/components/mapping/field-table";
 import { MappingDetailPanel } from "@/components/mapping/mapping-detail-panel";
+import { AutoMapReviewSheet } from "@/components/mapping/auto-map-review-sheet";
 import { ThreadList } from "@/components/threads/thread-list";
 import { Button } from "@/components/ui/button";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/constants";
 import Link from "next/link";
 import { ArrowLeft, MessageSquare, X } from "lucide-react";
 
 export function MappingEditorClient({ entityId }: { entityId: string }) {
+  const searchParams = useSearchParams();
   const { data: entity, isLoading } = useEntity(entityId);
-  const { selectedFieldId, setSelectedFieldId } = useMappingStore();
+  const { selectedFieldId, setSelectedFieldId, autoMapSheetOpen, setAutoMapSheetOpen } = useMappingStore();
+
+  // Re-select field when returning from Atlas
+  useEffect(() => {
+    const fieldId = searchParams.get("fieldId");
+    if (fieldId) {
+      setSelectedFieldId(fieldId);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [showEntityThreads, setShowEntityThreads] = useState(false);
 
   const { data: entityThreads } = useThreads({ entityId });
@@ -117,6 +127,15 @@ export function MappingEditorClient({ entityId }: { entityId: string }) {
           />
         )}
       </div>
+
+      {/* Batch Auto-Map review sheet */}
+      <AutoMapReviewSheet
+        open={autoMapSheetOpen}
+        onClose={() => setAutoMapSheetOpen(false)}
+        entityId={entityId}
+        entityName={entity.displayName || entity.name}
+        fields={entity.fields}
+      />
     </div>
   );
 }

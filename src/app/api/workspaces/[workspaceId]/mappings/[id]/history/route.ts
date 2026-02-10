@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { fieldMapping } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
+  const params = await ctx.params;
+  const { id } = params;
 
   // Get the mapping to find its targetFieldId
   const mapping = db
@@ -26,6 +25,8 @@ export async function GET(
       id: fieldMapping.id,
       version: fieldMapping.version,
       status: fieldMapping.status,
+      mappingType: fieldMapping.mappingType,
+      assigneeId: fieldMapping.assigneeId,
       editedBy: fieldMapping.editedBy,
       changeSummary: fieldMapping.changeSummary,
       createdBy: fieldMapping.createdBy,
@@ -43,4 +44,4 @@ export async function GET(
     .all();
 
   return NextResponse.json(history);
-}
+});

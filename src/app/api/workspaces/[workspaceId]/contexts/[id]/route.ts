@@ -1,14 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { context } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { updateContextSchema } from "@/lib/validators/context";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+export const GET = withAuth(async (_req, routeCtx, { workspaceId }) => {
+  const params = await routeCtx.params;
+  const { id } = params;
 
   const ctx = db
     .select()
@@ -21,13 +20,11 @@ export async function GET(
   }
 
   return NextResponse.json(ctx);
-}
+});
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+export const PATCH = withAuth(async (req, routeCtx, { workspaceId }) => {
+  const params = await routeCtx.params;
+  const { id } = params;
   const body = await req.json();
   const parsed = updateContextSchema.safeParse(body);
 
@@ -47,17 +44,15 @@ export async function PATCH(
   }
 
   return NextResponse.json(updated);
-}
+}, { requiredRole: "editor" });
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+export const DELETE = withAuth(async (_req, routeCtx, { workspaceId }) => {
+  const params = await routeCtx.params;
+  const { id } = params;
 
   db.delete(context)
     .where(and(eq(context.id, id), eq(context.workspaceId, workspaceId)))
     .run();
 
   return NextResponse.json({ success: true });
-}
+}, { requiredRole: "editor" });

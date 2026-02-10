@@ -13,20 +13,23 @@ export class OpenAIProvider implements LLMProvider {
   name = "openai";
   private client: OpenAI;
 
-  constructor() {
-    this.client = new OpenAI();
+  constructor(apiKey?: string) {
+    this.client = new OpenAI(apiKey ? { apiKey } : undefined);
   }
 
   async generateCompletion(
     request: CompletionRequest
   ): Promise<CompletionResponse> {
+    const userMessages = request.messages ?? [
+      { role: "user" as const, content: request.userMessage! },
+    ];
     const response = await this.client.chat.completions.create({
       model: request.model || DEFAULT_MODEL,
       max_tokens: request.maxTokens || 4096,
       temperature: request.temperature ?? 0,
       messages: [
         { role: "system", content: request.systemMessage },
-        { role: "user", content: request.userMessage },
+        ...userMessages,
       ],
     });
 
@@ -41,13 +44,16 @@ export class OpenAIProvider implements LLMProvider {
   async *generateStream(
     request: CompletionRequest
   ): AsyncIterable<StreamChunk> {
+    const userMessages = request.messages ?? [
+      { role: "user" as const, content: request.userMessage! },
+    ];
     const stream = await this.client.chat.completions.create({
       model: request.model || DEFAULT_MODEL,
       max_tokens: request.maxTokens || 4096,
       temperature: request.temperature ?? 0,
       messages: [
         { role: "system", content: request.systemMessage },
-        { role: "user", content: request.userMessage },
+        ...userMessages,
       ],
       stream: true,
       stream_options: { include_usage: true },

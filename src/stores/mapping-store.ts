@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { MappingStatus, EntityStatus } from "@/lib/constants";
+import type { MappingStatus, EntityStatus, Milestone } from "@/lib/constants";
 
 interface MappingState {
   selectedFieldId: string | null;
@@ -11,11 +11,17 @@ interface MappingState {
   entityStatusFilter: EntityStatus | "all";
   setEntityStatusFilter: (status: EntityStatus | "all") => void;
 
-  tierFilter: string | "all";
-  setTierFilter: (tier: string | "all") => void;
+  milestoneFilter: Milestone | "all";
+  setMilestoneFilter: (m: Milestone | "all") => void;
 
   searchQuery: string;
   setSearchQuery: (q: string) => void;
+
+  autoMapSheetOpen: boolean;
+  setAutoMapSheetOpen: (open: boolean) => void;
+
+  reviewGenerationId: string | null;
+  setReviewGenerationId: (id: string | null) => void;
 }
 
 export const useMappingStore = create<MappingState>((set) => ({
@@ -28,9 +34,15 @@ export const useMappingStore = create<MappingState>((set) => ({
   entityStatusFilter: "all",
   setEntityStatusFilter: (status) => set({ entityStatusFilter: status }),
 
-  tierFilter: "all",
-  setTierFilter: (tier) => set({ tierFilter: tier }),
+  milestoneFilter: "all",
+  setMilestoneFilter: (m) => set({ milestoneFilter: m }),
 
   searchQuery: "",
   setSearchQuery: (q) => set({ searchQuery: q }),
+
+  autoMapSheetOpen: false,
+  setAutoMapSheetOpen: (open) => set({ autoMapSheetOpen: open }),
+
+  reviewGenerationId: null,
+  setReviewGenerationId: (id) => set({ reviewGenerationId: id }),
 }));

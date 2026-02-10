@@ -32,10 +32,21 @@ function stripFrontmatter(content: string): string {
   return content.trim();
 }
 
+const ACRONYMS: Record<string, string> = {
+  cfpb: "CFPB", fcra: "FCRA", fdcpa: "FDCPA", fincen: "FinCEN",
+  glba: "GLBA", hpa: "HPA", scra: "SCRA", tcpa: "TCPA",
+  udaap: "UDAAP", ofac: "OFAC", fha: "FHA", usda: "USDA",
+  va: "VA", gse: "GSE", mbs: "MBS", mers: "MERS", cwcot: "CWCOT",
+  arm: "ARM", heloc: "HELOC", mi: "MI", pmi: "PMI", dc: "DC",
+  reo: "REO", hud: "HUD", respa: "RESPA", tila: "TILA",
+  qc: "QC", ach: "ACH", api: "API", llc: "LLC", lp: "LP",
+};
+
 function slugToLabel(slug: string): string {
   return slug
     .replace(/-/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace(/\b\w+\b/g, (word) => ACRONYMS[word.toLowerCase()] ?? word);
 }
 
 interface TopicFolder {
@@ -137,8 +148,8 @@ const importAll = db.transaction(() => {
 
     // Name from path
     const name = topic.tags.length > 0
-      ? topic.tags.map(slugToLabel).join(" > ")
-      : "Mortgage Servicing Domain (Overview)";
+      ? "Mortgage Servicing > " + topic.tags.map(slugToLabel).join(" > ")
+      : "Mortgage Servicing > Overview";
 
     // Rough token estimate (chars / 4)
     const tokenCount = Math.round(mergedContent.length / 4);

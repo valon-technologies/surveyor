@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { useAddComment } from "@/queries/thread-queries";
 
 interface ReplyFormProps {
@@ -11,12 +11,14 @@ interface ReplyFormProps {
 }
 
 export function ReplyForm({ threadId }: ReplyFormProps) {
+  const { data: session } = useSession();
   const addComment = useAddComment();
   const [body, setBody] = useState("");
-  const [authorName, setAuthorName] = useState("");
+
+  const authorName = session?.user?.name || session?.user?.email || "Unknown";
 
   const handleSubmit = () => {
-    if (!body.trim() || !authorName.trim()) return;
+    if (!body.trim()) return;
     addComment.mutate(
       { threadId, authorName, body },
       {
@@ -29,12 +31,6 @@ export function ReplyForm({ threadId }: ReplyFormProps) {
 
   return (
     <div className="border-t p-3 space-y-2">
-      <Input
-        value={authorName}
-        onChange={(e) => setAuthorName(e.target.value)}
-        placeholder="Your name"
-        className="text-xs"
-      />
       <Textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -45,7 +41,7 @@ export function ReplyForm({ threadId }: ReplyFormProps) {
       <Button
         size="sm"
         onClick={handleSubmit}
-        disabled={!body.trim() || !authorName.trim() || addComment.isPending}
+        disabled={!body.trim() || addComment.isPending}
       >
         {addComment.isPending ? "Sending..." : "Reply"}
       </Button>

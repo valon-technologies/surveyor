@@ -1,61 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { skill, skillContext, context } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { skillContext, context } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { withAuth } from "@/lib/auth/api-auth";
+import { matchSkills } from "@/lib/generation/context-assembler";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const searchParams = req.nextUrl.searchParams;
-  const entityName = searchParams.get("entityName")?.toLowerCase() || "";
-  const fieldName = searchParams.get("fieldName")?.toLowerCase() || "";
-  const dataType = searchParams.get("dataType")?.toUpperCase() || "";
+  const entityName = searchParams.get("entityName") || "";
+  const fieldName = searchParams.get("fieldName") || "";
+  const dataType = searchParams.get("dataType") || "";
 
-  // Load all active skills
-  const skills = db
-    .select()
-    .from(skill)
-    .where(and(eq(skill.workspaceId, workspaceId), eq(skill.isActive, true)))
-    .all();
-
-  const matched = skills.filter((s) => {
-    const app = s.applicability as {
-      entityPatterns?: string[];
-      fieldPatterns?: string[];
-      dataTypes?: string[];
-      subcategories?: string[];
-    } | null;
-
-    if (!app) return false;
-
-    let matches = false;
-
-    if (app.entityPatterns && app.entityPatterns.length > 0 && entityName) {
-      matches =
-        matches ||
-        app.entityPatterns.some((p) =>
-          entityName.includes(p.toLowerCase())
-        );
-    }
-
-    if (app.fieldPatterns && app.fieldPatterns.length > 0 && fieldName) {
-      matches =
-        matches ||
-        app.fieldPatterns.some((p) =>
-          fieldName.includes(p.toLowerCase())
-        );
-    }
-
-    if (app.dataTypes && app.dataTypes.length > 0 && dataType) {
-      matches =
-        matches ||
-        app.dataTypes.some((dt) => dt.toUpperCase() === dataType);
-    }
-
-    return matches;
-  });
+  const matched = matchSkills(workspaceId, entityName, fieldName, dataType);
 
   // Add context counts and contexts
   const withContexts = matched.map((s) => {
@@ -67,12 +23,12 @@ export async function GET(
       .all();
 
     const contexts = scs.map((sc) => {
-      const ctx = db.select().from(context).where(eq(context.id, sc.contextId)).get();
-      return { ...sc, context: ctx };
+      const ctxRow = db.select().from(context).where(eq(context.id, sc.contextId)).get();
+      return { ...sc, context: ctxRow };
     });
 
     return { ...s, contexts, contextCount: contexts.length };
   });
 
   return NextResponse.json(withContexts);
-}
+});

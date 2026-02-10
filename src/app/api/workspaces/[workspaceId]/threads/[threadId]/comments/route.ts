@@ -1,14 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { comment, commentThread } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createCommentSchema } from "@/lib/validators/thread";
+import { logActivity } from "@/lib/activity/log-activity";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; threadId: string }> }
-) {
-  const { workspaceId, threadId } = await params;
+export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
+  const params = await ctx.params;
+  const { threadId } = params;
   const body = await req.json();
   const parsed = createCommentSchema.safeParse(body);
 
@@ -47,5 +47,15 @@ export async function POST(
     .where(eq(commentThread.id, threadId))
     .run();
 
+  logActivity({
+    workspaceId,
+    fieldMappingId: thread.fieldMappingId || null,
+    entityId: thread.entityId || null,
+    actorId: userId,
+    actorName: parsed.data.authorName,
+    action: "comment_added",
+    detail: { threadId, subject: thread.subject },
+  });
+
   return NextResponse.json(created, { status: 201 });
-}
+}, { requiredRole: "editor" });

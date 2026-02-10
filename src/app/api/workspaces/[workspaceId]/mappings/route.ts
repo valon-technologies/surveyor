@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { fieldMapping, field, entity } from "@/lib/db/schema";
+import { fieldMapping, field, entity, commentThread, comment } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createMappingSchema } from "@/lib/validators/mapping";
+import { logActivity } from "@/lib/activity/log-activity";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const searchParams = req.nextUrl.searchParams;
   const status = searchParams.get("status");
   const entityId = searchParams.get("entityId");
@@ -38,13 +36,9 @@ export async function GET(
   }
 
   return NextResponse.json(mappings);
-}
+});
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const body = await req.json();
   const parsed = createMappingSchema.safeParse(body);
 
@@ -78,12 +72,15 @@ export async function POST(
         .all().at(-1)
     : undefined;
 
+  // New mappings always start as "pending"
   const [mapping] = db
     .insert(fieldMapping)
     .values({
       workspaceId,
       targetFieldId: input.targetFieldId,
-      status: input.status,
+      status: "pending",
+      mappingType: input.mappingType,
+      assigneeId: input.assigneeId,
       sourceEntityId: input.sourceEntityId,
       sourceFieldId: input.sourceFieldId,
       transform: input.transform,
@@ -100,5 +97,43 @@ export async function POST(
     .returning()
     .all();
 
+  // Get entity for activity
+  const targetField = db.select().from(field).where(eq(field.id, input.targetFieldId)).get();
+
+  logActivity({
+    workspaceId,
+    fieldMappingId: mapping.id,
+    entityId: targetField?.entityId || null,
+    actorId: userId,
+    actorName: input.createdBy || "manual",
+    action: "mapping_saved",
+    detail: { version: mapping.version, isNew: true },
+  });
+
+  // Auto-create review thread for non-high-confidence mappings with reviewComment
+  if (input.reviewComment && input.confidence !== "high") {
+    const [thread] = db
+      .insert(commentThread)
+      .values({
+        workspaceId,
+        entityId: targetField?.entityId || null,
+        fieldMappingId: mapping.id,
+        subject: `AI Review: ${input.confidence || "uncertain"} confidence mapping`,
+        createdBy: "AI Auto-Map",
+        commentCount: 1,
+      })
+      .returning()
+      .all();
+
+    db.insert(comment)
+      .values({
+        threadId: thread.id,
+        authorName: "AI Auto-Map",
+        body: input.reviewComment,
+        bodyFormat: "markdown",
+      })
+      .run();
+  }
+
   return NextResponse.json(mapping, { status: 201 });
-}
+}, { requiredRole: "editor" });

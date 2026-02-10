@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { mappingContext, context } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { addMappingContextSchema } from "@/lib/validators/mapping";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { id } = await params;
+export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
+  const params = await ctx.params;
+  const { id } = params;
 
   const mcs = db
     .select()
@@ -17,25 +16,23 @@ export async function GET(
     .all();
 
   const withDetail = mcs.map((mc) => {
-    const ctx = mc.contextId
+    const ctxDoc = mc.contextId
       ? db.select().from(context).where(eq(context.id, mc.contextId)).get()
       : null;
     return {
       ...mc,
-      contextName: ctx?.name ?? null,
-      contextCategory: ctx?.category ?? null,
-      contextPreview: ctx?.content?.slice(0, 120) ?? null,
+      contextName: ctxDoc?.name ?? null,
+      contextCategory: ctxDoc?.category ?? null,
+      contextPreview: ctxDoc?.content?.slice(0, 120) ?? null,
     };
   });
 
   return NextResponse.json(withDetail);
-}
+});
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { id } = await params;
+export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
+  const params = await ctx.params;
+  const { id } = params;
   const body = await req.json();
   const parsed = addMappingContextSchema.safeParse(body);
 
@@ -58,17 +55,17 @@ export async function POST(
     .all();
 
   // Return with context name
-  const ctx = input.contextId
+  const ctxDoc = input.contextId
     ? db.select().from(context).where(eq(context.id, input.contextId)).get()
     : null;
 
   return NextResponse.json(
     {
       ...created,
-      contextName: ctx?.name ?? null,
-      contextCategory: ctx?.category ?? null,
-      contextPreview: ctx?.content?.slice(0, 120) ?? null,
+      contextName: ctxDoc?.name ?? null,
+      contextCategory: ctxDoc?.category ?? null,
+      contextPreview: ctxDoc?.content?.slice(0, 120) ?? null,
     },
     { status: 201 }
   );
-}
+}, { requiredRole: "editor" });

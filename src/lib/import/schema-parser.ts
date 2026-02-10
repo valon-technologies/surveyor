@@ -14,6 +14,7 @@ export interface ParsedField {
   isRequired?: boolean;
   isKey?: boolean;
   description?: string;
+  milestone?: string;
   sampleValues?: string[];
   enumValues?: string[];
 }
@@ -63,6 +64,7 @@ export function parseCSVSchema(rawContent: string, fallbackEntityName: string, o
   const sampleCol = findCol(["sample", "sample_values", "examples", "example"]);
   const enumCol = findCol(["enum", "enum_values", "values", "allowed_values"]);
   const displayCol = findCol(["display_name", "display", "label"]);
+  const milestoneCol = findCol(["milestone", "phase", "delivery"]);
 
   if (!fieldCol) {
     throw new Error(
@@ -93,6 +95,7 @@ export function parseCSVSchema(rawContent: string, fallbackEntityName: string, o
       isRequired: isReq,
       isKey: keyCol ? parseBoolean(row[keyCol]) : undefined,
       description: descCol ? row[descCol]?.trim() : undefined,
+      milestone: milestoneCol ? parseMilestone(row[milestoneCol]) : undefined,
       sampleValues: sampleCol ? parsePipeList(row[sampleCol]) : undefined,
       enumValues: enumCol ? parsePipeList(row[enumCol]) : undefined,
     };
@@ -121,6 +124,17 @@ function parseBoolean(val: string | undefined, invert = false): boolean {
   const v = val.trim().toLowerCase();
   const truthy = ["true", "yes", "1", "y", "x"].includes(v);
   return invert ? !truthy : truthy;
+}
+
+function parseMilestone(val: string | undefined): string | undefined {
+  if (!val || !val.trim()) return undefined;
+  const trimmed = val.trim();
+  // Extract M1/M2/M3/M4 from values like "M1 - SDT", "M2", etc.
+  const match = trimmed.match(/^(M[1-4])\b/i);
+  if (match) return match[1].toUpperCase();
+  // "Not required" variants → NR
+  if (/not\s+required/i.test(trimmed)) return "NR";
+  return undefined;
 }
 
 function parsePipeList(val: string | undefined): string[] | undefined {

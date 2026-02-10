@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { MilestoneBadge } from "@/components/shared/tier-badge";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface FieldItem {
@@ -14,6 +15,7 @@ interface FieldItem {
   description?: string | null;
   sampleValues?: string[] | null;
   enumValues?: string[] | null;
+  milestone?: string | null;
 }
 
 const ENUM_PREVIEW_LIMIT = 3;
@@ -71,6 +73,7 @@ export function FieldList({ fields }: { fields: FieldItem[] }) {
           <tr className="bg-muted/50 text-left font-medium text-muted-foreground">
             <th className="px-3 py-2">Field</th>
             <th className="px-3 py-2 w-24">Type</th>
+            <th className="px-3 py-2 w-16">Milestone</th>
             <th className="px-3 py-2 w-12">Req</th>
             <th className="px-3 py-2 w-12">Key</th>
             <th className="px-3 py-2">Description</th>
@@ -83,6 +86,9 @@ export function FieldList({ fields }: { fields: FieldItem[] }) {
               <td className="px-3 py-1.5 font-mono">{f.name}</td>
               <td className="px-3 py-1.5 text-muted-foreground">
                 {f.dataType || "--"}
+              </td>
+              <td className="px-3 py-1.5">
+                <MilestoneBadge milestone={f.milestone ?? null} />
               </td>
               <td className="px-3 py-1.5">
                 {f.isRequired ? (

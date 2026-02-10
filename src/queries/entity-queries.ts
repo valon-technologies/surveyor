@@ -1,27 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api-client";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/constants";
-import type { Entity, EntityWithStats } from "@/types/entity";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
+import type { Entity } from "@/types/entity";
 import type { FieldWithMapping } from "@/types/field";
-
-const basePath = workspacePath(DEFAULT_WORKSPACE_ID, "entities");
 
 export function useEntities(filters?: {
   side?: string;
   status?: string;
-  tier?: string;
   search?: string;
 }) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "entities");
   return useQuery({
-    queryKey: ["entities", DEFAULT_WORKSPACE_ID, filters],
+    queryKey: ["entities", workspaceId, filters],
     queryFn: () =>
-      api.get<(Entity & { fieldCount: number })[]>(basePath, filters as Record<string, string>),
+      api.get<(Entity & { fieldCount: number; statusBreakdown: Record<string, number> })[]>(basePath, filters as Record<string, string>),
   });
 }
 
 export function useEntity(id: string | undefined) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "entities");
   return useQuery({
-    queryKey: ["entities", DEFAULT_WORKSPACE_ID, id],
+    queryKey: ["entities", workspaceId, id],
     queryFn: () =>
       api.get<
         Entity & {
@@ -38,11 +39,13 @@ export function useEntity(id: string | undefined) {
 }
 
 export function useUpdateEntity() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "entities");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...data }: { id: string } & Record<string, unknown>) =>
       api.patch<Entity>(`${basePath}/${id}`, data),
-    onSuccess: (_, vars) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["entities"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
     },

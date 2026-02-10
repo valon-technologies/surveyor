@@ -1,126 +1,174 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { entity, field, fieldMapping, question } from "@/lib/db/schema";
 import { eq, and, sql, count } from "drizzle-orm";
+import { MILESTONES } from "@/lib/constants";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
-
+export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   // Get all target entities with field counts and mapping stats
   const entities = db
-    .select({
-      id: entity.id,
-      name: entity.name,
-      displayName: entity.displayName,
-      side: entity.side,
-      status: entity.status,
-      priorityTier: entity.priorityTier,
-      sortOrder: entity.sortOrder,
-      schemaAssetId: entity.schemaAssetId,
-      description: entity.description,
-      metadata: entity.metadata,
-      createdAt: entity.createdAt,
-      updatedAt: entity.updatedAt,
-      workspaceId: entity.workspaceId,
-    })
+    .select()
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target")))
     .orderBy(entity.sortOrder)
     .all();
 
   // Get field counts and mapping stats per entity
-  const entityStats = await Promise.all(
-    entities.map((e) => {
-      const fields = db
-        .select({ id: field.id })
+  const entityStats = entities.map((e) => {
+    const fields = db
+      .select({ id: field.id })
+      .from(field)
+      .where(eq(field.entityId, e.id))
+      .all();
+
+    const fieldIds = fields.map((f) => f.id);
+    const statusCounts: Record<string, number> = {};
+
+    if (fieldIds.length > 0) {
+      const mappings = db
+        .select({
+          status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
+          cnt: count(),
+        })
         .from(field)
-        .where(eq(field.entityId, e.id))
+        .leftJoin(
+          fieldMapping,
+          and(
+            eq(fieldMapping.targetFieldId, field.id),
+            eq(fieldMapping.isLatest, true)
+          )
+        )
+        .where(
+          sql`${field.id} IN (${sql.join(
+            fieldIds.map((id) => sql`${id}`),
+            sql`, `
+          )})`
+        )
+        .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
         .all();
 
-      const fieldIds = fields.map((f) => f.id);
-      let mappedCount = 0;
-      const statusCounts: Record<string, number> = {};
-
-      if (fieldIds.length > 0) {
-        const mappings = db
-          .select({ status: fieldMapping.status })
-          .from(fieldMapping)
-          .where(
-            and(
-              eq(fieldMapping.workspaceId, workspaceId),
-              eq(fieldMapping.isLatest, true),
-              sql`${fieldMapping.targetFieldId} IN (${sql.join(
-                fieldIds.map((id) => sql`${id}`),
-                sql`, `
-              )})`
-            )
-          )
-          .all();
-
-        for (const m of mappings) {
-          statusCounts[m.status] = (statusCounts[m.status] || 0) + 1;
-          if (m.status !== "unmapped") mappedCount++;
-        }
+      for (const m of mappings) {
+        statusCounts[m.status] = m.cnt;
       }
+    }
 
-      const openQs = db
-        .select({ cnt: count() })
-        .from(question)
-        .where(and(eq(question.entityId, e.id), eq(question.status, "open")))
-        .get();
+    const mappedCount = statusCounts["fully_closed"] || 0;
 
-      return {
-        ...e,
-        fieldCount: fields.length,
-        mappedCount,
-        unmappedCount: fields.length - mappedCount,
-        coveragePercent: fields.length > 0 ? Math.round((mappedCount / fields.length) * 100) : 0,
-        openQuestions: openQs?.cnt || 0,
-      };
-    })
-  );
+    const openQs = db
+      .select({ cnt: count() })
+      .from(question)
+      .where(and(eq(question.entityId, e.id), eq(question.status, "open")))
+      .get();
 
-  // Group by tier
-  const entitiesByTier = {
-    P0: entityStats.filter((e) => e.priorityTier === "P0"),
-    P1: entityStats.filter((e) => e.priorityTier === "P1"),
-    P2: entityStats.filter((e) => e.priorityTier === "P2"),
-    unassigned: entityStats.filter((e) => !e.priorityTier),
-  };
+    return {
+      id: e.id,
+      name: e.name,
+      displayName: e.displayName,
+      status: e.status,
+      fieldCount: fields.length,
+      mappedCount,
+      unmappedCount: fields.length - mappedCount,
+      coveragePercent:
+        fields.length > 0
+          ? Math.round((mappedCount / fields.length) * 100)
+          : 0,
+      openQuestions: openQs?.cnt || 0,
+      statusBreakdown: statusCounts,
+    };
+  });
+
+  // Milestone stats: per-milestone status breakdown across all target fields
+  const milestoneStats = MILESTONES.map((m) => {
+    const rows = db
+      .select({
+        status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
+        cnt: count(),
+      })
+      .from(field)
+      .innerJoin(entity, eq(field.entityId, entity.id))
+      .leftJoin(
+        fieldMapping,
+        and(
+          eq(fieldMapping.targetFieldId, field.id),
+          eq(fieldMapping.isLatest, true)
+        )
+      )
+      .where(
+        and(
+          eq(entity.workspaceId, workspaceId),
+          eq(entity.side, "target"),
+          eq(field.milestone, m)
+        )
+      )
+      .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
+      .all();
+
+    const statusBreakdown: Record<string, number> = {};
+    let total = 0;
+    for (const r of rows) {
+      statusBreakdown[r.status] = r.cnt;
+      total += r.cnt;
+    }
+
+    const mapped = statusBreakdown["fully_closed"] || 0;
+
+    return {
+      milestone: m,
+      totalFields: total,
+      mappedFields: mapped,
+      coveragePercent: total > 0 ? Math.round((mapped / total) * 100) : 0,
+      statusBreakdown,
+    };
+  });
 
   // Aggregate stats
   const totalFields = entityStats.reduce((sum, e) => sum + e.fieldCount, 0);
   const mappedFields = entityStats.reduce((sum, e) => sum + e.mappedCount, 0);
 
-  // Status distribution across all mappings
-  const allMappings = db
-    .select({ status: fieldMapping.status, cnt: count() })
-    .from(fieldMapping)
-    .where(and(eq(fieldMapping.workspaceId, workspaceId), eq(fieldMapping.isLatest, true)))
-    .groupBy(fieldMapping.status)
+  // Status distribution across ALL target fields (including unmapped)
+  const allFieldStatuses = db
+    .select({
+      status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
+      cnt: count(),
+    })
+    .from(field)
+    .innerJoin(entity, eq(field.entityId, entity.id))
+    .leftJoin(
+      fieldMapping,
+      and(
+        eq(fieldMapping.targetFieldId, field.id),
+        eq(fieldMapping.isLatest, true)
+      )
+    )
+    .where(
+      and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target"))
+    )
+    .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
     .all();
 
   const statusDistribution: Record<string, number> = {};
-  for (const m of allMappings) {
-    statusDistribution[m.status] = m.cnt;
+  for (const r of allFieldStatuses) {
+    statusDistribution[r.status] = r.cnt;
   }
 
   const openQuestions = db
     .select({ cnt: count() })
     .from(question)
-    .where(and(eq(question.workspaceId, workspaceId), eq(question.status, "open")))
+    .where(
+      and(eq(question.workspaceId, workspaceId), eq(question.status, "open"))
+    )
     .get();
 
   return NextResponse.json({
     totalEntities: entities.length,
     totalFields,
     mappedFields,
-    coveragePercent: totalFields > 0 ? Math.round((mappedFields / totalFields) * 100) : 0,
+    coveragePercent:
+      totalFields > 0 ? Math.round((mappedFields / totalFields) * 100) : 0,
     openQuestions: openQuestions?.cnt || 0,
-    entitiesByTier,
+    entities: entityStats,
+    milestoneStats,
     statusDistribution,
   });
-}
+});

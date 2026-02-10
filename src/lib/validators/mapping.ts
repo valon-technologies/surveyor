@@ -1,9 +1,11 @@
 import { z } from "zod/v4";
-import { MAPPING_STATUSES, CONFIDENCE_LEVELS } from "@/lib/constants";
+import { MAPPING_STATUSES, MAPPING_TYPES, CONFIDENCE_LEVELS } from "@/lib/constants";
 
 export const createMappingSchema = z.object({
   targetFieldId: z.string().min(1),
-  status: z.enum(MAPPING_STATUSES),
+  status: z.enum(MAPPING_STATUSES).optional(),
+  mappingType: z.enum(MAPPING_TYPES).optional(),
+  assigneeId: z.string().optional(),
   sourceEntityId: z.string().optional(),
   sourceFieldId: z.string().optional(),
   transform: z.string().optional(),
@@ -12,11 +14,14 @@ export const createMappingSchema = z.object({
   reasoning: z.string().optional(),
   confidence: z.enum(CONFIDENCE_LEVELS).optional(),
   notes: z.string().optional(),
+  reviewComment: z.string().optional(),
   createdBy: z.enum(["manual", "llm", "import"]).optional().default("manual"),
 });
 
 export const updateMappingSchema = z.object({
   status: z.enum(MAPPING_STATUSES).optional(),
+  mappingType: z.enum(MAPPING_TYPES).nullable().optional(),
+  assigneeId: z.string().nullable().optional(),
   sourceEntityId: z.string().nullable().optional(),
   sourceFieldId: z.string().nullable().optional(),
   transform: z.string().nullable().optional(),

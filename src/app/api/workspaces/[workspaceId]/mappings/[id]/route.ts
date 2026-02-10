@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { fieldMapping, mappingContext, field, entity, context } from "@/lib/db/schema";
+import { fieldMapping, mappingContext, field, entity, context, userWorkspace } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { updateMappingSchema } from "@/lib/validators/mapping";
+import { logActivity } from "@/lib/activity/log-activity";
+import { computeStatusOnSave } from "@/lib/status/status-engine";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
+  const params = await ctx.params;
+  const { id } = params;
 
   const mapping = db
     .select()
@@ -43,13 +44,13 @@ export async function GET(
     .where(eq(mappingContext.fieldMappingId, id))
     .all();
 
-  const contextsWithNames = contexts.map((ctx) => {
+  const contextsWithNames = contexts.map((c) => {
     let contextName: string | undefined;
-    if (ctx.contextId) {
-      const c = db.select({ name: context.name }).from(context).where(eq(context.id, ctx.contextId)).get();
-      contextName = c?.name;
+    if (c.contextId) {
+      const cDoc = db.select({ name: context.name }).from(context).where(eq(context.id, c.contextId)).get();
+      contextName = cDoc?.name;
     }
-    return { ...ctx, contextName };
+    return { ...c, contextName };
   });
 
   return NextResponse.json({
@@ -67,7 +68,7 @@ export async function GET(
     sourceField,
     contexts: contextsWithNames,
   });
-}
+});
 
 function generateChangeSummary(
   oldMapping: Record<string, unknown>,
@@ -76,6 +77,8 @@ function generateChangeSummary(
   const changes: string[] = [];
   const fieldLabels: Record<string, string> = {
     status: "status",
+    mappingType: "mapping type",
+    assigneeId: "assignee",
     sourceEntityId: "source entity",
     sourceFieldId: "source field",
     transform: "transform",
@@ -110,11 +113,9 @@ function generateChangeSummary(
   return changes.length > 0 ? changes.join(", ") : "no changes detected";
 }
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
+  const params = await ctx.params;
+  const { id } = params;
   const body = await req.json();
   const parsed = updateMappingSchema.safeParse(body);
 
@@ -134,11 +135,18 @@ export async function PATCH(
 
   const { editedBy, ...updateData } = parsed.data;
 
+  // Auto-compute status on save (ignore client-provided status)
+  const autoStatus = computeStatusOnSave(existing.status);
+  const finalStatus = autoStatus;
+
   // Generate change summary
   const changeSummary = generateChangeSummary(
     existing as unknown as Record<string, unknown>,
-    updateData as Record<string, unknown>
+    { ...updateData, status: finalStatus } as Record<string, unknown>
   );
+
+  // Get target field for entity context
+  const targetField = db.select().from(field).where(eq(field.id, existing.targetFieldId)).get();
 
   // Mark existing version as not latest
   db.update(fieldMapping)
@@ -152,7 +160,9 @@ export async function PATCH(
     .values({
       workspaceId: existing.workspaceId,
       targetFieldId: existing.targetFieldId,
-      status: updateData.status ?? existing.status,
+      status: finalStatus,
+      mappingType: updateData.mappingType !== undefined ? updateData.mappingType : existing.mappingType,
+      assigneeId: updateData.assigneeId !== undefined ? updateData.assigneeId : existing.assigneeId,
       sourceEntityId: updateData.sourceEntityId !== undefined ? updateData.sourceEntityId : existing.sourceEntityId,
       sourceFieldId: updateData.sourceFieldId !== undefined ? updateData.sourceFieldId : existing.sourceFieldId,
       transform: updateData.transform !== undefined ? updateData.transform : existing.transform,
@@ -172,18 +182,42 @@ export async function PATCH(
     .returning()
     .all();
 
-  return NextResponse.json(newVersion);
-}
+  const actorName = editedBy || "Unknown";
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+  // Log mapping_saved activity
+  logActivity({
+    workspaceId,
+    fieldMappingId: newVersion.id,
+    entityId: targetField?.entityId || null,
+    actorId: userId,
+    actorName,
+    action: "mapping_saved",
+    detail: { changeSummary, version: newVersion.version },
+  });
+
+  // Log status_change if status changed
+  if (finalStatus !== existing.status) {
+    logActivity({
+      workspaceId,
+      fieldMappingId: newVersion.id,
+      entityId: targetField?.entityId || null,
+      actorId: userId,
+      actorName,
+      action: "status_change",
+      detail: { from: existing.status, to: finalStatus },
+    });
+  }
+
+  return NextResponse.json(newVersion);
+}, { requiredRole: "editor" });
+
+export const DELETE = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
+  const params = await ctx.params;
+  const { id } = params;
 
   db.delete(fieldMapping)
     .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
     .run();
 
   return NextResponse.json({ success: true });
-}
+}, { requiredRole: "editor" });

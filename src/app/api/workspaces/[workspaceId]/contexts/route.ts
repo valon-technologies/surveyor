@@ -1,14 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { context } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createContextSchema } from "@/lib/validators/context";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const searchParams = req.nextUrl.searchParams;
   const category = searchParams.get("category");
   const subcategory = searchParams.get("subcategory");
@@ -33,13 +30,9 @@ export async function GET(
     .all();
 
   return NextResponse.json(contexts);
-}
+});
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const POST = withAuth(async (req, ctx, { workspaceId }) => {
   const body = await req.json();
   const parsed = createContextSchema.safeParse(body);
 
@@ -67,4 +60,4 @@ export async function POST(
     .all();
 
   return NextResponse.json(created, { status: 201 });
-}
+}, { requiredRole: "editor" });

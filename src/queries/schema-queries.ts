@@ -1,26 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api-client";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/constants";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
 import type { SchemaAsset, SchemaAssetWithEntities, SchemaAssetCreateInput } from "@/types/schema";
 
-const basePath = workspacePath(DEFAULT_WORKSPACE_ID, "schemas");
-
 export function useSchemaAssets() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "schemas");
   return useQuery({
-    queryKey: ["schemas", DEFAULT_WORKSPACE_ID],
+    queryKey: ["schemas", workspaceId],
     queryFn: () => api.get<(SchemaAsset & { entityCount: number })[]>(basePath),
   });
 }
 
 export function useSchemaAsset(id: string | undefined) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "schemas");
   return useQuery({
-    queryKey: ["schemas", DEFAULT_WORKSPACE_ID, id],
+    queryKey: ["schemas", workspaceId, id],
     queryFn: () => api.get<SchemaAssetWithEntities>(`${basePath}/${id}`),
     enabled: !!id,
   });
 }
 
 export function useCreateSchemaAsset() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "schemas");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: SchemaAssetCreateInput) => api.post<SchemaAsset>(basePath, input),
@@ -33,6 +37,8 @@ export function useCreateSchemaAsset() {
 }
 
 export function useDeleteSchemaAsset() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "schemas");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete(`${basePath}/${id}`),

@@ -1,14 +1,30 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { entity, field, fieldMapping, question } from "@/lib/db/schema";
+import { entity, field, fieldMapping, question, user } from "@/lib/db/schema";
 import { eq, and, count, sql } from "drizzle-orm";
 import { updateEntitySchema } from "@/lib/validators/entity";
+import type { EntityStatus } from "@/lib/constants";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
+function deriveEntityStatus(
+  statusBreakdown: Record<string, number>,
+  fieldCount: number
+): EntityStatus {
+  if (fieldCount === 0) return "not_started";
+
+  const closed = statusBreakdown["fully_closed"] || 0;
+  const pending = statusBreakdown["pending"] || 0;
+  const commentSm = statusBreakdown["open_comment_sm"] || 0;
+  const commentVt = statusBreakdown["open_comment_vt"] || 0;
+
+  if (closed === fieldCount) return "complete";
+  if (commentSm > 0 || commentVt > 0) return "review";
+  if (closed > 0 || pending > 0) return "in_progress";
+  return "not_started";
+}
+
+export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
+  const { id } = await ctx.params;
 
   const ent = db
     .select()
@@ -21,7 +37,12 @@ export async function GET(
   }
 
   // Get fields with their latest mappings
-  const fields = db.select().from(field).where(eq(field.entityId, id)).orderBy(field.sortOrder).all();
+  const fields = db
+    .select()
+    .from(field)
+    .where(eq(field.entityId, id))
+    .orderBy(field.sortOrder)
+    .all();
 
   const fieldsWithMappings = fields.map((f) => {
     const mapping = db
@@ -39,15 +60,38 @@ export async function GET(
     let sourceEntityName: string | undefined;
     let sourceFieldName: string | undefined;
     if (mapping?.sourceFieldId) {
-      const sf = db.select().from(field).where(eq(field.id, mapping.sourceFieldId)).get();
+      const sf = db
+        .select()
+        .from(field)
+        .where(eq(field.id, mapping.sourceFieldId))
+        .get();
       if (sf) {
         sourceFieldName = sf.name;
-        const se = db.select().from(entity).where(eq(entity.id, sf.entityId)).get();
+        const se = db
+          .select()
+          .from(entity)
+          .where(eq(entity.id, sf.entityId))
+          .get();
         sourceEntityName = se?.name;
       }
     } else if (mapping?.sourceEntityId) {
-      const se = db.select().from(entity).where(eq(entity.id, mapping.sourceEntityId)).get();
+      const se = db
+        .select()
+        .from(entity)
+        .where(eq(entity.id, mapping.sourceEntityId))
+        .get();
       sourceEntityName = se?.name;
+    }
+
+    // Resolve assignee name
+    let assigneeName: string | null = null;
+    if (mapping?.assigneeId) {
+      const assignee = db
+        .select({ name: user.name })
+        .from(user)
+        .where(eq(user.id, mapping.assigneeId))
+        .get();
+      assigneeName = assignee?.name || null;
     }
 
     return {
@@ -56,6 +100,9 @@ export async function GET(
         ? {
             id: mapping.id,
             status: mapping.status,
+            mappingType: mapping.mappingType,
+            assigneeId: mapping.assigneeId,
+            assigneeName,
             sourceEntityId: mapping.sourceEntityId,
             sourceFieldId: mapping.sourceFieldId,
             sourceEntityName,
@@ -64,10 +111,19 @@ export async function GET(
             defaultValue: mapping.defaultValue,
             confidence: mapping.confidence,
             createdBy: mapping.createdBy,
+            editedBy: mapping.editedBy,
+            updatedAt: mapping.updatedAt,
           }
         : null,
     };
   });
+
+  // Build status breakdown from field mappings
+  const statusBreakdown: Record<string, number> = {};
+  for (const f of fieldsWithMappings) {
+    const s = f.mapping?.status || "unmapped";
+    statusBreakdown[s] = (statusBreakdown[s] || 0) + 1;
+  }
 
   // Stats
   const openQs = db
@@ -76,43 +132,63 @@ export async function GET(
     .where(and(eq(question.entityId, id), eq(question.status, "open")))
     .get();
 
-  const mappedCount = fieldsWithMappings.filter(
-    (f) => f.mapping && f.mapping.status !== "unmapped"
-  ).length;
+  const mappedCount = statusBreakdown["fully_closed"] || 0;
+
+  // Auto-derive entity status (preserve manual "blocked" override)
+  const computedStatus = deriveEntityStatus(statusBreakdown, fields.length);
+  if (ent.status !== "blocked" && ent.status !== computedStatus) {
+    db.update(entity)
+      .set({ status: computedStatus, updatedAt: new Date().toISOString() })
+      .where(eq(entity.id, id))
+      .run();
+  }
+
+  const effectiveStatus = ent.status === "blocked" ? "blocked" : computedStatus;
 
   return NextResponse.json({
     ...ent,
+    status: effectiveStatus,
     fields: fieldsWithMappings,
     fieldCount: fields.length,
     mappedCount,
     unmappedCount: fields.length - mappedCount,
-    coveragePercent: fields.length > 0 ? Math.round((mappedCount / fields.length) * 100) : 0,
+    coveragePercent:
+      fields.length > 0
+        ? Math.round((mappedCount / fields.length) * 100)
+        : 0,
     openQuestions: openQs?.cnt || 0,
+    statusBreakdown,
   });
-}
+});
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string; id: string }> }
-) {
-  const { workspaceId, id } = await params;
-  const body = await req.json();
-  const parsed = updateEntitySchema.safeParse(body);
+export const PATCH = withAuth(
+  async (req, ctx, { workspaceId }) => {
+    const { id } = await ctx.params;
+    const body = await req.json();
+    const parsed = updateEntitySchema.safeParse(body);
 
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.message }, { status: 400 });
-  }
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.message },
+        { status: 400 }
+      );
+    }
 
-  const [updated] = db
-    .update(entity)
-    .set({ ...parsed.data, updatedAt: new Date().toISOString() })
-    .where(and(eq(entity.id, id), eq(entity.workspaceId, workspaceId)))
-    .returning()
-    .all();
+    const [updated] = db
+      .update(entity)
+      .set({ ...parsed.data, updatedAt: new Date().toISOString() })
+      .where(and(eq(entity.id, id), eq(entity.workspaceId, workspaceId)))
+      .returning()
+      .all();
 
-  if (!updated) {
-    return NextResponse.json({ error: "Entity not found" }, { status: 404 });
-  }
+    if (!updated) {
+      return NextResponse.json(
+        { error: "Entity not found" },
+        { status: 404 }
+      );
+    }
 
-  return NextResponse.json(updated);
-}
+    return NextResponse.json(updated);
+  },
+  { requiredRole: "editor" }
+);

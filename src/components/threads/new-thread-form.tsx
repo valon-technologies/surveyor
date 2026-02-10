@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,13 +14,15 @@ interface NewThreadFormProps {
 }
 
 export function NewThreadForm({ entityId, fieldMappingId, onCreated }: NewThreadFormProps) {
+  const { data: session } = useSession();
   const createThread = useCreateThread();
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [createdBy, setCreatedBy] = useState("");
+
+  const createdBy = session?.user?.name || session?.user?.email || "Unknown";
 
   const handleSubmit = () => {
-    if (!body.trim() || !createdBy.trim()) return;
+    if (!body.trim()) return;
     createThread.mutate(
       {
         entityId,
@@ -42,12 +45,6 @@ export function NewThreadForm({ entityId, fieldMappingId, onCreated }: NewThread
     <div className="space-y-3 p-4 border rounded-lg">
       <h4 className="text-xs font-semibold">New Thread</h4>
       <Input
-        value={createdBy}
-        onChange={(e) => setCreatedBy(e.target.value)}
-        placeholder="Your name"
-        className="text-xs"
-      />
-      <Input
         value={subject}
         onChange={(e) => setSubject(e.target.value)}
         placeholder="Subject (optional)"
@@ -63,7 +60,7 @@ export function NewThreadForm({ entityId, fieldMappingId, onCreated }: NewThread
       <Button
         size="sm"
         onClick={handleSubmit}
-        disabled={!body.trim() || !createdBy.trim() || createThread.isPending}
+        disabled={!body.trim() || createThread.isPending}
       >
         {createThread.isPending ? "Creating..." : "Start Thread"}
       </Button>

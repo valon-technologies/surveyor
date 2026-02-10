@@ -1,14 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { question } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createQuestionSchema } from "@/lib/validators/question";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const searchParams = req.nextUrl.searchParams;
   const status = searchParams.get("status");
   const entityId = searchParams.get("entityId");
@@ -25,13 +22,9 @@ export async function GET(
     .all();
 
   return NextResponse.json(questions);
-}
+});
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const POST = withAuth(async (req, ctx, { workspaceId }) => {
   const body = await req.json();
   const parsed = createQuestionSchema.safeParse(body);
 
@@ -54,4 +47,4 @@ export async function POST(
     .all();
 
   return NextResponse.json(created, { status: 201 });
-}
+}, { requiredRole: "editor" });

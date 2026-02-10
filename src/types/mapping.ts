@@ -1,10 +1,12 @@
-import type { MappingStatus, ConfidenceLevel } from "@/lib/constants";
+import type { MappingStatus, MappingType, ConfidenceLevel } from "@/lib/constants";
 
 export interface FieldMapping {
   id: string;
   workspaceId: string;
   targetFieldId: string;
   status: MappingStatus;
+  mappingType: MappingType | null;
+  assigneeId: string | null;
   sourceEntityId: string | null;
   sourceFieldId: string | null;
   transform: string | null;
@@ -26,7 +28,9 @@ export interface FieldMapping {
 
 export interface FieldMappingCreateInput {
   targetFieldId: string;
-  status: MappingStatus;
+  status?: MappingStatus;
+  mappingType?: MappingType;
+  assigneeId?: string;
   sourceEntityId?: string;
   sourceFieldId?: string;
   transform?: string;
@@ -35,11 +39,14 @@ export interface FieldMappingCreateInput {
   reasoning?: string;
   confidence?: ConfidenceLevel;
   notes?: string;
+  reviewComment?: string;
   createdBy?: string;
 }
 
 export interface FieldMappingUpdateInput {
   status?: MappingStatus;
+  mappingType?: MappingType | null;
+  assigneeId?: string | null;
   sourceEntityId?: string | null;
   sourceFieldId?: string | null;
   transform?: string | null;
@@ -80,6 +87,8 @@ export interface MappingHistoryEntry {
   id: string;
   version: number;
   status: MappingStatus;
+  mappingType: MappingType | null;
+  assigneeId: string | null;
   editedBy: string | null;
   changeSummary: string | null;
   createdBy: string;

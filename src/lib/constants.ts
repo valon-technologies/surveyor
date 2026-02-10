@@ -1,33 +1,76 @@
 // ─── Mapping Statuses ─────────────────────────────────────────
 export const MAPPING_STATUSES = [
   "unmapped",
-  "mapped",
-  "not_available",
-  "requires_clarification",
-  "derived",
-  "default",
-  "system_generated",
+  "pending",
+  "open_comment_sm",
+  "open_comment_vt",
+  "fully_closed",
 ] as const;
 export type MappingStatus = (typeof MAPPING_STATUSES)[number];
 
 export const MAPPING_STATUS_COLORS: Record<MappingStatus, string> = {
   unmapped: "#6b7280",
-  mapped: "#22c55e",
-  not_available: "#9ca3af",
-  requires_clarification: "#f59e0b",
-  derived: "#8b5cf6",
-  default: "#3b82f6",
-  system_generated: "#06b6d4",
+  pending: "#3b82f6",
+  open_comment_sm: "#f59e0b",
+  open_comment_vt: "#8b5cf6",
+  fully_closed: "#22c55e",
 };
 
 export const MAPPING_STATUS_LABELS: Record<MappingStatus, string> = {
   unmapped: "Unmapped",
-  mapped: "Mapped",
-  not_available: "N/A",
-  requires_clarification: "Needs Clarification",
+  pending: "Pending",
+  open_comment_sm: "Open Comment (SM)",
+  open_comment_vt: "Open Comment (VT)",
+  fully_closed: "Fully Closed",
+};
+
+export const MAPPING_STATUS_DESCRIPTIONS: Record<MappingStatus, string> = {
+  unmapped: "No mapping has been defined for this field",
+  pending: "Mapping saved, awaiting review or comment",
+  open_comment_sm: "Open comment from ServiceMac team requiring response",
+  open_comment_vt: "Open comment from Valon Tech team requiring response",
+  fully_closed: "Mapping reviewed, validated, and closed",
+};
+
+// ─── Mapping Types ───────────────────────────────────────────
+export const MAPPING_TYPES = [
+  "direct",
+  "rename",
+  "type_cast",
+  "enum",
+  "flatten_to_normalize",
+  "aggregate",
+  "join",
+  "derived",
+  "pivot",
+  "conditional",
+] as const;
+export type MappingType = (typeof MAPPING_TYPES)[number];
+
+export const MAPPING_TYPE_LABELS: Record<MappingType, string> = {
+  direct: "Direct",
+  rename: "Rename",
+  type_cast: "Type Cast",
+  enum: "Enum",
+  flatten_to_normalize: "Flatten / Normalize",
+  aggregate: "Aggregate",
+  join: "Join",
   derived: "Derived",
-  default: "Default",
-  system_generated: "System Generated",
+  pivot: "Pivot",
+  conditional: "Conditional",
+};
+
+export const MAPPING_TYPE_DESCRIPTIONS: Record<MappingType, string> = {
+  direct: "1:1 copy — same field name and type, no transformation needed",
+  rename: "Same data, different field name in the target schema",
+  type_cast: "Same data but requires a type conversion (e.g. string → date)",
+  enum: "Source values must be mapped to a target enumeration",
+  flatten_to_normalize: "Nested or repeated source data flattened into a normalized structure",
+  aggregate: "Multiple source rows aggregated into a single target value",
+  join: "Target value requires joining two or more source tables",
+  derived: "Computed from one or more source fields via business logic",
+  pivot: "Source rows pivoted into target columns (or vice versa)",
+  conditional: "Mapping logic varies based on runtime conditions",
 };
 
 // ─── Entity Statuses ──────────────────────────────────────────
@@ -56,20 +99,24 @@ export const ENTITY_STATUS_LABELS: Record<EntityStatus, string> = {
   complete: "Complete",
 };
 
-// ─── Priority Tiers ───────────────────────────────────────────
-export const PRIORITY_TIERS = ["P0", "P1", "P2"] as const;
-export type PriorityTier = (typeof PRIORITY_TIERS)[number];
+// ─── Milestones (field-level delivery targets) ──────────────
+export const MILESTONES = ["M1", "M2", "M3", "M4", "NR"] as const;
+export type Milestone = (typeof MILESTONES)[number];
 
-export const TIER_COLORS: Record<PriorityTier, string> = {
-  P0: "#ef4444",
-  P1: "#f59e0b",
-  P2: "#6b7280",
+export const MILESTONE_COLORS: Record<Milestone, string> = {
+  M1: "#ef4444",
+  M2: "#f59e0b",
+  M3: "#3b82f6",
+  M4: "#6b7280",
+  NR: "#d4d4d8",
 };
 
-export const TIER_LABELS: Record<PriorityTier, string> = {
-  P0: "P0 — Critical",
-  P1: "P1 — Important",
-  P2: "P2 — Nice to Have",
+export const MILESTONE_LABELS: Record<Milestone, string> = {
+  M1: "M1 — 2/1",
+  M2: "M2 — 5/1",
+  M3: "M3 — 7/1",
+  M4: "M4 — 9/1",
+  NR: "Not Required",
 };
 
 // ─── Field Types ──────────────────────────────────────────────
@@ -193,6 +240,65 @@ export type SchemaSide = (typeof SCHEMA_SIDES)[number];
 // ─── Schema Formats ───────────────────────────────────────────
 export const SCHEMA_FORMATS = ["csv", "json", "sql_ddl"] as const;
 export type SchemaFormat = (typeof SCHEMA_FORMATS)[number];
+
+// ─── Workspace Teams ─────────────────────────────────────────
+export const WORKSPACE_TEAMS = ["SM", "VT"] as const;
+export type WorkspaceTeam = (typeof WORKSPACE_TEAMS)[number];
+
+export const WORKSPACE_TEAM_LABELS: Record<WorkspaceTeam, string> = {
+  SM: "ServiceMac",
+  VT: "Valon Tech",
+};
+
+// ─── Workspace Roles ─────────────────────────────────────────
+export const WORKSPACE_ROLES = ["owner", "editor", "viewer"] as const;
+export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
+
+export const WORKSPACE_ROLE_LABELS: Record<WorkspaceRole, string> = {
+  owner: "Owner",
+  editor: "Editor",
+  viewer: "Viewer",
+};
+
+// ─── Activity Actions ────────────────────────────────────────
+export const ACTIVITY_ACTIONS = [
+  "status_change",
+  "comment_added",
+  "thread_created",
+  "thread_resolved",
+  "mapping_saved",
+  "validation_ran",
+  "case_closed",
+  "case_reopened",
+] as const;
+export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];
+
+// ─── Invite Statuses ─────────────────────────────────────────
+export const INVITE_STATUSES = ["pending", "accepted", "revoked"] as const;
+export type InviteStatus = (typeof INVITE_STATUSES)[number];
+
+// ─── LLM Models ─────────────────────────────────────────────
+export const LLM_MODELS = {
+  claude: [
+    { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", context: 200_000, costTier: "low" },
+    { id: "claude-sonnet-4-5-20250929", label: "Sonnet 4.5", context: 200_000, costTier: "medium" },
+    { id: "claude-opus-4-6", label: "Opus 4.6", context: 200_000, costTier: "high" },
+  ],
+  openai: [
+    { id: "gpt-4o-mini", label: "GPT-4o mini", context: 128_000, costTier: "low" },
+    { id: "gpt-4o", label: "GPT-4o", context: 128_000, costTier: "medium" },
+    { id: "o1", label: "o1", context: 200_000, costTier: "high" },
+  ],
+} as const;
+
+export type LLMProvider = keyof typeof LLM_MODELS;
+export type LLMModelId = (typeof LLM_MODELS)[LLMProvider][number]["id"];
+
+/** Smart defaults: fast/cheap for single-field, balanced for batch */
+export const DEFAULT_MODELS: Record<LLMProvider, { singleField: string; batch: string }> = {
+  claude: { singleField: "claude-haiku-4-5-20251001", batch: "claude-sonnet-4-5-20250929" },
+  openai: { singleField: "gpt-4o-mini", batch: "gpt-4o" },
+};
 
 // ─── Default workspace ───────────────────────────────────────
 export const DEFAULT_WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";

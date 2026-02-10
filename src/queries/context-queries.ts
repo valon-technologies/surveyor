@@ -1,9 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api-client";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/constants";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
 import type { Context, ContextCreateInput, ContextUpdateInput } from "@/types/context";
-
-const basePath = workspacePath(DEFAULT_WORKSPACE_ID, "contexts");
 
 export function useContexts(filters?: {
   category?: string;
@@ -12,22 +10,28 @@ export function useContexts(filters?: {
   fieldId?: string;
   isActive?: string;
 }) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "contexts");
   return useQuery({
-    queryKey: ["contexts", DEFAULT_WORKSPACE_ID, filters],
+    queryKey: ["contexts", workspaceId, filters],
     queryFn: () =>
       api.get<Context[]>(basePath, filters as Record<string, string>),
   });
 }
 
 export function useContext(id: string | undefined) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "contexts");
   return useQuery({
-    queryKey: ["contexts", DEFAULT_WORKSPACE_ID, id],
+    queryKey: ["contexts", workspaceId, id],
     queryFn: () => api.get<Context>(`${basePath}/${id}`),
     enabled: !!id,
   });
 }
 
 export function useCreateContext() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "contexts");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: ContextCreateInput) => api.post<Context>(basePath, input),
@@ -38,6 +42,8 @@ export function useCreateContext() {
 }
 
 export function useUpdateContext() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "contexts");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...data }: { id: string } & ContextUpdateInput) =>
@@ -49,6 +55,8 @@ export function useUpdateContext() {
 }
 
 export function useDeleteContext() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "contexts");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete(`${basePath}/${id}`),

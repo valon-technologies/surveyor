@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api-client";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/constants";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
 import type {
   Skill,
   SkillWithCount,
@@ -11,24 +11,28 @@ import type {
   SkillContextWithDetail,
 } from "@/types/skill";
 
-const basePath = workspacePath(DEFAULT_WORKSPACE_ID, "skills");
-
 export function useSkills() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "skills");
   return useQuery({
-    queryKey: ["skills", DEFAULT_WORKSPACE_ID],
+    queryKey: ["skills", workspaceId],
     queryFn: () => api.get<SkillWithCount[]>(basePath),
   });
 }
 
 export function useSkill(id: string | undefined) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "skills");
   return useQuery({
-    queryKey: ["skills", DEFAULT_WORKSPACE_ID, id],
+    queryKey: ["skills", workspaceId, id],
     queryFn: () => api.get<SkillWithContexts>(`${basePath}/${id}`),
     enabled: !!id,
   });
 }
 
 export function useCreateSkill() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "skills");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: SkillCreateInput) => api.post<SkillWithCount>(basePath, input),
@@ -39,6 +43,8 @@ export function useCreateSkill() {
 }
 
 export function useUpdateSkill() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "skills");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...data }: { id: string } & SkillUpdateInput) =>
@@ -50,6 +56,8 @@ export function useUpdateSkill() {
 }
 
 export function useDeleteSkill() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "skills");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete(`${basePath}/${id}`),
@@ -60,8 +68,10 @@ export function useDeleteSkill() {
 }
 
 export function useSkillContexts(skillId: string | undefined) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "skills");
   return useQuery({
-    queryKey: ["skills", DEFAULT_WORKSPACE_ID, skillId, "contexts"],
+    queryKey: ["skills", workspaceId, skillId, "contexts"],
     queryFn: () =>
       api.get<SkillContextWithDetail[]>(`${basePath}/${skillId}/contexts`),
     enabled: !!skillId,
@@ -69,6 +79,8 @@ export function useSkillContexts(skillId: string | undefined) {
 }
 
 export function useAddSkillContext() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "skills");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -86,6 +98,8 @@ export function useAddSkillContext() {
 }
 
 export function useRemoveSkillContext() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "skills");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ skillId, scId }: { skillId: string; scId: string }) =>
@@ -101,10 +115,12 @@ export function useMatchingSkills(
   fieldName?: string,
   dataType?: string
 ) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "skills");
   return useQuery({
     queryKey: [
       "skills",
-      DEFAULT_WORKSPACE_ID,
+      workspaceId,
       "match",
       entityName,
       fieldName,

@@ -1,12 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { context } from "@/lib/db/schema";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ workspaceId: string }> }
-) {
-  const { workspaceId } = await params;
+export const POST = withAuth(async (req, ctx, { workspaceId }) => {
   const body = await req.json();
 
   if (!Array.isArray(body.contexts)) {
@@ -18,7 +15,7 @@ export async function POST(
   for (const c of body.contexts) {
     if (!c.name || !c.category || !c.content) continue;
 
-    const [ctx] = db
+    const [item] = db
       .insert(context)
       .values({
         workspaceId,
@@ -35,8 +32,8 @@ export async function POST(
       .returning()
       .all();
 
-    created.push(ctx);
+    created.push(item);
   }
 
   return NextResponse.json({ imported: created.length, contexts: created }, { status: 201 });
-}
+}, { requiredRole: "editor" });

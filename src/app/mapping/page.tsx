@@ -6,11 +6,10 @@ import { EntityFilters } from "@/components/mapping/entity-filters";
 import { EntityList } from "@/components/mapping/entity-list";
 
 export default function MappingPage() {
-  const { entityStatusFilter, tierFilter, searchQuery } = useMappingStore();
+  const { entityStatusFilter, searchQuery } = useMappingStore();
   const { data: entities, isLoading } = useEntities({
     side: "target",
     status: entityStatusFilter === "all" ? undefined : entityStatusFilter,
-    tier: tierFilter === "all" ? undefined : tierFilter,
     search: searchQuery || undefined,
   });
 

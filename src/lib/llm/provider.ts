@@ -1,6 +1,10 @@
 export interface CompletionRequest {
   systemMessage: string;
-  userMessage: string;
+  userMessage?: string;
+  messages?: Array<{
+    role: "user" | "assistant";
+    content: string;
+  }>;
   model?: string;
   temperature?: number;
   maxTokens?: number;

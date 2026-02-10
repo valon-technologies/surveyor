@@ -1,17 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api-client";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/constants";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
 import type { CommentThread, ThreadWithComments, CreateThreadInput, CreateCommentInput } from "@/types/thread";
-
-const basePath = workspacePath(DEFAULT_WORKSPACE_ID, "threads");
 
 export function useThreads(filters?: {
   entityId?: string;
   fieldMappingId?: string;
   status?: string;
 }) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "threads");
   return useQuery({
-    queryKey: ["threads", DEFAULT_WORKSPACE_ID, filters],
+    queryKey: ["threads", workspaceId, filters],
     queryFn: () =>
       api.get<CommentThread[]>(basePath, filters as Record<string, string>),
     enabled: !!(filters?.entityId || filters?.fieldMappingId),
@@ -19,14 +19,18 @@ export function useThreads(filters?: {
 }
 
 export function useThread(threadId: string | undefined) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "threads");
   return useQuery({
-    queryKey: ["threads", DEFAULT_WORKSPACE_ID, threadId],
+    queryKey: ["threads", workspaceId, threadId],
     queryFn: () => api.get<ThreadWithComments>(`${basePath}/${threadId}`),
     enabled: !!threadId,
   });
 }
 
 export function useCreateThread() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "threads");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateThreadInput) => api.post<ThreadWithComments>(basePath, input),
@@ -37,6 +41,8 @@ export function useCreateThread() {
 }
 
 export function useAddComment() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "threads");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ threadId, ...input }: CreateCommentInput & { threadId: string }) =>
@@ -48,6 +54,8 @@ export function useAddComment() {
 }
 
 export function useUpdateThread() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "threads");
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
