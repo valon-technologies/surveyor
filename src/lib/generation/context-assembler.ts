@@ -26,21 +26,20 @@ interface MatchedSkill {
  * Match active skills against entity/field/dataType criteria.
  * Extracted from the skills/match API route for reuse in generation.
  */
-export function matchSkills(
+export async function matchSkills(
   workspaceId: string,
   entityName: string,
   fieldName?: string,
   dataType?: string
-): MatchedSkill[] {
+): Promise<MatchedSkill[]> {
   const entityLower = entityName.toLowerCase();
   const fieldLower = fieldName?.toLowerCase() || "";
   const dataUpper = dataType?.toUpperCase() || "";
 
-  const skills = db
+  const skills = await db
     .select()
     .from(skill)
-    .where(and(eq(skill.workspaceId, workspaceId), eq(skill.isActive, true)))
-    .all();
+    .where(and(eq(skill.workspaceId, workspaceId), eq(skill.isActive, true)));
 
   return skills.filter((s) => {
     const app = s.applicability as MatchedSkill["applicability"];
@@ -74,12 +73,12 @@ export function matchSkills(
  * Assemble all context content from matched skills, grouped by role,
  * trimmed to fit within the given token budget.
  */
-export function assembleContext(
+export async function assembleContext(
   workspaceId: string,
   entityName: string,
   tokenBudget: number
-): AssembledContext {
-  const matched = matchSkills(workspaceId, entityName);
+): Promise<AssembledContext> {
+  const matched = await matchSkills(workspaceId, entityName);
 
   const primaryContexts: AssembledContext["primaryContexts"] = [];
   const referenceContexts: AssembledContext["referenceContexts"] = [];
@@ -87,22 +86,20 @@ export function assembleContext(
   const seenContextIds = new Set<string>();
 
   for (const s of matched) {
-    const scs = db
+    const scs = await db
       .select()
       .from(skillContext)
       .where(eq(skillContext.skillId, s.id))
-      .orderBy(skillContext.sortOrder)
-      .all();
+      .orderBy(skillContext.sortOrder);
 
     for (const sc of scs) {
       if (seenContextIds.has(sc.contextId)) continue;
       seenContextIds.add(sc.contextId);
 
-      const ctx = db
+      const ctx = (await db
         .select()
         .from(context)
-        .where(eq(context.id, sc.contextId))
-        .get();
+        .where(eq(context.id, sc.contextId)))[0];
 
       if (!ctx || !ctx.isActive || !ctx.content) continue;
 

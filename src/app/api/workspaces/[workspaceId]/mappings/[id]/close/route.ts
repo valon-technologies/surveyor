@@ -9,11 +9,10 @@ export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const existing = db
+  const existing = (await db
     .select()
     .from(fieldMapping)
-    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
-    .get();
+    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId))))[0];
 
   if (!existing) {
     return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
@@ -23,15 +22,14 @@ export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
     return NextResponse.json({ error: "Already closed" }, { status: 400 });
   }
 
-  const targetField = db.select().from(field).where(eq(field.id, existing.targetFieldId)).get();
+  const targetField = (await db.select().from(field).where(eq(field.id, existing.targetFieldId)))[0];
 
   // Copy-on-write: mark old as not latest
-  db.update(fieldMapping)
+  await db.update(fieldMapping)
     .set({ isLatest: false, updatedAt: new Date().toISOString() })
-    .where(eq(fieldMapping.id, id))
-    .run();
+    .where(eq(fieldMapping.id, id));
 
-  const [newVersion] = db
+  const [newVersion] = await db
     .insert(fieldMapping)
     .values({
       ...existing,
@@ -44,10 +42,9 @@ export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })
-    .returning()
-    .all();
+    .returning();
 
-  logActivity({
+  await logActivity({
     workspaceId,
     fieldMappingId: newVersion.id,
     entityId: targetField?.entityId || null,

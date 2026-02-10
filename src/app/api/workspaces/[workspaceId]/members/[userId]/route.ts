@@ -21,7 +21,7 @@ export const PATCH = withAuth(
       return NextResponse.json({ error: "Invalid team" }, { status: 400 });
     }
 
-    const membership = db
+    const membership = (await db
       .select()
       .from(userWorkspace)
       .where(
@@ -29,8 +29,7 @@ export const PATCH = withAuth(
           eq(userWorkspace.userId, targetUserId),
           eq(userWorkspace.workspaceId, workspaceId)
         )
-      )
-      .get();
+      ))[0];
 
     if (!membership) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
@@ -40,10 +39,9 @@ export const PATCH = withAuth(
     if (role !== undefined) updates.role = role;
     if (team !== undefined) updates.team = team;
 
-    db.update(userWorkspace)
+    await db.update(userWorkspace)
       .set(updates)
-      .where(eq(userWorkspace.id, membership.id))
-      .run();
+      .where(eq(userWorkspace.id, membership.id));
 
     return NextResponse.json({ ...membership, ...updates });
   },
@@ -63,7 +61,7 @@ export const DELETE = withAuth(
       );
     }
 
-    const membership = db
+    const membership = (await db
       .select()
       .from(userWorkspace)
       .where(
@@ -71,8 +69,7 @@ export const DELETE = withAuth(
           eq(userWorkspace.userId, targetUserId),
           eq(userWorkspace.workspaceId, workspaceId)
         )
-      )
-      .get();
+      ))[0];
 
     if (!membership) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
@@ -85,9 +82,8 @@ export const DELETE = withAuth(
       );
     }
 
-    db.delete(userWorkspace)
-      .where(eq(userWorkspace.id, membership.id))
-      .run();
+    await db.delete(userWorkspace)
+      .where(eq(userWorkspace.id, membership.id));
 
     return NextResponse.json({ success: true });
   },

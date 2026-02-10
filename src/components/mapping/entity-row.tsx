@@ -11,6 +11,7 @@ import type { Entity } from "@/types/entity";
 
 const STATUS_ORDER: MappingStatus[] = [
   "fully_closed",
+  "excluded",
   "pending",
   "open_comment_sm",
   "open_comment_vt",

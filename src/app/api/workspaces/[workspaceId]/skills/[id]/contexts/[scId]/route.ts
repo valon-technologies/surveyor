@@ -15,12 +15,11 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const [updated] = db
+  const [updated] = await db
     .update(skillContext)
     .set(parsed.data)
     .where(eq(skillContext.id, scId))
-    .returning()
-    .all();
+    .returning();
 
   if (!updated) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -33,7 +32,7 @@ export const DELETE = withAuth(async (req, ctx, { userId, workspaceId, role }) =
   const params = await ctx.params;
   const { scId } = params;
 
-  db.delete(skillContext).where(eq(skillContext.id, scId)).run();
+  await db.delete(skillContext).where(eq(skillContext.id, scId));
 
   return NextResponse.json({ success: true });
 }, { requiredRole: "editor" });

@@ -7,16 +7,16 @@
  * Usage: npx tsx scripts/import-vds-entities.ts
  */
 
-import Database from "better-sqlite3";
+import postgres from "postgres";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import "dotenv/config";
 
-const DB_PATH = path.resolve(process.cwd(), "surveyor.db");
 const VDS_ROOT = "/Users/grantlee/Dev/mapping-skills/.claude/skills/vds-entities";
 const WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
 
-const db = new Database(DB_PATH);
+const client = postgres(process.env.DATABASE_URL!, { prepare: false });
 
 function readMd(filePath: string): string {
   return fs.readFileSync(filePath, "utf-8");
@@ -88,80 +88,74 @@ function discoverTopicFolders(dir: string, pathParts: string[] = []): TopicFolde
   return folders;
 }
 
-const topics = discoverTopicFolders(VDS_ROOT);
-console.log(`Discovered ${topics.length} topic folders.\n`);
+async function main() {
+  const topics = discoverTopicFolders(VDS_ROOT);
+  console.log(`Discovered ${topics.length} topic folders.\n`);
 
-const insertContext = db.prepare(`
-  INSERT OR IGNORE INTO context (
-    id, workspace_id, name, category, subcategory, entity_id, field_id,
-    content, content_format, token_count, tags, is_active, sort_order,
-    import_source, metadata, created_at, updated_at
-  ) VALUES (
-    @id, @workspace_id, @name, 'schema', 'data_dictionary', NULL, NULL,
-    @content, 'markdown', @token_count, @tags, 1, @sort_order,
-    @import_source, NULL,
-    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
-    strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  )
-`);
+  let imported = 0;
+  let skipped = 0;
 
-let imported = 0;
-let skipped = 0;
+  await client.begin(async (tx) => {
+    for (let i = 0; i < topics.length; i++) {
+      const topic = topics[i];
 
-const importAll = db.transaction(() => {
-  for (let i = 0; i < topics.length; i++) {
-    const topic = topics[i];
+      // Build merged content
+      const parts: string[] = [];
+      if (topic.skillMd) {
+        parts.push(stripFrontmatter(readMd(topic.skillMd)));
+      }
+      for (const detailFile of topic.detailFiles.sort()) {
+        const fileName = path.basename(detailFile, ".md");
+        const content = stripFrontmatter(readMd(detailFile));
+        parts.push(`\n---\n\n## ${slugToLabel(fileName)}\n\n${content}`);
+      }
 
-    // Build merged content
-    const parts: string[] = [];
-    if (topic.skillMd) {
-      parts.push(stripFrontmatter(readMd(topic.skillMd)));
+      const mergedContent = parts.join("\n\n");
+      if (!mergedContent.trim()) {
+        skipped++;
+        continue;
+      }
+
+      // Deterministic UUID from path
+      const hash = crypto.createHash("md5").update(`vds-entities/${topic.relativePath}`).digest("hex");
+      const uuid = [hash.slice(0, 8), hash.slice(8, 12), hash.slice(12, 16), hash.slice(16, 20), hash.slice(20, 32)].join("-");
+
+      // Name: "VDS > Core Loan > Loan"
+      const name = topic.nameParts.length > 0
+        ? "VDS > " + topic.nameParts.map(slugToLabel).join(" > ")
+        : "VDS > Overview";
+
+      const tokenCount = Math.round(mergedContent.length / 4);
+
+      const result = await tx`
+        INSERT INTO context (
+          id, workspace_id, name, category, subcategory, entity_id, field_id,
+          content, content_format, token_count, tags, is_active, sort_order,
+          import_source, metadata, created_at, updated_at
+        ) VALUES (
+          ${uuid}, ${WORKSPACE_ID}, ${name}, 'schema', 'data_dictionary', NULL, NULL,
+          ${mergedContent}, 'markdown', ${tokenCount}, ${JSON.stringify(topic.tags)}, 1, ${i},
+          ${"vds-entities/" + topic.relativePath}, NULL,
+          NOW(), NOW()
+        )
+        ON CONFLICT (id) DO NOTHING
+      `;
+
+      if (result.count > 0) {
+        imported++;
+        console.log(`  [+] ${name} (${tokenCount} tokens)`);
+      } else {
+        skipped++;
+        console.log(`  [=] ${name} (already exists)`);
+      }
     }
-    for (const detailFile of topic.detailFiles.sort()) {
-      const fileName = path.basename(detailFile, ".md");
-      const content = stripFrontmatter(readMd(detailFile));
-      parts.push(`\n---\n\n## ${slugToLabel(fileName)}\n\n${content}`);
-    }
+  });
 
-    const mergedContent = parts.join("\n\n");
-    if (!mergedContent.trim()) {
-      skipped++;
-      continue;
-    }
+  console.log(`\nImport complete: ${imported} created, ${skipped} skipped.`);
+  await client.end();
+}
 
-    // Deterministic UUID from path
-    const hash = crypto.createHash("md5").update(`vds-entities/${topic.relativePath}`).digest("hex");
-    const uuid = [hash.slice(0, 8), hash.slice(8, 12), hash.slice(12, 16), hash.slice(16, 20), hash.slice(20, 32)].join("-");
-
-    // Name: "VDS > Core Loan > Loan"
-    const name = topic.nameParts.length > 0
-      ? "VDS > " + topic.nameParts.map(slugToLabel).join(" > ")
-      : "VDS > Overview";
-
-    const tokenCount = Math.round(mergedContent.length / 4);
-
-    const result = insertContext.run({
-      id: uuid,
-      workspace_id: WORKSPACE_ID,
-      name,
-      content: mergedContent,
-      token_count: tokenCount,
-      tags: JSON.stringify(topic.tags),
-      sort_order: i,
-      import_source: `vds-entities/${topic.relativePath}`,
-    });
-
-    if (result.changes > 0) {
-      imported++;
-      console.log(`  [+] ${name} (${tokenCount} tokens)`);
-    } else {
-      skipped++;
-      console.log(`  [=] ${name} (already exists)`);
-    }
-  }
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
 });
-
-importAll();
-
-console.log(`\nImport complete: ${imported} created, ${skipped} skipped.`);
-db.close();

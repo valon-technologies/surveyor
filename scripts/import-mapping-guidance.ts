@@ -15,16 +15,16 @@
  * Usage: npx tsx scripts/import-mapping-guidance.ts
  */
 
-import Database from "better-sqlite3";
+import postgres from "postgres";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import "dotenv/config";
 
-const DB_PATH = path.resolve(process.cwd(), "surveyor.db");
 const SKILLS_ROOT = "/Users/grantlee/Dev/mapping-skills";
 const WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
 
-const db = new Database(DB_PATH);
+const client = postgres(process.env.DATABASE_URL!, { prepare: false });
 
 function stripFrontmatter(content: string): string {
   if (content.startsWith("---")) {
@@ -197,32 +197,35 @@ for (const entity of entityFolders) {
 }
 
 // --- Insert ---
-const now = new Date().toISOString();
-const stmt = db.prepare(`
-  INSERT OR IGNORE INTO context (id, workspace_id, name, category, subcategory, content, content_format, token_count, tags, is_active, sort_order, import_source, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, 'markdown', ?, ?, 1, 0, ?, ?, ?)
-`);
+async function main() {
+  const now = new Date().toISOString();
 
-const insertAll = db.transaction(() => {
-  for (const doc of docs) {
-    const tokenCount = Math.ceil(doc.content.length / 4);
-    stmt.run(
-      doc.id, WORKSPACE_ID, doc.name, doc.category, doc.subcategory,
-      doc.content, tokenCount, JSON.stringify(doc.tags),
-      doc.importSource, now, now
-    );
-  }
+  await client.begin(async (tx) => {
+    for (const doc of docs) {
+      const tokenCount = Math.ceil(doc.content.length / 4);
+      await tx`
+        INSERT INTO context (id, workspace_id, name, category, subcategory, content, content_format, token_count, tags, is_active, sort_order, import_source, created_at, updated_at)
+        VALUES (${doc.id}, ${WORKSPACE_ID}, ${doc.name}, ${doc.category}, ${doc.subcategory},
+                ${doc.content}, 'markdown', ${tokenCount}, ${JSON.stringify(doc.tags)},
+                1, 0, ${doc.importSource}, ${now}, ${now})
+        ON CONFLICT (id) DO NOTHING
+      `;
+    }
+  });
+
+  console.log(`Imported ${docs.length} mapping guidance contexts:`);
+  const methodology = docs.filter((d) => d.name.startsWith("Mapping"));
+  const qa = docs.filter((d) => d.name.startsWith("Mapping Q&A"));
+  console.log(`  Methodology docs: ${methodology.length}`);
+  console.log(`  Q&A docs:         ${qa.length}`);
+
+  const total = (await client`SELECT COUNT(*) as cnt FROM context`)[0] as { cnt: number };
+  console.log(`\nTotal contexts in DB: ${total.cnt}`);
+
+  await client.end();
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
 });
-
-insertAll();
-
-console.log(`Imported ${docs.length} mapping guidance contexts:`);
-const methodology = docs.filter((d) => d.name.startsWith("Mapping"));
-const qa = docs.filter((d) => d.name.startsWith("Mapping Q&A"));
-console.log(`  Methodology docs: ${methodology.length}`);
-console.log(`  Q&A docs:         ${qa.length}`);
-
-const total = db.prepare("SELECT COUNT(*) as cnt FROM context").get() as { cnt: number };
-console.log(`\nTotal contexts in DB: ${total.cnt}`);
-
-db.close();

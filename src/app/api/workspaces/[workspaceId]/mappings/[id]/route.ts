@@ -11,47 +11,46 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const mapping = db
+  const mapping = (await db
     .select()
     .from(fieldMapping)
-    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
-    .get();
+    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId))))[0];
 
   if (!mapping) {
     return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
   }
 
   // Get target field info
-  const targetField = db.select().from(field).where(eq(field.id, mapping.targetFieldId)).get();
+  const targetField = (await db.select().from(field).where(eq(field.id, mapping.targetFieldId)))[0];
   const targetEntity = targetField
-    ? db.select().from(entity).where(eq(entity.id, targetField.entityId)).get()
+    ? (await db.select().from(entity).where(eq(entity.id, targetField.entityId)))[0]
     : null;
 
   // Get source field info
   let sourceField = null;
   if (mapping.sourceFieldId) {
-    const sf = db.select().from(field).where(eq(field.id, mapping.sourceFieldId)).get();
+    const sf = (await db.select().from(field).where(eq(field.id, mapping.sourceFieldId)))[0];
     if (sf) {
-      const se = db.select().from(entity).where(eq(entity.id, sf.entityId)).get();
+      const se = (await db.select().from(entity).where(eq(entity.id, sf.entityId)))[0];
       sourceField = { ...sf, entityName: se?.name };
     }
   }
 
   // Get contexts
-  const contexts = db
+  const contexts = await db
     .select()
     .from(mappingContext)
-    .where(eq(mappingContext.fieldMappingId, id))
-    .all();
+    .where(eq(mappingContext.fieldMappingId, id));
 
-  const contextsWithNames = contexts.map((c) => {
+  const contextsWithNames = [];
+  for (const c of contexts) {
     let contextName: string | undefined;
     if (c.contextId) {
-      const cDoc = db.select({ name: context.name }).from(context).where(eq(context.id, c.contextId)).get();
+      const cDoc = (await db.select({ name: context.name }).from(context).where(eq(context.id, c.contextId)))[0];
       contextName = cDoc?.name;
     }
-    return { ...c, contextName };
-  });
+    contextsWithNames.push({ ...c, contextName });
+  }
 
   return NextResponse.json({
     ...mapping,
@@ -123,11 +122,10 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const existing = db
+  const existing = (await db
     .select()
     .from(fieldMapping)
-    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
-    .get();
+    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId))))[0];
 
   if (!existing) {
     return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
@@ -146,16 +144,15 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
   );
 
   // Get target field for entity context
-  const targetField = db.select().from(field).where(eq(field.id, existing.targetFieldId)).get();
+  const targetField = (await db.select().from(field).where(eq(field.id, existing.targetFieldId)))[0];
 
   // Mark existing version as not latest
-  db.update(fieldMapping)
+  await db.update(fieldMapping)
     .set({ isLatest: false, updatedAt: new Date().toISOString() })
-    .where(eq(fieldMapping.id, id))
-    .run();
+    .where(eq(fieldMapping.id, id));
 
   // Create new version (copy-on-write)
-  const [newVersion] = db
+  const [newVersion] = await db
     .insert(fieldMapping)
     .values({
       workspaceId: existing.workspaceId,
@@ -179,13 +176,12 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
       editedBy: editedBy || null,
       changeSummary,
     })
-    .returning()
-    .all();
+    .returning();
 
   const actorName = editedBy || "Unknown";
 
   // Log mapping_saved activity
-  logActivity({
+  await logActivity({
     workspaceId,
     fieldMappingId: newVersion.id,
     entityId: targetField?.entityId || null,
@@ -197,7 +193,7 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
 
   // Log status_change if status changed
   if (finalStatus !== existing.status) {
-    logActivity({
+    await logActivity({
       workspaceId,
       fieldMappingId: newVersion.id,
       entityId: targetField?.entityId || null,
@@ -215,9 +211,8 @@ export const DELETE = withAuth(async (req, ctx, { userId, workspaceId, role }) =
   const params = await ctx.params;
   const { id } = params;
 
-  db.delete(fieldMapping)
-    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
-    .run();
+  await db.delete(fieldMapping)
+    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)));
 
   return NextResponse.json({ success: true });
 }, { requiredRole: "editor" });

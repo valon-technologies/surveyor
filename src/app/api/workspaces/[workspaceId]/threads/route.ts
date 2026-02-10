@@ -18,12 +18,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   if (fieldMappingId) conditions.push(eq(commentThread.fieldMappingId, fieldMappingId));
   if (status) conditions.push(eq(commentThread.status, status));
 
-  const threads = db
+  const threads = await db
     .select()
     .from(commentThread)
     .where(and(...conditions))
-    .orderBy(commentThread.createdAt)
-    .all();
+    .orderBy(commentThread.createdAt);
 
   return NextResponse.json(threads);
 });
@@ -39,7 +38,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
   const { createdBy, body: commentBody, bodyFormat, entityId, fieldMappingId, subject } = parsed.data;
 
   // Create thread + first comment atomically
-  const [thread] = db
+  const [thread] = await db
     .insert(commentThread)
     .values({
       workspaceId,
@@ -49,10 +48,9 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
       createdBy,
       commentCount: 1,
     })
-    .returning()
-    .all();
+    .returning();
 
-  const [firstComment] = db
+  const [firstComment] = await db
     .insert(comment)
     .values({
       threadId: thread.id,
@@ -60,11 +58,10 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
       body: commentBody,
       bodyFormat: bodyFormat || "markdown",
     })
-    .returning()
-    .all();
+    .returning();
 
   // Log thread_created activity
-  logActivity({
+  await logActivity({
     workspaceId,
     fieldMappingId: fieldMappingId || null,
     entityId: entityId || null,
@@ -76,7 +73,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
 
   // Auto-transition mapping status based on commenter's team
   if (fieldMappingId) {
-    const membership = db
+    const membership = (await db
       .select({ team: userWorkspace.team })
       .from(userWorkspace)
       .where(
@@ -84,26 +81,23 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
           eq(userWorkspace.userId, userId),
           eq(userWorkspace.workspaceId, workspaceId)
         )
-      )
-      .get();
+      ))[0];
 
     if (membership?.team) {
-      const mapping = db
+      const mapping = (await db
         .select()
         .from(fieldMapping)
-        .where(and(eq(fieldMapping.id, fieldMappingId), eq(fieldMapping.isLatest, true)))
-        .get();
+        .where(and(eq(fieldMapping.id, fieldMappingId), eq(fieldMapping.isLatest, true))))[0];
 
       if (mapping) {
         const newStatus = computeStatusOnComment(mapping.status, membership.team as "SM" | "VT");
         if (newStatus !== mapping.status) {
           // Copy-on-write status change
-          db.update(fieldMapping)
+          await db.update(fieldMapping)
             .set({ isLatest: false, updatedAt: new Date().toISOString() })
-            .where(eq(fieldMapping.id, mapping.id))
-            .run();
+            .where(eq(fieldMapping.id, mapping.id));
 
-          const [newVersion] = db
+          const [newVersion] = await db
             .insert(fieldMapping)
             .values({
               ...mapping,
@@ -117,10 +111,9 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             })
-            .returning()
-            .all();
+            .returning();
 
-          logActivity({
+          await logActivity({
             workspaceId,
             fieldMappingId: newVersion.id,
             entityId: entityId || null,

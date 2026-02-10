@@ -10,7 +10,7 @@ export const DELETE = withAuth(
     const params = await ctx.params;
     const inviteId = params.id;
 
-    const invite = db
+    const invite = (await db
       .select()
       .from(workspaceInvite)
       .where(
@@ -18,17 +18,15 @@ export const DELETE = withAuth(
           eq(workspaceInvite.id, inviteId),
           eq(workspaceInvite.workspaceId, workspaceId)
         )
-      )
-      .get();
+      ))[0];
 
     if (!invite) {
       return NextResponse.json({ error: "Invite not found" }, { status: 404 });
     }
 
-    db.update(workspaceInvite)
+    await db.update(workspaceInvite)
       .set({ status: "revoked" })
-      .where(eq(workspaceInvite.id, inviteId))
-      .run();
+      .where(eq(workspaceInvite.id, inviteId));
 
     return NextResponse.json({ success: true });
   },

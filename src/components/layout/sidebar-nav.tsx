@@ -16,11 +16,14 @@ import {
   Compass,
   LogOut,
   Settings,
+  HelpCircle,
 } from "lucide-react";
+import { useQuestions } from "@/queries/question-queries";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/mapping", label: "Mapping", icon: Map },
+  { href: "/mapping/questions", label: "Questions", icon: HelpCircle, badge: true },
   { href: "/schemas", label: "Schemas", icon: Database },
   { href: "/context", label: "Context", icon: BookOpen },
   { href: "/skills", label: "Skills", icon: PenTool },
@@ -31,6 +34,7 @@ const navItems = [
 export function SidebarNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { data: openQuestions } = useQuestions({ status: "open" });
 
   return (
     <aside className="w-56 border-r bg-sidebar h-screen flex flex-col shrink-0">
@@ -52,6 +56,8 @@ export function SidebarNav() {
               : pathname.startsWith(item.href);
           const Icon = item.icon;
 
+          const badgeCount = item.badge ? (openQuestions?.length || 0) : 0;
+
           return (
             <Link
               key={item.href}
@@ -65,6 +71,11 @@ export function SidebarNav() {
             >
               <Icon className="h-4 w-4" />
               {item.label}
+              {badgeCount > 0 && (
+                <span className="ml-auto inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold">
+                  {badgeCount}
+                </span>
+              )}
             </Link>
           );
         })}

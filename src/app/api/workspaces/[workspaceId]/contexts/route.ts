@@ -22,12 +22,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     conditions.push(eq(context.isActive, isActive !== "false"));
   }
 
-  const contexts = db
+  const contexts = await db
     .select()
     .from(context)
     .where(and(...conditions))
-    .orderBy(context.sortOrder)
-    .all();
+    .orderBy(context.sortOrder);
 
   return NextResponse.json(contexts);
 });
@@ -42,7 +41,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
 
   const input = parsed.data;
 
-  const [created] = db
+  const [created] = await db
     .insert(context)
     .values({
       workspaceId,
@@ -56,8 +55,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
       tags: input.tags,
       importSource: input.importSource,
     })
-    .returning()
-    .all();
+    .returning();
 
   return NextResponse.json(created, { status: 201 });
 }, { requiredRole: "editor" });

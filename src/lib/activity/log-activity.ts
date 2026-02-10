@@ -12,8 +12,8 @@ interface LogActivityInput {
   detail?: Record<string, unknown>;
 }
 
-export function logActivity(input: LogActivityInput) {
-  db.insert(activity)
+export async function logActivity(input: LogActivityInput) {
+  await db.insert(activity)
     .values({
       workspaceId: input.workspaceId,
       fieldMappingId: input.fieldMappingId || null,
@@ -22,6 +22,5 @@ export function logActivity(input: LogActivityInput) {
       actorName: input.actorName,
       action: input.action,
       detail: input.detail || null,
-    })
-    .run();
+    });
 }

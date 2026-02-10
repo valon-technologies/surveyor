@@ -11,14 +11,13 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const token = db
+  const token = (await db
     .select({
       email: userBigqueryToken.email,
       createdAt: userBigqueryToken.createdAt,
     })
     .from(userBigqueryToken)
-    .where(eq(userBigqueryToken.userId, session.user.id))
-    .get();
+    .where(eq(userBigqueryToken.userId, session.user.id)))[0];
 
   if (!token) {
     return NextResponse.json({ connected: false });
@@ -38,9 +37,8 @@ export async function DELETE() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  db.delete(userBigqueryToken)
-    .where(eq(userBigqueryToken.userId, session.user.id))
-    .run();
+  await db.delete(userBigqueryToken)
+    .where(eq(userBigqueryToken.userId, session.user.id));
 
   return NextResponse.json({ disconnected: true });
 }

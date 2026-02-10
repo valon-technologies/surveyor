@@ -8,7 +8,7 @@ import { parseCSVSchema } from "@/lib/import/schema-parser";
 
 export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   // Exclude rawContent from list response (can be huge)
-  const assets = db
+  const assets = await db
     .select({
       id: schemaAsset.id,
       workspaceId: schemaAsset.workspaceId,
@@ -23,19 +23,17 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
     })
     .from(schemaAsset)
     .where(eq(schemaAsset.workspaceId, workspaceId))
-    .orderBy(schemaAsset.createdAt)
-    .all();
+    .orderBy(schemaAsset.createdAt);
 
   // Get entity counts per asset
-  const result = assets.map((asset) => {
-    const entityCount = db
+  const result = await Promise.all(assets.map(async (asset) => {
+    const entityCount = (await db
       .select({ cnt: count() })
       .from(entity)
-      .where(eq(entity.schemaAssetId, asset.id))
-      .get();
+      .where(eq(entity.schemaAssetId, asset.id)))[0];
 
     return { ...asset, entityCount: entityCount?.cnt || 0 };
-  });
+  }));
 
   return NextResponse.json(result);
 });
@@ -51,7 +49,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
   const input = parsed.data;
 
   // Create schema asset
-  const [asset] = db
+  const [asset] = await db
     .insert(schemaAsset)
     .values({
       workspaceId,
@@ -62,8 +60,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
       format: input.format,
       rawContent: input.rawContent,
     })
-    .returning()
-    .all();
+    .returning();
 
   // Parse CSV into entities + fields
   if (input.format === "csv" || !input.format) {
@@ -75,7 +72,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
       for (let i = 0; i < parsedEntities.length; i++) {
         const pe = parsedEntities[i];
 
-        const [ent] = db
+        const [ent] = await db
           .insert(entity)
           .values({
             workspaceId,
@@ -86,8 +83,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
             description: pe.description,
             sortOrder: i,
           })
-          .returning()
-          .all();
+          .returning();
 
         if (pe.fields.length > 0) {
           const fieldValues = pe.fields.map((f, j) => ({
@@ -104,7 +100,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
             sortOrder: j,
           }));
 
-          db.insert(field).values(fieldValues).run();
+          await db.insert(field).values(fieldValues);
         }
       }
     } catch (err) {

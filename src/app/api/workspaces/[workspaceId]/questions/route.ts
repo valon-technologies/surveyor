@@ -9,17 +9,18 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const searchParams = req.nextUrl.searchParams;
   const status = searchParams.get("status");
   const entityId = searchParams.get("entityId");
+  const targetForTeam = searchParams.get("targetForTeam");
 
   const conditions = [eq(question.workspaceId, workspaceId)];
   if (status) conditions.push(eq(question.status, status));
   if (entityId) conditions.push(eq(question.entityId, entityId));
+  if (targetForTeam) conditions.push(eq(question.targetForTeam, targetForTeam));
 
-  const questions = db
+  const questions = await db
     .select()
     .from(question)
     .where(and(...conditions))
-    .orderBy(question.createdAt)
-    .all();
+    .orderBy(question.createdAt);
 
   return NextResponse.json(questions);
 });
@@ -34,7 +35,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
 
   const input = parsed.data;
 
-  const [created] = db
+  const [created] = await db
     .insert(question)
     .values({
       workspaceId,
@@ -43,8 +44,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
       question: input.question,
       askedBy: input.askedBy || "user",
     })
-    .returning()
-    .all();
+    .returning();
 
   return NextResponse.json(created, { status: 201 });
 }, { requiredRole: "editor" });

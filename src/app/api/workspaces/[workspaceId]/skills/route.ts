@@ -6,22 +6,20 @@ import { createSkillSchema } from "@/lib/validators/skill";
 import { withAuth } from "@/lib/auth/api-auth";
 
 export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
-  const skills = db
+  const skills = await db
     .select()
     .from(skill)
     .where(eq(skill.workspaceId, workspaceId))
-    .orderBy(skill.sortOrder)
-    .all();
+    .orderBy(skill.sortOrder);
 
   // Add context counts
-  const withCounts = skills.map((s) => {
-    const count = db
+  const withCounts = await Promise.all(skills.map(async (s) => {
+    const count = (await db
       .select({ count: sql<number>`count(*)` })
       .from(skillContext)
-      .where(eq(skillContext.skillId, s.id))
-      .get();
+      .where(eq(skillContext.skillId, s.id)))[0];
     return { ...s, contextCount: count?.count ?? 0 };
-  });
+  }));
 
   return NextResponse.json(withCounts);
 });
@@ -36,7 +34,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
 
   const input = parsed.data;
 
-  const [created] = db
+  const [created] = await db
     .insert(skill)
     .values({
       workspaceId,
@@ -46,8 +44,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
       applicability: input.applicability,
       tags: input.tags,
     })
-    .returning()
-    .all();
+    .returning();
 
   return NextResponse.json({ ...created, contextCount: 0 }, { status: 201 });
 }, { requiredRole: "editor" });

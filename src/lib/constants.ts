@@ -5,6 +5,7 @@ export const MAPPING_STATUSES = [
   "open_comment_sm",
   "open_comment_vt",
   "fully_closed",
+  "excluded",
 ] as const;
 export type MappingStatus = (typeof MAPPING_STATUSES)[number];
 
@@ -14,6 +15,7 @@ export const MAPPING_STATUS_COLORS: Record<MappingStatus, string> = {
   open_comment_sm: "#f59e0b",
   open_comment_vt: "#8b5cf6",
   fully_closed: "#22c55e",
+  excluded: "#a8a29e",
 };
 
 export const MAPPING_STATUS_LABELS: Record<MappingStatus, string> = {
@@ -22,6 +24,7 @@ export const MAPPING_STATUS_LABELS: Record<MappingStatus, string> = {
   open_comment_sm: "Open Comment (SM)",
   open_comment_vt: "Open Comment (VT)",
   fully_closed: "Fully Closed",
+  excluded: "Excluded",
 };
 
 export const MAPPING_STATUS_DESCRIPTIONS: Record<MappingStatus, string> = {
@@ -30,6 +33,7 @@ export const MAPPING_STATUS_DESCRIPTIONS: Record<MappingStatus, string> = {
   open_comment_sm: "Open comment from ServiceMac team requiring response",
   open_comment_vt: "Open comment from Valon Tech team requiring response",
   fully_closed: "Mapping reviewed, validated, and closed",
+  excluded: "Business decided this field does not need mapping",
 };
 
 // ─── Mapping Types ───────────────────────────────────────────
@@ -299,6 +303,52 @@ export const DEFAULT_MODELS: Record<LLMProvider, { singleField: string; batch: s
   claude: { singleField: "claude-haiku-4-5-20251001", batch: "claude-sonnet-4-5-20250929" },
   openai: { singleField: "gpt-4o-mini", batch: "gpt-4o" },
 };
+
+// ─── Review Statuses ──────────────────────────────────────────
+export const REVIEW_STATUSES = ["accepted", "punted", "needs_discussion"] as const;
+export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
+
+export const REVIEW_STATUS_LABELS: Record<ReviewStatus, string> = {
+  accepted: "Accepted",
+  punted: "Punted",
+  needs_discussion: "Needs Discussion",
+};
+
+export const REVIEW_STATUS_COLORS: Record<ReviewStatus, string> = {
+  accepted: "#22c55e",
+  punted: "#f59e0b",
+  needs_discussion: "#3b82f6",
+};
+
+// ─── Batch Run Statuses ──────────────────────────────────────
+export const BATCH_RUN_STATUSES = ["pending", "running", "completed", "failed"] as const;
+export type BatchRunStatus = (typeof BATCH_RUN_STATUSES)[number];
+
+// ─── Question Priorities ─────────────────────────────────────
+export const QUESTION_PRIORITIES = ["urgent", "high", "normal", "low"] as const;
+export type QuestionPriority = (typeof QUESTION_PRIORITIES)[number];
+
+export const QUESTION_PRIORITY_LABELS: Record<QuestionPriority, string> = {
+  urgent: "Urgent",
+  high: "High",
+  normal: "Normal",
+  low: "Low",
+};
+
+export const QUESTION_PRIORITY_COLORS: Record<QuestionPriority, string> = {
+  urgent: "#ef4444",
+  high: "#f59e0b",
+  normal: "#6b7280",
+  low: "#d4d4d8",
+};
+
+// ─── Chat Session Statuses ───────────────────────────────────
+export const CHAT_SESSION_STATUSES = ["active", "resolved", "abandoned"] as const;
+export type ChatSessionStatus = (typeof CHAT_SESSION_STATUSES)[number];
+
+// ─── Chat Message Roles ──────────────────────────────────────
+export const CHAT_MESSAGE_ROLES = ["user", "assistant", "system"] as const;
+export type ChatMessageRole = (typeof CHAT_MESSAGE_ROLES)[number];
 
 // ─── Default workspace ───────────────────────────────────────
 export const DEFAULT_WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";

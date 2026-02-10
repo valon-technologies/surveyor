@@ -46,16 +46,16 @@ interface PreparedGeneration {
 }
 
 /**
- * Synchronous setup: validates, loads data, assembles context, creates generation record.
- * Returns immediately with generation metadata + prepared data for async execution.
+ * Async setup: validates, loads data, assembles context, creates generation record.
+ * Returns with generation metadata + prepared data for async execution.
  */
-export function startGeneration(
+export async function startGeneration(
   input: RunGenerationInput
-): { startResult: GenerationStartResult; prepared: PreparedGeneration } {
+): Promise<{ startResult: GenerationStartResult; prepared: PreparedGeneration }> {
   const { workspaceId, userId, entityId, fieldIds, preferredProvider } = input;
 
   // 1. Check for concurrent generation on this entity
-  const running = db
+  const running = (await db
     .select()
     .from(generation)
     .where(
@@ -64,8 +64,7 @@ export function startGeneration(
         eq(generation.entityId, entityId),
         eq(generation.status, "running")
       )
-    )
-    .get();
+    ))[0];
 
   if (running) {
     throw new Error(
@@ -74,29 +73,27 @@ export function startGeneration(
   }
 
   // 2. Load target entity
-  const targetEntity = db
+  const targetEntity = (await db
     .select()
     .from(entity)
-    .where(and(eq(entity.id, entityId), eq(entity.workspaceId, workspaceId)))
-    .get();
+    .where(and(eq(entity.id, entityId), eq(entity.workspaceId, workspaceId))))[0];
 
   if (!targetEntity) {
     throw new Error("Entity not found");
   }
 
   // 3. Load target fields
-  let targetFields = db
+  let targetFields = await db
     .select()
     .from(field)
     .where(eq(field.entityId, entityId))
-    .orderBy(field.sortOrder)
-    .all();
+    .orderBy(field.sortOrder);
 
   if (fieldIds?.length) {
     const idSet = new Set(fieldIds);
     targetFields = targetFields.filter((f) => idSet.has(f.id));
   } else {
-    const existingMappings = db
+    const existingMappings = await db
       .select({ targetFieldId: fieldMapping.targetFieldId })
       .from(fieldMapping)
       .where(
@@ -104,8 +101,7 @@ export function startGeneration(
           eq(fieldMapping.workspaceId, workspaceId),
           eq(fieldMapping.isLatest, true)
         )
-      )
-      .all();
+      );
 
     const mappedIds = new Set(existingMappings.map((m) => m.targetFieldId));
     targetFields = targetFields.filter((f) => !mappedIds.has(f.id));
@@ -116,28 +112,26 @@ export function startGeneration(
   }
 
   // 4. Load source entities and fields
-  const sourceEntities = db
+  const sourceEntities = await db
     .select()
     .from(entity)
-    .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-    .all();
+    .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")));
 
   const sourceEntityIds = sourceEntities.map((e) => e.id);
   const sourceFields =
     sourceEntityIds.length > 0
-      ? db
+      ? (await db
           .select()
-          .from(field)
-          .all()
+          .from(field))
           .filter((f) => sourceEntityIds.includes(f.entityId))
       : [];
 
   // 5. Resolve provider
-  const { provider, providerName } = resolveProvider(userId, preferredProvider);
+  const { provider, providerName } = await resolveProvider(userId, preferredProvider);
 
   // 6. Assemble context
   const tokenBudget = getTokenBudget(providerName);
-  const assembledCtx = assembleContext(workspaceId, targetEntity.name, tokenBudget);
+  const assembledCtx = await assembleContext(workspaceId, targetEntity.name, tokenBudget);
 
   // 7. Build prompt
   const { systemMessage, userMessage } = buildPrompt({
@@ -159,7 +153,7 @@ export function startGeneration(
   const generationId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  db.insert(generation)
+  await db.insert(generation)
     .values({
       id: generationId,
       workspaceId,
@@ -175,8 +169,7 @@ export function startGeneration(
       },
       createdAt: now,
       updatedAt: now,
-    })
-    .run();
+    });
 
   return {
     startResult: {
@@ -249,7 +242,7 @@ export async function executeGeneration(prepared: PreparedGeneration): Promise<v
       requestedFieldNames: targetFields.map((f) => f.name),
     });
 
-    db.update(generation)
+    await db.update(generation)
       .set({
         status: "completed",
         model: response.model,
@@ -260,42 +253,39 @@ export async function executeGeneration(prepared: PreparedGeneration): Promise<v
         durationMs,
         updatedAt: new Date().toISOString(),
       })
-      .where(eq(generation.id, generationId))
-      .run();
+      .where(eq(generation.id, generationId));
   } catch (error) {
     const durationMs = Date.now() - startTime;
     const errorMessage =
       error instanceof Error ? error.message : String(error);
 
-    db.update(generation)
+    await db.update(generation)
       .set({
         status: "failed",
         error: errorMessage,
         durationMs,
         updatedAt: new Date().toISOString(),
       })
-      .where(eq(generation.id, generationId))
-      .run();
+      .where(eq(generation.id, generationId));
   }
 }
 
 /**
- * Convenience wrapper: runs start + execute synchronously (blocking).
+ * Convenience wrapper: runs start + execute (blocking).
  * Used for cases where you want to wait for the result.
  */
 export async function runGeneration(
   input: RunGenerationInput
 ): Promise<RunGenerationResult> {
-  const { startResult, prepared } = startGeneration(input);
+  const { startResult, prepared } = await startGeneration(input);
 
   await executeGeneration(prepared);
 
   // Read the completed record from DB
-  const gen = db
+  const gen = (await db
     .select()
     .from(generation)
-    .where(eq(generation.id, startResult.generationId))
-    .get();
+    .where(eq(generation.id, startResult.generationId)))[0];
 
   if (!gen) {
     throw new Error("Generation record not found after execution");

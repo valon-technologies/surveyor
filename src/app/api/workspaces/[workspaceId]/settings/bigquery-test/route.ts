@@ -18,11 +18,10 @@ export const POST = withAuth(async (req, _ctx, { userId }) => {
   }
 
   // Load user's BQ OAuth token
-  const bqToken = db
+  const bqToken = (await db
     .select()
     .from(userBigqueryToken)
-    .where(eq(userBigqueryToken.userId, userId))
-    .get();
+    .where(eq(userBigqueryToken.userId, userId)))[0];
 
   const bqOptions: ConstructorParameters<typeof BigQuery>[0] = { projectId };
 

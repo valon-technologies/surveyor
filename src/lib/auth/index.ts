@@ -20,11 +20,10 @@ const providers: Provider[] = [
         const email = credentials.email as string;
         const password = credentials.password as string;
 
-        const found = db
+        const found = (await db
           .select()
           .from(user)
-          .where(eq(user.email, email))
-          .get();
+          .where(eq(user.email, email)))[0];
 
         if (!found?.passwordHash) return null;
 
@@ -61,28 +60,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       // For OAuth sign-ins, find or create the user record
       if (account && account.provider !== "credentials" && authUser?.email) {
-        const existing = db
+        const existing = (await db
           .select()
           .from(user)
-          .where(eq(user.email, authUser.email))
-          .get();
+          .where(eq(user.email, authUser.email)))[0];
 
         if (existing) {
           token.id = existing.id;
         } else {
           // Create user + default workspace for OAuth sign-ups
-          const [newUser] = db
+          const [newUser] = await db
             .insert(user)
             .values({
               name: authUser.name || authUser.email,
               email: authUser.email,
               image: authUser.image,
             })
-            .returning()
-            .all();
+            .returning();
 
           token.id = newUser.id;
-          createDefaultWorkspace(newUser.id, newUser.name || "My Workspace");
+          await createDefaultWorkspace(newUser.id, newUser.name || "My Workspace");
         }
       }
 
@@ -97,18 +94,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 });
 
-function createDefaultWorkspace(userId: string, userName: string) {
-  const [ws] = db
+async function createDefaultWorkspace(userId: string, userName: string) {
+  const [ws] = await db
     .insert(workspace)
     .values({
       name: `${userName}'s Workspace`,
       description: "Personal mapping workspace",
       settings: { defaultProvider: "claude" },
     })
-    .returning()
-    .all();
+    .returning();
 
-  db.insert(userWorkspace)
-    .values({ userId, workspaceId: ws.id, role: "owner" })
-    .run();
+  await db.insert(userWorkspace)
+    .values({ userId, workspaceId: ws.id, role: "owner" });
 }

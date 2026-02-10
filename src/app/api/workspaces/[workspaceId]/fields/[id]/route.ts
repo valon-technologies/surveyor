@@ -21,12 +21,11 @@ export const PATCH = withAuth(async (req, ctx, { workspaceId }) => {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const [updated] = db
+  const [updated] = await db
     .update(field)
     .set({ ...parsed.data, updatedAt: new Date().toISOString() })
     .where(eq(field.id, id))
-    .returning()
-    .all();
+    .returning();
 
   if (!updated) {
     return NextResponse.json({ error: "Field not found" }, { status: 404 });

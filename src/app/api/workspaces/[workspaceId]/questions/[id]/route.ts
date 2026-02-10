@@ -14,12 +14,11 @@ export const PATCH = withAuth(async (req, ctx, { workspaceId }) => {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const [updated] = db
+  const [updated] = await db
     .update(question)
     .set({ ...parsed.data, updatedAt: new Date().toISOString() })
     .where(and(eq(question.id, id), eq(question.workspaceId, workspaceId)))
-    .returning()
-    .all();
+    .returning();
 
   if (!updated) {
     return NextResponse.json({ error: "Question not found" }, { status: 404 });

@@ -7,7 +7,7 @@ import { eq, and, count } from "drizzle-orm";
 export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   const { id } = await ctx.params;
 
-  const asset = db
+  const asset = (await db
     .select({
       id: schemaAsset.id,
       workspaceId: schemaAsset.workspaceId,
@@ -21,30 +21,27 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
       updatedAt: schemaAsset.updatedAt,
     })
     .from(schemaAsset)
-    .where(and(eq(schemaAsset.id, id), eq(schemaAsset.workspaceId, workspaceId)))
-    .get();
+    .where(and(eq(schemaAsset.id, id), eq(schemaAsset.workspaceId, workspaceId))))[0];
 
   if (!asset) {
     return NextResponse.json({ error: "Schema asset not found" }, { status: 404 });
   }
 
   // Get entities with field counts
-  const entities = db
+  const entities = await db
     .select()
     .from(entity)
     .where(eq(entity.schemaAssetId, id))
-    .orderBy(entity.sortOrder)
-    .all();
+    .orderBy(entity.sortOrder);
 
-  const entitiesWithFields = entities.map((ent) => {
-    const fieldCount = db
+  const entitiesWithFields = await Promise.all(entities.map(async (ent) => {
+    const fieldCount = (await db
       .select({ cnt: count() })
       .from(field)
-      .where(eq(field.entityId, ent.id))
-      .get();
+      .where(eq(field.entityId, ent.id)))[0];
 
     return { ...ent, fieldCount: fieldCount?.cnt || 0 };
-  });
+  }));
 
   return NextResponse.json({ ...asset, entities: entitiesWithFields });
 });
@@ -52,9 +49,8 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
 export const DELETE = withAuth(async (_req, ctx, { workspaceId }) => {
   const { id } = await ctx.params;
 
-  db.delete(schemaAsset)
-    .where(and(eq(schemaAsset.id, id), eq(schemaAsset.workspaceId, workspaceId)))
-    .run();
+  await db.delete(schemaAsset)
+    .where(and(eq(schemaAsset.id, id), eq(schemaAsset.workspaceId, workspaceId)));
 
   return NextResponse.json({ success: true });
 }, { requiredRole: "editor" });
