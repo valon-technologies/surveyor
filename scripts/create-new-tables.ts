@@ -47,7 +47,7 @@ async function main() {
         content_format TEXT NOT NULL DEFAULT 'markdown',
         token_count INTEGER,
         tags TEXT,
-        is_active INTEGER NOT NULL DEFAULT 1,
+        is_active BOOLEAN NOT NULL DEFAULT true,
         sort_order INTEGER NOT NULL DEFAULT 0,
         import_source TEXT,
         metadata TEXT,

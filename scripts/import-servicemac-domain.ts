@@ -17,7 +17,7 @@ import crypto from "crypto";
 import "dotenv/config";
 
 const SM_ROOT = "/Users/grantlee/Dev/mapping-skills/.claude/skills/servicemac-domain";
-const WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
+const WORKSPACE_ID = "847602b2-188d-4fca-b1b1-d6098bb22aba";
 
 const client = postgres(process.env.DATABASE_URL!, { prepare: false });
 
@@ -218,7 +218,7 @@ async function main() {
         INSERT INTO context (id, workspace_id, name, category, subcategory, content, content_format, token_count, tags, is_active, sort_order, import_source, created_at, updated_at)
         VALUES (${doc.id}, ${WORKSPACE_ID}, ${doc.name}, ${doc.category}, ${doc.subcategory},
                 ${doc.content}, 'markdown', ${tokenCount}, ${JSON.stringify(doc.tags)},
-                1, 0, ${doc.importSource}, ${now}, ${now})
+                true, 0, ${doc.importSource}, ${now}, ${now})
         ON CONFLICT (id) DO NOTHING
       `;
     }

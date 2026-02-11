@@ -11,7 +11,7 @@ import crypto from "crypto";
 import "dotenv/config";
 
 const TRANSCRIPTS_DIR = "/Users/grantlee/Dev/mapping-skills/servicemac-m1/transcripts";
-const WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
+const WORKSPACE_ID = "847602b2-188d-4fca-b1b1-d6098bb22aba";
 
 const client = postgres(process.env.DATABASE_URL!, { prepare: false });
 
@@ -44,7 +44,7 @@ async function main() {
           import_source, metadata, created_at, updated_at
         ) VALUES (
           ${uuid}, ${WORKSPACE_ID}, ${t.name}, 'adhoc', 'transcript', NULL, NULL,
-          ${content}, 'markdown', ${tokenCount}, ${JSON.stringify(["servicemac", "transcript", "mapping-session"])}, 1, ${i},
+          ${content}, 'markdown', ${tokenCount}, ${JSON.stringify(["servicemac", "transcript", "mapping-session"])}, true, ${i},
           ${"servicemac-m1/transcripts/" + t.file}, NULL,
           NOW(), NOW()
         )

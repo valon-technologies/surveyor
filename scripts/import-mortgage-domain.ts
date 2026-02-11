@@ -14,7 +14,7 @@ import crypto from "crypto";
 import "dotenv/config";
 
 const SKILLS_ROOT = "/Users/grantlee/Dev/mapping-skills/.claude/skills/mortgage-domain";
-const WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
+const WORKSPACE_ID = "847602b2-188d-4fca-b1b1-d6098bb22aba";
 
 const client = postgres(process.env.DATABASE_URL!, { prepare: false });
 
@@ -151,7 +151,7 @@ async function main() {
           import_source, metadata, created_at, updated_at
         ) VALUES (
           ${uuid}, ${WORKSPACE_ID}, ${name}, 'foundational', 'domain_knowledge', NULL, NULL,
-          ${mergedContent}, 'markdown', ${tokenCount}, ${tagsJson}, 1, ${i},
+          ${mergedContent}, 'markdown', ${tokenCount}, ${tagsJson}, true, ${i},
           ${importSource}, NULL,
           NOW(), NOW()
         )

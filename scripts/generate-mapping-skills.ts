@@ -16,7 +16,7 @@ import path from "path";
 import crypto from "crypto";
 import "dotenv/config";
 
-const WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
+const WORKSPACE_ID = "847602b2-188d-4fca-b1b1-d6098bb22aba";
 const client = postgres(process.env.DATABASE_URL!, { prepare: false });
 
 async function main() {
@@ -321,7 +321,7 @@ ${sourceTableList}
       await tx`
         INSERT INTO skill (id, workspace_id, name, description, instructions, applicability, tags, is_active, sort_order)
         VALUES (${skillId}, ${WORKSPACE_ID}, ${"Mapping: " + label}, ${description},
-                ${instructions}, ${JSON.stringify(applicability)}, ${JSON.stringify(tags)}, 1, ${skillCount})
+                ${instructions}, ${JSON.stringify(applicability)}, ${JSON.stringify(tags)}, true, ${skillCount})
       `;
 
       let ctxOrder = 0;

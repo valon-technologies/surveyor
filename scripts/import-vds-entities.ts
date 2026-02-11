@@ -14,7 +14,7 @@ import crypto from "crypto";
 import "dotenv/config";
 
 const VDS_ROOT = "/Users/grantlee/Dev/mapping-skills/.claude/skills/vds-entities";
-const WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
+const WORKSPACE_ID = "847602b2-188d-4fca-b1b1-d6098bb22aba";
 
 const client = postgres(process.env.DATABASE_URL!, { prepare: false });
 
@@ -134,7 +134,7 @@ async function main() {
           import_source, metadata, created_at, updated_at
         ) VALUES (
           ${uuid}, ${WORKSPACE_ID}, ${name}, 'schema', 'data_dictionary', NULL, NULL,
-          ${mergedContent}, 'markdown', ${tokenCount}, ${JSON.stringify(topic.tags)}, 1, ${i},
+          ${mergedContent}, 'markdown', ${tokenCount}, ${JSON.stringify(topic.tags)}, true, ${i},
           ${"vds-entities/" + topic.relativePath}, NULL,
           NOW(), NOW()
         )

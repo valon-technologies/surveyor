@@ -15,7 +15,7 @@ import path from "path";
 import crypto from "crypto";
 import "dotenv/config";
 
-const WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
+const WORKSPACE_ID = "847602b2-188d-4fca-b1b1-d6098bb22aba";
 const client = postgres(process.env.DATABASE_URL!, { prepare: false });
 
 function makeId(): string {
@@ -299,7 +299,7 @@ async function main() {
       await tx`
         INSERT INTO skill (id, workspace_id, name, description, instructions, applicability, tags, is_active, sort_order)
         VALUES (${skillId}, ${WORKSPACE_ID}, ${skill.name}, ${skill.description},
-                ${skill.instructions}, ${JSON.stringify(skill.applicability)}, ${JSON.stringify(skill.tags)}, 1, ${idx})
+                ${skill.instructions}, ${JSON.stringify(skill.applicability)}, ${JSON.stringify(skill.tags)}, true, ${idx})
         ON CONFLICT (id) DO NOTHING
       `;
 
