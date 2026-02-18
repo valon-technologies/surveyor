@@ -6,7 +6,7 @@ import { eq, and } from "drizzle-orm";
 
 // GET — list pending invites for this workspace
 export const GET = withAuth(async (_req, _ctx, { workspaceId }) => {
-  const invites = await db
+  const invites = db
     .select()
     .from(workspaceInvite)
     .where(
@@ -14,7 +14,8 @@ export const GET = withAuth(async (_req, _ctx, { workspaceId }) => {
         eq(workspaceInvite.workspaceId, workspaceId),
         eq(workspaceInvite.status, "pending")
       )
-    );
+    )
+    .all();
 
   return NextResponse.json(invites);
 });
@@ -29,7 +30,7 @@ export const POST = withAuth(
     }
 
     // Check for existing pending invite
-    const existing = (await db
+    const existing = db
       .select()
       .from(workspaceInvite)
       .where(
@@ -38,7 +39,8 @@ export const POST = withAuth(
           eq(workspaceInvite.email, email),
           eq(workspaceInvite.status, "pending")
         )
-      ))[0];
+      )
+      .get();
 
     if (existing) {
       return NextResponse.json(
@@ -50,7 +52,7 @@ export const POST = withAuth(
     // Set expiry to 7 days from now
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const [invite] = await db
+    const [invite] = db
       .insert(workspaceInvite)
       .values({
         workspaceId,
@@ -59,7 +61,8 @@ export const POST = withAuth(
         invitedBy: userId,
         expiresAt,
       })
-      .returning();
+      .returning()
+      .all();
 
     return NextResponse.json(invite, { status: 201 });
   },

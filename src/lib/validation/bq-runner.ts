@@ -1,6 +1,6 @@
-import { BigQuery } from "@google-cloud/bigquery";
-import type { BigQueryConfig, BigQueryCredentials } from "@/types/workspace";
+import type { BigQueryConfig } from "@/types/workspace";
 import type { ValidationInput, ValidationOutput, ValidationCheck } from "./runner";
+import { listTables, getTableSchema, type BqField } from "@/lib/bigquery/gestalt-client";
 
 // Map BQ types to broad categories for compatibility checking
 const BQ_TYPE_CATEGORIES: Record<string, string> = {
@@ -63,7 +63,6 @@ function categorizeBqType(bqType: string): string {
 }
 
 function categorizeVdsType(vdsType: string): string {
-  // Normalize: strip size specs like "VARCHAR(255)" -> "varchar"
   const base = vdsType.toLowerCase().replace(/\(.*\)/, "").trim();
   return VDS_TYPE_CATEGORIES[base] || "unknown";
 }
@@ -80,22 +79,18 @@ function areTypesCompatible(bqType: string, vdsType: string): { compatible: bool
     return { compatible: true, detail: `BQ "${bqType}" (${bqCat}) is compatible with VDS "${vdsType}" (${vdsCat})` };
   }
 
-  // Numeric -> String is generally safe (implicit cast)
   if (bqCat === "numeric" && vdsCat === "string") {
     return { compatible: true, detail: `BQ "${bqType}" can be cast to VDS "${vdsType}" (numeric→string)` };
   }
 
-  // Date/datetime -> String is generally safe
   if ((bqCat === "date" || bqCat === "datetime") && vdsCat === "string") {
     return { compatible: true, detail: `BQ "${bqType}" can be cast to VDS "${vdsType}" (date→string)` };
   }
 
-  // Boolean -> numeric/string usually works
   if (bqCat === "boolean" && (vdsCat === "numeric" || vdsCat === "string")) {
     return { compatible: true, detail: `BQ "${bqType}" can be cast to VDS "${vdsType}" (boolean→${vdsCat})` };
   }
 
-  // Date <-> datetime often compatible
   if ((bqCat === "date" && vdsCat === "datetime") || (bqCat === "datetime" && vdsCat === "date")) {
     return { compatible: true, detail: `BQ "${bqType}" and VDS "${vdsType}" are date-compatible (may truncate time)` };
   }
@@ -109,29 +104,32 @@ function areTypesCompatible(bqType: string, vdsType: string): { compatible: bool
 export async function runBqValidation(
   input: ValidationInput,
   config: BigQueryConfig,
-  credentials?: BigQueryCredentials
 ): Promise<ValidationOutput> {
-  const bqOptions: ConstructorParameters<typeof BigQuery>[0] = {
-    projectId: config.projectId,
-  };
-
-  if (credentials) {
-    bqOptions.credentials = {
-      type: "authorized_user",
-      client_id: credentials.clientId,
-      client_secret: credentials.clientSecret,
-      refresh_token: credentials.refreshToken,
-    };
-  }
-
-  const bq = new BigQuery(bqOptions);
   const checks: ValidationCheck[] = [];
   const errors: string[] = [];
+
+  // Cache: fetch tables list once, and cache schemas per table
+  let tablesList: string[] | null = null;
+  const schemaCache: Record<string, BqField[]> = {};
+
+  async function getTables(): Promise<string[]> {
+    if (!tablesList) {
+      tablesList = await listTables(config.projectId, config.sourceDataset);
+    }
+    return tablesList;
+  }
+
+  async function getFields(tableName: string): Promise<BqField[]> {
+    if (!schemaCache[tableName]) {
+      const schema = await getTableSchema(config.projectId, config.sourceDataset, tableName);
+      schemaCache[tableName] = schema.schema.fields;
+    }
+    return schemaCache[tableName];
+  }
 
   for (const f of input.fields) {
     const sourceTable = f.source?.table || null;
     const sourceField = f.source?.field || null;
-    const transform = f.source?.transform || null;
 
     // 1. Table exists
     if (!sourceTable) {
@@ -143,16 +141,15 @@ export async function runBqValidation(
       });
     } else {
       try {
-        const [rows] = await bq.query({
-          query: `SELECT table_name FROM \`${config.projectId}.${config.sourceDataset}\`.INFORMATION_SCHEMA.TABLES WHERE table_name = @tableName`,
-          params: { tableName: sourceTable },
-        });
-        if (rows.length > 0) {
+        const tables = await getTables();
+        // Case-insensitive match
+        const match = tables.find((t) => t.toLowerCase() === sourceTable.toLowerCase());
+        if (match) {
           checks.push({
             checkType: "table_exists",
             field: f.vds_field,
             status: "passed",
-            message: `Table "${sourceTable}" exists in ${config.sourceDataset}`,
+            message: `Table "${match}" exists in ${config.sourceDataset}`,
           });
         } else {
           checks.push({
@@ -186,24 +183,25 @@ export async function runBqValidation(
       });
     } else {
       try {
-        const [rows] = await bq.query({
-          query: `SELECT column_name, data_type FROM \`${config.projectId}.${config.sourceDataset}\`.INFORMATION_SCHEMA.COLUMNS WHERE table_name = @tableName AND column_name = @columnName`,
-          params: { tableName: sourceTable, columnName: sourceField },
-        });
-        if (rows.length > 0) {
-          bqDataType = rows[0].data_type;
+        // Use the actual table name (case-matched) from the tables list
+        const tables = await getTables();
+        const actualTable = tables.find((t) => t.toLowerCase() === sourceTable.toLowerCase()) || sourceTable;
+        const fields = await getFields(actualTable);
+        const match = fields.find((fld) => fld.name.toLowerCase() === sourceField.toLowerCase());
+        if (match) {
+          bqDataType = match.type;
           checks.push({
             checkType: "field_exists",
             field: f.vds_field,
             status: "passed",
-            message: `Field "${sourceField}" exists in "${sourceTable}" (type: ${bqDataType})`,
+            message: `Field "${match.name}" exists in "${actualTable}" (type: ${bqDataType})`,
           });
         } else {
           checks.push({
             checkType: "field_exists",
             field: f.vds_field,
             status: "failed",
-            message: `Field "${sourceField}" not found in table "${sourceTable}"`,
+            message: `Field "${sourceField}" not found in table "${actualTable}"`,
           });
         }
       } catch (err) {
@@ -242,35 +240,13 @@ export async function runBqValidation(
       });
     }
 
-    // 4. Transform SQL valid (dry run)
-    if (!transform || !sourceTable) {
-      checks.push({
-        checkType: "transform_valid",
-        field: f.vds_field,
-        status: "skipped",
-        message: !transform ? "No transform SQL specified" : "No source table specified",
-      });
-    } else {
-      try {
-        const query = `SELECT ${transform} FROM \`${config.projectId}.${config.sourceDataset}.${sourceTable}\` LIMIT 0`;
-        await bq.createQueryJob({ query, dryRun: true });
-        checks.push({
-          checkType: "transform_valid",
-          field: f.vds_field,
-          status: "passed",
-          message: "Transform SQL is valid (dry run passed)",
-        });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Unknown error";
-        checks.push({
-          checkType: "transform_valid",
-          field: f.vds_field,
-          status: "failed",
-          message: "Transform SQL is invalid",
-          detail: msg,
-        });
-      }
-    }
+    // 4. Transform SQL — skipped (Gestalt query endpoint not available for dry-run)
+    checks.push({
+      checkType: "transform_valid",
+      field: f.vds_field,
+      status: "skipped",
+      message: "Transform validation not available via Gestalt",
+    });
   }
 
   // Build summary
@@ -283,7 +259,6 @@ export async function runBqValidation(
 
   const passed = summary.failed === 0;
 
-  // Build legacy results array for backwards compatibility
   const results = input.fields.map((f) => {
     const fieldChecks = checks.filter((c) => c.field === f.vds_field);
     const anyFailed = fieldChecks.some((c) => c.status === "failed" || c.status === "error");

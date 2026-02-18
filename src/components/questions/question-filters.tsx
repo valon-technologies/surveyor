@@ -5,6 +5,7 @@ import {
   WORKSPACE_TEAMS,
   WORKSPACE_TEAM_LABELS,
   QUESTION_STATUSES,
+  QUESTION_STATUS_LABELS,
   QUESTION_PRIORITIES,
   QUESTION_PRIORITY_LABELS,
 } from "@/lib/constants";
@@ -36,7 +37,7 @@ export function QuestionFilters({
     { value: "all", label: "All Statuses" },
     ...QUESTION_STATUSES.map((s) => ({
       value: s,
-      label: s.charAt(0).toUpperCase() + s.slice(1),
+      label: QUESTION_STATUS_LABELS[s],
     })),
   ];
 

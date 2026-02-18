@@ -1,30 +1,146 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { entity, field, fieldMapping, question } from "@/lib/db/schema";
-import { eq, and, sql, count } from "drizzle-orm";
+import {
+  entity,
+  field,
+  fieldMapping,
+  question,
+  user,
+  chatSession,
+} from "@/lib/db/schema";
+import { eq, and, sql, count, notInArray } from "drizzle-orm";
 import { MILESTONES } from "@/lib/constants";
+import type {
+  LeaderboardEntry,
+  AssignedFieldItem,
+  MyQuestionItem,
+} from "@/types/dashboard";
 
-export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
+export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
+  const url = new URL(req.url);
+  const tab = url.searchParams.get("tab");
+
+  // ─── My Work Tab ──────────────────────────────────────────
+  if (tab === "my-work") {
+    // Assigned fields: latest mappings assigned to current user, not yet closed
+    const assignedFields: AssignedFieldItem[] = db
+      .select({
+        fieldMappingId: fieldMapping.id,
+        targetFieldId: fieldMapping.targetFieldId,
+        targetFieldName: field.name,
+        targetFieldDescription: field.description,
+        entityId: entity.id,
+        entityName: sql<string>`COALESCE(${entity.displayName}, ${entity.name})`,
+        status: fieldMapping.status,
+        confidence: fieldMapping.confidence,
+        mappingType: fieldMapping.mappingType,
+        puntNote: fieldMapping.puntNote,
+        updatedAt: fieldMapping.updatedAt,
+      })
+      .from(fieldMapping)
+      .innerJoin(field, eq(field.id, fieldMapping.targetFieldId))
+      .innerJoin(entity, eq(entity.id, field.entityId))
+      .where(
+        and(
+          eq(fieldMapping.workspaceId, workspaceId),
+          eq(fieldMapping.assigneeId, userId),
+          eq(fieldMapping.isLatest, true),
+          notInArray(fieldMapping.status, ["accepted", "excluded"])
+        )
+      )
+      .orderBy(entity.sortOrder, field.sortOrder)
+      .all();
+
+    // My questions: open questions I created or am assigned to
+    const allOpenQuestions = db
+      .select({
+        id: question.id,
+        question: question.question,
+        status: question.status,
+        priority: question.priority,
+        entityId: question.entityId,
+        entityName: entity.displayName,
+        entityNameFallback: entity.name,
+        fieldId: question.fieldId,
+        assigneeIds: question.assigneeIds,
+        createdByUserId: question.createdByUserId,
+        replyCount: question.replyCount,
+        createdAt: question.createdAt,
+      })
+      .from(question)
+      .leftJoin(entity, eq(entity.id, question.entityId))
+      .where(
+        and(
+          eq(question.workspaceId, workspaceId),
+          eq(question.status, "open")
+        )
+      )
+      .orderBy(
+        sql`CASE ${question.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END`,
+        question.createdAt
+      )
+      .all();
+
+    // Filter to questions the user created or is assigned to
+    const myQuestions: MyQuestionItem[] = [];
+    for (const q of allOpenQuestions) {
+      const assigneeIds = q.assigneeIds ?? [];
+      const isAssigned = assigneeIds.includes(userId);
+      const isCreated = q.createdByUserId === userId;
+      if (!isAssigned && !isCreated) continue;
+
+      // Look up field name if fieldId exists
+      let fieldName: string | null = null;
+      if (q.fieldId) {
+        const f = db
+          .select({ name: field.name })
+          .from(field)
+          .where(eq(field.id, q.fieldId))
+          .get();
+        fieldName = f?.name ?? null;
+      }
+
+      myQuestions.push({
+        id: q.id,
+        question: q.question,
+        status: q.status,
+        priority: q.priority,
+        entityId: q.entityId,
+        entityName: q.entityName ?? q.entityNameFallback ?? null,
+        fieldName,
+        replyCount: q.replyCount,
+        createdAt: q.createdAt,
+        relationship: isAssigned ? "assigned" : "created",
+      });
+    }
+
+    return NextResponse.json({ assignedFields, myQuestions });
+  }
+
+  // ─── Overview Tab (default) ───────────────────────────────
+
   // Get all target entities with field counts and mapping stats
-  const entities = await db
+  const entities = db
     .select()
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target")))
-    .orderBy(entity.sortOrder);
+    .orderBy(entity.sortOrder)
+    .all();
 
   // Get field counts and mapping stats per entity
-  const entityStats = await Promise.all(entities.map(async (e) => {
-    const fields = await db
+  const entityStats = entities.map((e) => {
+    const fields = db
       .select({ id: field.id })
       .from(field)
-      .where(eq(field.entityId, e.id));
+      .where(eq(field.entityId, e.id))
+      .all();
 
     const fieldIds = fields.map((f) => f.id);
     const statusCounts: Record<string, number> = {};
 
     if (fieldIds.length > 0) {
-      const mappings = await db
+      const mappings = db
         .select({
           status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
           cnt: count(),
@@ -43,19 +159,21 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
             sql`, `
           )})`
         )
-        .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`);
+        .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
+        .all();
 
       for (const m of mappings) {
         statusCounts[m.status] = m.cnt;
       }
     }
 
-    const mappedCount = statusCounts["fully_closed"] || 0;
+    const mappedCount = statusCounts["accepted"] || 0;
 
-    const openQs = (await db
+    const openQs = db
       .select({ cnt: count() })
       .from(question)
-      .where(and(eq(question.entityId, e.id), eq(question.status, "open"))))[0];
+      .where(and(eq(question.entityId, e.id), eq(question.status, "open")))
+      .get();
 
     return {
       id: e.id,
@@ -72,11 +190,11 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
       openQuestions: openQs?.cnt || 0,
       statusBreakdown: statusCounts,
     };
-  }));
+  });
 
-  // Milestone stats: per-milestone status breakdown across all target fields
-  const milestoneStats = await Promise.all(MILESTONES.map(async (m) => {
-    const rows = await db
+  // Milestone stats
+  const milestoneStats = MILESTONES.map((m) => {
+    const rows = db
       .select({
         status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
         cnt: count(),
@@ -97,7 +215,8 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
           eq(field.milestone, m)
         )
       )
-      .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`);
+      .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
+      .all();
 
     const statusBreakdown: Record<string, number> = {};
     let total = 0;
@@ -106,7 +225,7 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
       total += r.cnt;
     }
 
-    const mapped = statusBreakdown["fully_closed"] || 0;
+    const mapped = statusBreakdown["accepted"] || 0;
 
     return {
       milestone: m,
@@ -115,14 +234,14 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
       coveragePercent: total > 0 ? Math.round((mapped / total) * 100) : 0,
       statusBreakdown,
     };
-  }));
+  });
 
   // Aggregate stats
   const totalFields = entityStats.reduce((sum, e) => sum + e.fieldCount, 0);
   const mappedFields = entityStats.reduce((sum, e) => sum + e.mappedCount, 0);
 
-  // Status distribution across ALL target fields (including unmapped)
-  const allFieldStatuses = await db
+  // Status distribution
+  const allFieldStatuses = db
     .select({
       status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
       cnt: count(),
@@ -139,19 +258,84 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
     .where(
       and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target"))
     )
-    .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`);
+    .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
+    .all();
 
   const statusDistribution: Record<string, number> = {};
   for (const r of allFieldStatuses) {
     statusDistribution[r.status] = r.cnt;
   }
 
-  const openQuestions = (await db
+  const openQuestions = db
     .select({ cnt: count() })
     .from(question)
     .where(
       and(eq(question.workspaceId, workspaceId), eq(question.status, "open"))
-    ))[0];
+    )
+    .get();
+
+  // ─── Leaderboard Queries ────────────────────────────────────
+
+  // Most Mapped: accepted + isLatest, grouped by assigneeId
+  const mostMapped: LeaderboardEntry[] = db
+    .select({
+      userId: fieldMapping.assigneeId,
+      name: user.name,
+      image: user.image,
+      count: count(),
+    })
+    .from(fieldMapping)
+    .innerJoin(user, eq(user.id, fieldMapping.assigneeId))
+    .where(
+      and(
+        eq(fieldMapping.workspaceId, workspaceId),
+        eq(fieldMapping.status, "accepted"),
+        eq(fieldMapping.isLatest, true),
+        sql`${fieldMapping.assigneeId} IS NOT NULL`
+      )
+    )
+    .groupBy(fieldMapping.assigneeId, user.name, user.image)
+    .orderBy(sql`count(*) DESC`)
+    .limit(10)
+    .all() as LeaderboardEntry[];
+
+  // Most Questions Answered: resolved questions grouped by resolvedBy
+  const mostQuestionsAnswered: LeaderboardEntry[] = db
+    .select({
+      userId: question.resolvedBy,
+      name: user.name,
+      image: user.image,
+      count: count(),
+    })
+    .from(question)
+    .innerJoin(user, eq(user.id, question.resolvedBy))
+    .where(
+      and(
+        eq(question.workspaceId, workspaceId),
+        eq(question.status, "resolved"),
+        sql`${question.resolvedBy} IS NOT NULL`
+      )
+    )
+    .groupBy(question.resolvedBy, user.name, user.image)
+    .orderBy(sql`count(*) DESC`)
+    .limit(10)
+    .all() as LeaderboardEntry[];
+
+  // Most Bot Collaborations: chat sessions grouped by createdBy
+  const mostBotCollaborations: LeaderboardEntry[] = db
+    .select({
+      userId: chatSession.createdBy,
+      name: user.name,
+      image: user.image,
+      count: count(),
+    })
+    .from(chatSession)
+    .innerJoin(user, eq(user.id, chatSession.createdBy))
+    .where(eq(chatSession.workspaceId, workspaceId))
+    .groupBy(chatSession.createdBy, user.name, user.image)
+    .orderBy(sql`count(*) DESC`)
+    .limit(10)
+    .all() as LeaderboardEntry[];
 
   return NextResponse.json({
     totalEntities: entities.length,
@@ -163,5 +347,10 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
     entities: entityStats,
     milestoneStats,
     statusDistribution,
+    leaderboard: {
+      mostMapped,
+      mostQuestionsAnswered,
+      mostBotCollaborations,
+    },
   });
 });

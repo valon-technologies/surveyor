@@ -10,16 +10,16 @@
  * Usage: npx tsx scripts/import-servicemac-domain.ts
  */
 
-import postgres from "postgres";
+import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import "dotenv/config";
 
+const DB_PATH = path.resolve(process.cwd(), "surveyor.db");
 const SM_ROOT = "/Users/grantlee/Dev/mapping-skills/.claude/skills/servicemac-domain";
-const WORKSPACE_ID = "847602b2-188d-4fca-b1b1-d6098bb22aba";
+const WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
 
-const client = postgres(process.env.DATABASE_URL!, { prepare: false });
+const db = new Database(DB_PATH);
 
 // --- Acronym-aware label conversion ---
 const ACRONYMS: Record<string, string> = {
@@ -208,42 +208,39 @@ if (fs.existsSync(enumsDir)) {
 }
 
 // --- Insert ---
-async function main() {
-  const now = new Date().toISOString();
+const now = new Date().toISOString();
+const stmt = db.prepare(`
+  INSERT OR IGNORE INTO context (id, workspace_id, name, category, subcategory, content, content_format, token_count, tags, is_active, sort_order, import_source, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, 'markdown', ?, ?, 1, 0, ?, ?, ?)
+`);
 
-  await client.begin(async (tx) => {
-    for (const doc of docs) {
-      const tokenCount = Math.ceil(doc.content.length / 4);
-      await tx`
-        INSERT INTO context (id, workspace_id, name, category, subcategory, content, content_format, token_count, tags, is_active, sort_order, import_source, created_at, updated_at)
-        VALUES (${doc.id}, ${WORKSPACE_ID}, ${doc.name}, ${doc.category}, ${doc.subcategory},
-                ${doc.content}, 'markdown', ${tokenCount}, ${JSON.stringify(doc.tags)},
-                true, 0, ${doc.importSource}, ${now}, ${now})
-        ON CONFLICT (id) DO NOTHING
-      `;
-    }
-  });
-
-  console.log(`Imported ${docs.length} ServiceMac domain contexts:`);
-  const byType = { topLevel: 0, tables: 0, domains: 0, enums: 0 };
-  for (const d of docs) {
-    if (d.name.includes("> Tables >")) byType.tables++;
-    else if (d.name.includes("> Domains >")) byType.domains++;
-    else if (d.name.includes("> Enums >")) byType.enums++;
-    else byType.topLevel++;
+const insertAll = db.transaction(() => {
+  for (const doc of docs) {
+    const tokenCount = Math.ceil(doc.content.length / 4);
+    stmt.run(
+      doc.id, WORKSPACE_ID, doc.name, doc.category, doc.subcategory,
+      doc.content, tokenCount, JSON.stringify(doc.tags),
+      doc.importSource, now, now
+    );
   }
-  console.log(`  Top-level docs: ${byType.topLevel}`);
-  console.log(`  Table docs:     ${byType.tables}`);
-  console.log(`  Domain docs:    ${byType.domains}`);
-  console.log(`  Enum docs:      ${byType.enums}`);
-
-  const total = (await client`SELECT COUNT(*) as cnt FROM context`)[0] as { cnt: number };
-  console.log(`\nTotal contexts in DB: ${total.cnt}`);
-
-  await client.end();
-}
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
 });
+
+insertAll();
+
+console.log(`Imported ${docs.length} ServiceMac domain contexts:`);
+const byType = { topLevel: 0, tables: 0, domains: 0, enums: 0 };
+for (const d of docs) {
+  if (d.name.includes("> Tables >")) byType.tables++;
+  else if (d.name.includes("> Domains >")) byType.domains++;
+  else if (d.name.includes("> Enums >")) byType.enums++;
+  else byType.topLevel++;
+}
+console.log(`  Top-level docs: ${byType.topLevel}`);
+console.log(`  Table docs:     ${byType.tables}`);
+console.log(`  Domain docs:    ${byType.domains}`);
+console.log(`  Enum docs:      ${byType.enums}`);
+
+const total = db.prepare("SELECT COUNT(*) as cnt FROM context").get() as { cnt: number };
+console.log(`\nTotal contexts in DB: ${total.cnt}`);
+
+db.close();

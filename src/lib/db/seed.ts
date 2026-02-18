@@ -1,29 +1,29 @@
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
 import { workspace } from "./schema";
 
-async function seed() {
-  const client = postgres(process.env.DATABASE_URL!, { prepare: false });
-  const db = drizzle(client);
+function seed() {
+  const sqlite = new Database(process.env.DATABASE_PATH || "./surveyor.db");
+  sqlite.pragma("journal_mode = WAL");
+  const db = drizzle(sqlite);
 
   console.log("Seeding database...");
 
   // Create default workspace
-  const [ws] = await db
+  const [ws] = db
     .insert(workspace)
     .values({
       name: "Default Workspace",
       description: "Field-level schema mapping workspace",
       settings: { defaultProvider: "claude" },
     })
-    .returning();
+    .returning()
+    .all();
 
   console.log(`Created workspace: ${ws.id}`);
   console.log("\nSeed complete!");
   console.log(`\nWorkspace ID: ${ws.id}`);
   console.log(`Update DEFAULT_WORKSPACE_ID in src/lib/constants.ts if needed.`);
-
-  await client.end();
 }
 
-seed().catch(console.error);
+seed();

@@ -12,10 +12,11 @@
  * Usage: npx tsx scripts/cleanup-context-content.ts [--dry-run]
  */
 
-import postgres from "postgres";
-import "dotenv/config";
+import Database from "better-sqlite3";
+import path from "path";
 
-const client = postgres(process.env.DATABASE_URL!, { prepare: false });
+const DB_PATH = path.resolve(process.cwd(), "surveyor.db");
+const db = new Database(DB_PATH);
 const dryRun = process.argv.includes("--dry-run");
 
 // --- Content cleanup functions ---
@@ -34,15 +35,15 @@ function removeResourcesSections(content: string): string {
 
 /**
  * Convert dead .md links to plain text.
- * [FIELDS.md](FIELDS.md) -> "Fields"
- * [ESCROW-ANALYSIS.md](ESCROW-ANALYSIS.md) -> "Escrow Analysis"
- * [ONBOARDING-REFERENCE.md](../../ONBOARDING-REFERENCE.md) -> "Onboarding Reference"
+ * [FIELDS.md](FIELDS.md) → "Fields"
+ * [ESCROW-ANALYSIS.md](ESCROW-ANALYSIS.md) → "Escrow Analysis"
+ * [ONBOARDING-REFERENCE.md](../../ONBOARDING-REFERENCE.md) → "Onboarding Reference"
  */
 function fixDeadMdLinks(content: string): string {
   return content.replace(
     /\[([^\]]*\.md)\]\([^)]*\.md\)/g,
     (_match, linkText: string) => {
-      // Convert "FIELDS.md" -> "Fields", "ESCROW-ANALYSIS.md" -> "Escrow Analysis"
+      // Convert "FIELDS.md" → "Fields", "ESCROW-ANALYSIS.md" → "Escrow Analysis"
       return linkText
         .replace(/\.md$/, "")
         .replace(/-/g, " ")
@@ -67,8 +68,8 @@ function removeSkillDirectives(content: string): string {
 
 /**
  * Fix section headers that are FILENAME format.
- * "## ESCROW ANALYSIS" -> "## Escrow Analysis"
- * "## FIELDS" -> "## Fields"
+ * "## ESCROW ANALYSIS" → "## Escrow Analysis"
+ * "## FIELDS" → "## Fields"
  * Only fix headers that are ALL CAPS (leave mixed case alone).
  */
 function fixSectionHeaders(content: string): string {
@@ -88,7 +89,7 @@ function fixSectionHeaders(content: string): string {
 }
 
 /**
- * Clean up excess blank lines (3+ consecutive -> 2).
+ * Clean up excess blank lines (3+ consecutive → 2).
  */
 function collapseBlankLines(content: string): string {
   return content.replace(/\n{4,}/g, "\n\n\n");
@@ -127,64 +128,62 @@ function estimateTokens(content: string): number {
 
 // --- Main ---
 
-async function main() {
-  const rows = await client`SELECT id, name, content FROM context` as { id: string; name: string; content: string }[];
+const rows = db
+  .prepare("SELECT id, name, content FROM context")
+  .all() as { id: string; name: string; content: string }[];
 
-  let contentChanges = 0;
-  let tokenUpdates = 0;
+let contentChanges = 0;
+let tokenUpdates = 0;
 
-  const updates: { id: string; name: string; content: string; tokenCount: number; changed: boolean }[] = [];
+const updates: { id: string; name: string; content: string; tokenCount: number; changed: boolean }[] = [];
 
-  for (const row of rows) {
-    const cleaned = cleanContent(row.content);
-    const tokenCount = estimateTokens(cleaned);
-    const changed = cleaned !== row.content;
+for (const row of rows) {
+  const cleaned = cleanContent(row.content);
+  const tokenCount = estimateTokens(cleaned);
+  const changed = cleaned !== row.content;
 
-    if (changed) contentChanges++;
-    tokenUpdates++;
+  if (changed) contentChanges++;
+  tokenUpdates++;
 
-    updates.push({
-      id: row.id,
-      name: row.name,
-      content: cleaned,
-      tokenCount,
-      changed,
-    });
-  }
-
-  console.log(`Content changes: ${contentChanges} of ${rows.length} contexts`);
-  console.log(`Token counts to set: ${tokenUpdates}\n`);
-
-  // Show preview of content changes
-  if (dryRun) {
-    for (const u of updates.filter((u) => u.changed)) {
-      const originalLen = rows.find((r) => r.id === u.id)!.content.length;
-      const newLen = u.content.length;
-      const diff = originalLen - newLen;
-      console.log(`  ${u.name}`);
-      console.log(`    ${originalLen} -> ${newLen} chars (-${diff}), ~${u.tokenCount} tokens\n`);
-    }
-    console.log("Dry run -- no changes made.");
-    await client.end();
-    process.exit(0);
-  }
-
-  // Apply updates
-  const now = new Date().toISOString();
-
-  await client.begin(async (tx) => {
-    for (const u of updates) {
-      await tx`UPDATE context SET content = ${u.content}, token_count = ${u.tokenCount}, updated_at = ${now} WHERE id = ${u.id}`;
-    }
+  updates.push({
+    id: row.id,
+    name: row.name,
+    content: cleaned,
+    tokenCount,
+    changed,
   });
-
-  console.log(`Updated ${contentChanges} contexts with cleaned content.`);
-  console.log(`Set token_count on all ${tokenUpdates} contexts.`);
-
-  await client.end();
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+console.log(`Content changes: ${contentChanges} of ${rows.length} contexts`);
+console.log(`Token counts to set: ${tokenUpdates}\n`);
+
+// Show preview of content changes
+if (dryRun) {
+  for (const u of updates.filter((u) => u.changed)) {
+    const originalLen = rows.find((r) => r.id === u.id)!.content.length;
+    const newLen = u.content.length;
+    const diff = originalLen - newLen;
+    console.log(`  ${u.name}`);
+    console.log(`    ${originalLen} → ${newLen} chars (−${diff}), ~${u.tokenCount} tokens\n`);
+  }
+  console.log("Dry run — no changes made.");
+  process.exit(0);
+}
+
+// Apply updates
+const stmt = db.prepare(
+  "UPDATE context SET content = ?, token_count = ?, updated_at = ? WHERE id = ?"
+);
+const now = new Date().toISOString();
+
+const applyAll = db.transaction(() => {
+  for (const u of updates) {
+    stmt.run(u.content, u.tokenCount, now, u.id);
+  }
 });
+
+applyAll();
+console.log(`Updated ${contentChanges} contexts with cleaned content.`);
+console.log(`Set token_count on all ${tokenUpdates} contexts.`);
+
+db.close();

@@ -8,7 +8,8 @@ import { useMapping } from "@/queries/mapping-queries";
 import { useEntity } from "@/queries/entity-queries";
 import { FieldBrowserPanel } from "./components/field-browser-panel";
 import { LineageDiagram } from "./components/lineage-diagram";
-import { CodePanel } from "./components/code-panel";
+import { CodePanel, EntityCodePanel } from "./components/code-panel";
+import { EntityPipelineOverview } from "./components/entity-pipeline-overview";
 import {
   TopologyEmptySelection,
   TopologyNoMapping,
@@ -31,6 +32,7 @@ export function TopologyClient() {
     rightPanelCollapsed,
     toggleLeftPanel,
     toggleRightPanel,
+    selectEntity,
     hydrateFromParams,
   } = useTopologyStore();
 
@@ -51,15 +53,20 @@ export function TopologyClient() {
     selectedMappingId ?? undefined
   );
   const { data: entity } = useEntity(selectedEntityId ?? undefined);
+  const { data: parentEntity } = useEntity(
+    entity?.parentEntityId ?? undefined
+  );
 
   const selectedField = entity?.fields?.find(
     (f) => f.id === selectedFieldId
   );
 
-  // Breadcrumb
-  const breadcrumb = selectedField
-    ? `${entity?.displayName || entity?.name || ""} / ${selectedField.displayName || selectedField.name}`
-    : null;
+  // Breadcrumb — show parent > component when viewing a component entity
+  const entityLabel = entity?.displayName || entity?.name || "";
+  const parentLabel = parentEntity?.displayName || parentEntity?.name || "";
+  const isComponent = !!entity?.parentEntityId && !!parentEntity;
+
+  const isEntityOnlyView = !!selectedEntityId && !selectedFieldId;
 
   return (
     <div className="h-full flex flex-col">
@@ -67,11 +74,34 @@ export function TopologyClient() {
       <div className="border-b px-4 py-2 flex items-center gap-3">
         <Waypoints className="h-4 w-4 text-primary" />
         <span className="font-semibold text-sm">Topology</span>
-        {breadcrumb && (
+        {isComponent && (
+          <>
+            <span className="text-muted-foreground text-xs">/</span>
+            <button
+              onClick={() => selectEntity(entity!.parentEntityId!)}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors truncate"
+            >
+              {parentLabel}
+            </button>
+            <span className="text-muted-foreground text-xs">/</span>
+            <span className="text-xs text-muted-foreground truncate">
+              {entityLabel}
+            </span>
+          </>
+        )}
+        {!isComponent && selectedField && (
           <>
             <span className="text-muted-foreground text-xs">/</span>
             <span className="text-xs text-muted-foreground truncate">
-              {breadcrumb}
+              {entityLabel} / {selectedField.displayName || selectedField.name}
+            </span>
+          </>
+        )}
+        {!isComponent && !selectedField && selectedEntityId && entityLabel && (
+          <>
+            <span className="text-muted-foreground text-xs">/</span>
+            <span className="text-xs text-muted-foreground truncate">
+              {entityLabel}
             </span>
           </>
         )}
@@ -108,9 +138,14 @@ export function TopologyClient() {
           </div>
         )}
 
-        {/* Center: diagram */}
+        {/* Center: diagram or entity overview */}
         <div className="flex-1 overflow-hidden">
-          {!selectedFieldId ? (
+          {isEntityOnlyView ? (
+            <EntityPipelineOverview
+              entityId={selectedEntityId!}
+              entityName={entityLabel}
+            />
+          ) : !selectedFieldId ? (
             <TopologyEmptySelection />
           ) : !selectedMappingId ? (
             <TopologyNoMapping />
@@ -127,8 +162,8 @@ export function TopologyClient() {
           )}
         </div>
 
-        {/* Right panel: code */}
-        {selectedMappingId && mapping && (
+        {/* Right panel: code (field-level or entity-level) */}
+        {(isEntityOnlyView || (selectedMappingId && mapping)) && (
           rightPanelCollapsed ? (
             <div className="border-l p-2 flex flex-col items-center">
               <Button
@@ -143,7 +178,11 @@ export function TopologyClient() {
             </div>
           ) : (
             <div className="w-96 border-l shrink-0">
-              <CodePanel mapping={mapping} />
+              {isEntityOnlyView ? (
+                <EntityCodePanel entityId={selectedEntityId!} />
+              ) : (
+                <CodePanel mapping={mapping!} />
+              )}
             </div>
           )
         )}

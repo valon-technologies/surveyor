@@ -12,6 +12,17 @@ export function useChatSessions() {
   });
 }
 
+export function useChatSessionsByMapping(fieldMappingId: string | null) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "chat-sessions");
+  return useQuery({
+    queryKey: ["chat-sessions", workspaceId, "by-mapping", fieldMappingId],
+    queryFn: () =>
+      api.get<ChatSession[]>(basePath, { fieldMappingId: fieldMappingId! }),
+    enabled: !!fieldMappingId,
+  });
+}
+
 export function useChatSession(sessionId: string | null) {
   const { workspaceId } = useWorkspace();
   const basePath = workspacePath(workspaceId, "chat-sessions");

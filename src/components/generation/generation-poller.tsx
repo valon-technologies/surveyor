@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGenerationPoll } from "@/queries/generation-queries";
 import { useGenerationQueueStore } from "@/stores/generation-queue-store";
-import { useMappingStore } from "@/stores/mapping-store";
 import { useToast } from "@/components/ui/toast";
 import type { ParseResult } from "@/types/generation";
 
@@ -16,8 +15,6 @@ function SinglePoller({ generationId }: { generationId: string }) {
   const { addToast } = useToast();
   const qc = useQueryClient();
   const router = useRouter();
-  const setAutoMapSheetOpen = useMappingStore((s) => s.setAutoMapSheetOpen);
-  const setReviewGenerationId = useMappingStore((s) => s.setReviewGenerationId);
   const notifiedRef = useRef(false);
 
   const queueItem = queue.find((g) => g.generationId === generationId);
@@ -47,9 +44,7 @@ function SinglePoller({ generationId }: { generationId: string }) {
           ? {
               label: "Review",
               onClick: () => {
-                setReviewGenerationId(generationId);
-                setAutoMapSheetOpen(true);
-                router.push(`/mapping/${entityId}`);
+                router.push(`/mapping?entityId=${entityId}`);
               },
             }
           : undefined,

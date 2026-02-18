@@ -2,10 +2,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api-client";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import type { ReviewCardData } from "@/types/review";
-import type { ConfidenceLevel, ReviewStatus } from "@/lib/constants";
+import type { ConfidenceLevel, MappingStatus } from "@/lib/constants";
 
 interface ReviewQueueFilters {
-  reviewStatus?: ReviewStatus | "all";
+  status?: MappingStatus | "all";
   confidence?: ConfidenceLevel | "all";
   entityId?: string | "all";
   sortBy?: string;
@@ -17,8 +17,8 @@ export function useReviewQueue(filters?: ReviewQueueFilters) {
   const basePath = workspacePath(workspaceId, "review-queue");
 
   const params: Record<string, string> = {};
-  if (filters?.reviewStatus && filters.reviewStatus !== "all")
-    params.reviewStatus = filters.reviewStatus;
+  if (filters?.status && filters.status !== "all")
+    params.status = filters.status;
   if (filters?.confidence && filters.confidence !== "all")
     params.confidence = filters.confidence;
   if (filters?.entityId && filters.entityId !== "all")
@@ -53,8 +53,24 @@ export function useExcludeMapping() {
   const basePath = workspacePath(workspaceId, "mappings");
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (mappingId: string) =>
-      api.post(`${basePath}/${mappingId}/exclude`),
+    mutationFn: ({ mappingId, reason }: { mappingId: string; reason?: string }) =>
+      api.post(`${basePath}/${mappingId}/exclude`, { reason }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["review-queue"] });
+      qc.invalidateQueries({ queryKey: ["mappings"] });
+      qc.invalidateQueries({ queryKey: ["entities"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useBatchExclude() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "mappings");
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ mappingIds, reason }: { mappingIds: string[]; reason?: string }) =>
+      api.post(`${basePath}/batch-exclude`, { mappingIds, reason }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["review-queue"] });
       qc.invalidateQueries({ queryKey: ["mappings"] });

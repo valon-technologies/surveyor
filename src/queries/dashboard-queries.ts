@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api-client";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
-import type { DashboardStats } from "@/types/dashboard";
+import type { DashboardStats, MyWorkData } from "@/types/dashboard";
 
 export function useDashboardStats() {
   const { workspaceId } = useWorkspace();
@@ -9,5 +9,16 @@ export function useDashboardStats() {
     queryKey: ["dashboard", workspaceId],
     queryFn: () =>
       api.get<DashboardStats>(workspacePath(workspaceId, "dashboard")),
+  });
+}
+
+export function useMyWork() {
+  const { workspaceId } = useWorkspace();
+  return useQuery({
+    queryKey: ["dashboard-my-work", workspaceId],
+    queryFn: () =>
+      api.get<MyWorkData>(workspacePath(workspaceId, "dashboard"), {
+        tab: "my-work",
+      }),
   });
 }

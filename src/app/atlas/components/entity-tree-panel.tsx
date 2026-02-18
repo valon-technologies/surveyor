@@ -22,10 +22,10 @@ import { cn } from "@/lib/utils";
 import type { FieldWithMapping } from "@/types/field";
 
 const DEBUGGABLE_STATUSES: MappingStatus[] = [
-  "pending",
-  "open_comment_sm",
-  "open_comment_vt",
-  "fully_closed",
+  "unreviewed",
+  "accepted",
+  "punted",
+  "needs_discussion",
 ];
 
 export function EntityTreePanel() {
@@ -68,7 +68,7 @@ export function EntityTreePanel() {
         </div>
         {/* Status filter */}
         <div className="flex gap-1">
-          {(["all", "pending", "fully_closed"] as const).map((f) => (
+          {(["all", "unreviewed", "accepted"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setStatusFilter(f)}
@@ -79,7 +79,7 @@ export function EntityTreePanel() {
                   : "bg-muted text-muted-foreground hover:text-foreground"
               )}
             >
-              {f === "all" ? "All" : f === "pending" ? "Pending" : "Closed"}
+              {f === "all" ? "All" : f === "unreviewed" ? "Unreviewed" : "Accepted"}
             </button>
           ))}
         </div>
@@ -144,7 +144,7 @@ function EntityNode({
   onToggle: () => void;
   selectedFieldId: string | null;
   onSelectField: (entityId: string, fieldId: string, mappingId: string) => void;
-  statusFilter: "pending" | "fully_closed" | "all";
+  statusFilter: "unreviewed" | "accepted" | "all";
   searchQuery: string;
 }) {
   // Fetch entity detail when expanded OR when a filter is active (so we can hide empty entities)

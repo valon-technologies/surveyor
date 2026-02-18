@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, Loader2, Check, X, ChevronDown, Trash2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useMappingStore } from "@/stores/mapping-store";
 import {
   useGenerationQueueStore,
   selectRunningCount,
@@ -90,8 +89,6 @@ export function GenerationQueue() {
 function QueueItem({ item, onNavigate }: { item: QueuedGeneration; onNavigate: () => void }) {
   const [elapsed, setElapsed] = useState(0);
   const router = useRouter();
-  const setAutoMapSheetOpen = useMappingStore((s) => s.setAutoMapSheetOpen);
-  const setReviewGenerationId = useMappingStore((s) => s.setReviewGenerationId);
 
   useEffect(() => {
     if (item.status !== "running") return;
@@ -107,9 +104,7 @@ function QueueItem({ item, onNavigate }: { item: QueuedGeneration; onNavigate: (
 
   const handleClick = () => {
     onNavigate();
-    setReviewGenerationId(item.generationId);
-    setAutoMapSheetOpen(true);
-    router.push(`/mapping/${item.entityId}`);
+    router.push(`/mapping?entityId=${item.entityId}`);
   };
 
   return (

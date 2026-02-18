@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { context } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createContextSchema } from "@/lib/validators/context";
+import { invalidateWorkspaceContextCache } from "@/lib/generation/context-cache";
 
 export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const searchParams = req.nextUrl.searchParams;
@@ -22,11 +23,12 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     conditions.push(eq(context.isActive, isActive !== "false"));
   }
 
-  const contexts = await db
+  const contexts = db
     .select()
     .from(context)
     .where(and(...conditions))
-    .orderBy(context.sortOrder);
+    .orderBy(context.sortOrder)
+    .all();
 
   return NextResponse.json(contexts);
 });
@@ -41,7 +43,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
 
   const input = parsed.data;
 
-  const [created] = await db
+  const [created] = db
     .insert(context)
     .values({
       workspaceId,
@@ -55,7 +57,9 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
       tags: input.tags,
       importSource: input.importSource,
     })
-    .returning();
+    .returning()
+    .all();
 
+  invalidateWorkspaceContextCache(workspaceId);
   return NextResponse.json(created, { status: 201 });
 }, { requiredRole: "editor" });

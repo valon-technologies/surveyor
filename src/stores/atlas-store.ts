@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type AtlasStatusFilter = "pending" | "fully_closed" | "all";
+type AtlasStatusFilter = "unreviewed" | "accepted" | "all";
 
 interface AtlasState {
   leftPanelCollapsed: boolean;
@@ -36,7 +36,7 @@ export const useAtlasStore = create<AtlasState>((set) => ({
   selectedFieldId: null,
   selectedMappingId: null,
   searchQuery: "",
-  statusFilter: "pending",
+  statusFilter: "unreviewed",
   fromMapping: false,
   fromEntityId: null,
 

@@ -1,33 +1,34 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Database, CheckCircle, XCircle, Loader2, LogOut, ExternalLink } from "lucide-react";
+import { Database, CheckCircle, XCircle, Loader2, Terminal, ChevronDown, RefreshCw, ExternalLink } from "lucide-react";
 import {
   useWorkspaceSettings,
   useUpdateWorkspaceSettings,
   useTestBqConnection,
+  useBqAuthStatus,
+  useBqAuthLogin,
 } from "@/queries/workspace-queries";
-import { useBigqueryAuth, useDisconnectBigquery } from "@/queries/bigquery-auth-queries";
 
 export default function BigQuerySettingsPage() {
   const { data: settings, isLoading } = useWorkspaceSettings();
   const updateSettings = useUpdateWorkspaceSettings();
   const testConnection = useTestBqConnection();
-  const { data: bqAuth, isLoading: bqAuthLoading } = useBigqueryAuth();
-  const disconnect = useDisconnectBigquery();
-  const searchParams = useSearchParams();
+  const { data: authStatus, refetch: refetchAuth } = useBqAuthStatus();
+  const authLogin = useBqAuthLogin();
+
+  const PROJECT_DATASETS: Record<string, string> = {
+    "service-mac-stage": "raw_acdc_M2_trial1",
+    "service-mac-prod": "raw_acdc_m1",
+  };
 
   const [projectId, setProjectId] = useState("");
   const [sourceDataset, setSourceDataset] = useState("");
   const [targetDataset, setTargetDataset] = useState("");
   const [initialized, setInitialized] = useState(false);
-
-  const justConnected = searchParams.get("bq_connected") === "1";
-  const oauthError = searchParams.get("bq_error");
 
   // Initialize form from settings
   useEffect(() => {
@@ -38,6 +39,12 @@ export default function BigQuerySettingsPage() {
       setInitialized(true);
     }
   }, [settings, initialized]);
+
+  const handleProjectChange = (value: string) => {
+    setProjectId(value);
+    // Auto-set the linked source dataset
+    setSourceDataset(PROJECT_DATASETS[value] || "");
+  };
 
   const handleTest = () => {
     testConnection.mutate({ projectId, sourceDataset });
@@ -65,84 +72,98 @@ export default function BigQuerySettingsPage() {
       <div>
         <h1 className="text-lg font-semibold">BigQuery Connection</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Connect your Google account to enable BigQuery source table validation.
+          Connect to BigQuery to enable source table validation for your mappings.
         </p>
       </div>
 
-      {/* OAuth success banner */}
-      {justConnected && (
-        <div className="rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 px-3 py-2 text-xs text-green-700 dark:text-green-300">
-          <span className="flex items-center gap-1.5">
-            <CheckCircle className="h-3.5 w-3.5" />
-            BigQuery connected successfully.
-          </span>
-        </div>
-      )}
-
-      {/* OAuth error banner */}
-      {oauthError && (
-        <div className="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 px-3 py-2 text-xs text-red-700 dark:text-red-300">
-          <span className="flex items-center gap-1.5">
-            <XCircle className="h-3.5 w-3.5" />
-            OAuth error: {oauthError.replace(/_/g, " ")}
-          </span>
-        </div>
-      )}
-
-      {/* Google Account Connection */}
+      {/* Query Auth (ADC) */}
       <div className="border rounded-lg p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Database className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Google Account</span>
+            <Terminal className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Query Authentication</span>
           </div>
-          {bqAuthLoading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-          ) : bqAuth?.connected ? (
-            <Badge variant="outline" className="text-xs">
-              <CheckCircle className="h-3 w-3 mr-1 text-green-600" />
-              Connected
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-xs text-muted-foreground">
-              Not connected
+          {authStatus && (
+            <Badge
+              variant="outline"
+              className={`text-xs ${
+                authStatus.status === "valid"
+                  ? "text-green-700 border-green-300"
+                  : "text-red-700 border-red-300"
+              }`}
+            >
+              {authStatus.status === "valid" ? (
+                <><CheckCircle className="h-3 w-3 mr-1" /> Authenticated</>
+              ) : authStatus.status === "expired" ? (
+                <><XCircle className="h-3 w-3 mr-1" /> Expired</>
+              ) : (
+                <><XCircle className="h-3 w-3 mr-1" /> Not configured</>
+              )}
             </Badge>
           )}
         </div>
 
-        {bqAuth?.connected ? (
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              Authenticated as <span className="font-medium text-foreground">{bqAuth.email || "unknown"}</span>
-            </p>
+        <p className="text-xs text-muted-foreground">
+          BigQuery queries require Google Application Default Credentials.
+          {authStatus?.status !== "valid" && " Click below to authenticate via your browser."}
+        </p>
+
+        {authStatus?.status !== "valid" && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => authLogin.mutate()}
+              disabled={authLogin.isPending}
+            >
+              {authLogin.isPending ? (
+                <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Opening browser...</>
+              ) : (
+                <><ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Authenticate with Google</>
+              )}
+            </Button>
             <Button
               variant="ghost"
               size="sm"
-              className="text-xs h-7"
-              onClick={() => disconnect.mutate()}
-              disabled={disconnect.isPending}
+              onClick={() => refetchAuth()}
+              className="text-xs"
             >
-              <LogOut className="h-3 w-3 mr-1" />
-              Disconnect
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              Connect your Google account to grant BigQuery read access for validation.
-            </p>
-            <Button variant="outline" size="sm" onClick={() => { window.location.href = "/api/auth/bigquery/authorize"; }}>
-              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-              Connect BigQuery
+              <RefreshCw className="h-3 w-3 mr-1" /> Check status
             </Button>
           </div>
         )}
+
+        {authLogin.data && !authLogin.data.ok && (
+          <p className="text-xs text-red-600">{authLogin.data.error}</p>
+        )}
+
+        {authLogin.isSuccess && authLogin.data?.ok && (
+          <p className="text-xs text-amber-600">
+            Browser opened. Complete the Google sign-in, then click &quot;Check status&quot; to verify.
+          </p>
+        )}
+
+        <details className="text-[11px] text-muted-foreground">
+          <summary className="cursor-pointer hover:text-foreground">Manual setup</summary>
+          <p className="mt-1.5">
+            Alternatively, run in your terminal:
+          </p>
+          <pre className="bg-muted/50 border rounded px-3 py-2 text-xs font-mono overflow-x-auto mt-1">
+            gcloud auth application-default login
+          </pre>
+          <p className="mt-1.5">
+            For Gestalt metadata (table schemas, etc.), also ensure <code className="text-[11px]">GESTALT_API_KEY</code> is set in <code className="text-[11px]">.env.local</code>.
+          </p>
+        </details>
       </div>
 
       {/* Dataset Configuration */}
       <div className="border rounded-lg p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Dataset Configuration</span>
+          <div className="flex items-center gap-2">
+            <Database className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Dataset Configuration</span>
+          </div>
           {isConfigured && (
             <Badge variant="outline" className="text-xs">
               <CheckCircle className="h-3 w-3 mr-1 text-green-600" />
@@ -155,24 +176,43 @@ export default function BigQuerySettingsPage() {
           <label className="text-sm font-medium">
             Project ID <span className="text-red-500">*</span>
           </label>
-          <Input
-            value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
-            placeholder="my-gcp-project"
-            className="font-mono text-sm"
-          />
+          <div className="relative">
+            <select
+              value={projectId}
+              onChange={(e) => handleProjectChange(e.target.value)}
+              className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm font-mono appearance-none pr-8 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              <option value="">Select a project...</option>
+              {Object.keys(PROJECT_DATASETS).map((id) => (
+                <option key={id} value={id}>{id}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
         </div>
 
         <div className="space-y-1.5">
           <label className="text-sm font-medium">
             Source Dataset <span className="text-red-500">*</span>
           </label>
-          <Input
-            value={sourceDataset}
-            onChange={(e) => setSourceDataset(e.target.value)}
-            placeholder="raw_source_data"
-            className="font-mono text-sm"
-          />
+          <div className="relative">
+            <select
+              value={sourceDataset}
+              onChange={(e) => setSourceDataset(e.target.value)}
+              disabled={!projectId}
+              className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm font-mono appearance-none pr-8 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">
+                {projectId ? "Select a dataset..." : "Select a project first"}
+              </option>
+              {projectId && PROJECT_DATASETS[projectId] && (
+                <option value={PROJECT_DATASETS[projectId]}>
+                  {PROJECT_DATASETS[projectId]}
+                </option>
+              )}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
           <p className="text-xs text-muted-foreground">
             The dataset containing source tables to validate against.
           </p>

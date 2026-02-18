@@ -3,6 +3,7 @@
 import { useQuestions } from "@/queries/question-queries";
 import { QuestionCard } from "./question-card";
 import type { QuestionStatus, QuestionPriority, WorkspaceTeam } from "@/lib/constants";
+import type { Question } from "@/types/question";
 
 interface QuestionQueueProps {
   teamFilter: WorkspaceTeam | "all";
@@ -59,16 +60,36 @@ export function QuestionQueue({
 
   const openCount = filtered.filter((q) => q.status === "open").length;
 
+  // Group by entity
+  const grouped = new Map<string, { entityName: string; questions: Question[] }>();
+  for (const q of filtered) {
+    const key = q.entityId || "_none";
+    if (!grouped.has(key)) {
+      grouped.set(key, { entityName: q.entityName || "No entity", questions: [] });
+    }
+    grouped.get(key)!.questions.push(q);
+  }
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="text-xs text-muted-foreground">
-        {filtered.length} questions
+        {filtered.length} question{filtered.length !== 1 ? "s" : ""}
         {openCount > 0 && (
           <span className="text-blue-600 ml-2">{openCount} open</span>
         )}
       </div>
-      {filtered.map((q) => (
-        <QuestionCard key={q.id} question={q} />
+      {[...grouped.entries()].map(([entityId, group]) => (
+        <div key={entityId} className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold font-mono">{group.entityName}</h3>
+            <span className="text-xs text-muted-foreground">
+              {group.questions.length} question{group.questions.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          {group.questions.map((q) => (
+            <QuestionCard key={q.id} question={q} />
+          ))}
+        </div>
       ))}
     </div>
   );

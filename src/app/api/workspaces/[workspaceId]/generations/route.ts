@@ -13,11 +13,12 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const conditions = [eq(generation.workspaceId, workspaceId)];
   if (entityId) conditions.push(eq(generation.entityId, entityId));
 
-  const generations = await db
+  const generations = db
     .select()
     .from(generation)
     .where(and(...conditions))
-    .orderBy(generation.createdAt);
+    .orderBy(generation.createdAt)
+    .all();
 
   return NextResponse.json(generations);
 });
@@ -34,7 +35,7 @@ export const POST = withAuth(
     }
 
     try {
-      const { startResult, prepared } = await startGeneration({
+      const { startResult, prepared } = startGeneration({
         workspaceId,
         userId,
         entityId: parsed.data.entityId,

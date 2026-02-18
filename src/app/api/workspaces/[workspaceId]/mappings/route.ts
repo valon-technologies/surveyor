@@ -17,17 +17,19 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   ];
   if (status) conditions.push(eq(fieldMapping.status, status));
 
-  let mappings = await db
+  let mappings = db
     .select()
     .from(fieldMapping)
-    .where(and(...conditions));
+    .where(and(...conditions))
+    .all();
 
   // Filter by entity if specified (requires joining through field)
   if (entityId) {
-    const entityFieldIds = (await db
+    const entityFieldIds = db
       .select({ id: field.id })
       .from(field)
-      .where(eq(field.entityId, entityId)))
+      .where(eq(field.entityId, entityId))
+      .all()
       .map((f) => f.id);
 
     mappings = mappings.filter((m) => entityFieldIds.includes(m.targetFieldId));
@@ -47,33 +49,35 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
   const input = parsed.data;
 
   // Mark any existing latest mapping for this field as not latest
-  await db.update(fieldMapping)
+  db.update(fieldMapping)
     .set({ isLatest: false })
     .where(
       and(
         eq(fieldMapping.targetFieldId, input.targetFieldId),
         eq(fieldMapping.isLatest, true)
       )
-    );
+    )
+    .run();
 
   // Get the current version number
-  const existing = await db
+  const existing = db
     .select({ version: fieldMapping.version })
     .from(fieldMapping)
-    .where(eq(fieldMapping.targetFieldId, input.targetFieldId));
+    .where(eq(fieldMapping.targetFieldId, input.targetFieldId))
+    .all();
   const nextVersion = existing.length > 0 ? Math.max(...existing.map((e) => e.version)) + 1 : 1;
   const parentMapping = existing.length > 0
-    ? (await db.select({ id: fieldMapping.id }).from(fieldMapping)
-        .where(and(eq(fieldMapping.targetFieldId, input.targetFieldId)))).at(-1)
+    ? db.select({ id: fieldMapping.id }).from(fieldMapping)
+        .where(and(eq(fieldMapping.targetFieldId, input.targetFieldId))).all().at(-1)
     : undefined;
 
-  // New mappings always start as "pending"
-  const [mapping] = await db
+  // New mappings always start as "unreviewed"
+  const [mapping] = db
     .insert(fieldMapping)
     .values({
       workspaceId,
       targetFieldId: input.targetFieldId,
-      status: "pending",
+      status: "unreviewed",
       mappingType: input.mappingType,
       assigneeId: input.assigneeId,
       sourceEntityId: input.sourceEntityId,
@@ -89,10 +93,11 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
       parentId: parentMapping?.id,
       isLatest: true,
     })
-    .returning();
+    .returning()
+    .all();
 
   // Get entity for activity
-  const targetField = (await db.select().from(field).where(eq(field.id, input.targetFieldId)))[0];
+  const targetField = db.select().from(field).where(eq(field.id, input.targetFieldId)).get();
 
   await logActivity({
     workspaceId,
@@ -106,7 +111,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
 
   // Auto-create review thread for non-high-confidence mappings with reviewComment
   if (input.reviewComment && input.confidence !== "high") {
-    const [thread] = await db
+    const [thread] = db
       .insert(commentThread)
       .values({
         workspaceId,
@@ -116,15 +121,17 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
         createdBy: "AI Auto-Map",
         commentCount: 1,
       })
-      .returning();
+      .returning()
+      .all();
 
-    await db.insert(comment)
+    db.insert(comment)
       .values({
         threadId: thread.id,
         authorName: "AI Auto-Map",
         body: input.reviewComment,
         bodyFormat: "markdown",
-      });
+      })
+      .run();
   }
 
   return NextResponse.json(mapping, { status: 201 });

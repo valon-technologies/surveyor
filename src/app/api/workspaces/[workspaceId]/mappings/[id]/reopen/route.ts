@@ -9,49 +9,52 @@ export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const existing = (await db
+  const existing = db
     .select()
     .from(fieldMapping)
-    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId))))[0];
+    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
+    .get();
 
   if (!existing) {
     return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
   }
 
-  if (existing.status !== "fully_closed") {
+  if (existing.status !== "accepted") {
     return NextResponse.json({ error: "Not closed" }, { status: 400 });
   }
 
-  const targetField = (await db.select().from(field).where(eq(field.id, existing.targetFieldId)))[0];
+  const targetField = db.select().from(field).where(eq(field.id, existing.targetFieldId)).get();
 
   // Copy-on-write: mark old as not latest
-  await db.update(fieldMapping)
+  db.update(fieldMapping)
     .set({ isLatest: false, updatedAt: new Date().toISOString() })
-    .where(eq(fieldMapping.id, id));
+    .where(eq(fieldMapping.id, id))
+    .run();
 
-  const [newVersion] = await db
+  const [newVersion] = db
     .insert(fieldMapping)
     .values({
       ...existing,
       id: crypto.randomUUID(),
-      status: "pending",
+      status: "unreviewed",
       version: existing.version + 1,
       parentId: existing.id,
       isLatest: true,
-      changeSummary: `status: fully_closed → pending (case re-opened)`,
+      changeSummary: `status: accepted → unreviewed (case re-opened)`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })
-    .returning();
+    .returning()
+    .all();
 
-  await logActivity({
+  logActivity({
     workspaceId,
     fieldMappingId: newVersion.id,
     entityId: targetField?.entityId || null,
     actorId: userId,
     actorName: existing.editedBy || "Unknown",
     action: "case_reopened",
-    detail: { from: "fully_closed", to: "pending" },
+    detail: { from: "accepted", to: "unreviewed" },
   });
 
   return NextResponse.json(newVersion);

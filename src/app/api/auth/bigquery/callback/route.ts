@@ -91,10 +91,11 @@ export async function GET(req: NextRequest) {
   const userId = session.user.id;
 
   // Delete existing token for this user
-  await db.delete(userBigqueryToken)
-    .where(eq(userBigqueryToken.userId, userId));
+  db.delete(userBigqueryToken)
+    .where(eq(userBigqueryToken.userId, userId))
+    .run();
 
-  await db.insert(userBigqueryToken)
+  db.insert(userBigqueryToken)
     .values({
       userId,
       email,
@@ -102,7 +103,8 @@ export async function GET(req: NextRequest) {
       iv,
       authTag,
       scope: tokens.scope || null,
-    });
+    })
+    .run();
 
   const res = NextResponse.redirect(
     new URL("/settings/bigquery?bq_connected=1", process.env.NEXTAUTH_URL)

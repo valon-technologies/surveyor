@@ -10,6 +10,7 @@ export interface ChatSession {
   messageCount: number;
   lastMessageAt: string | null;
   createdBy: string;
+  createdByName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -25,6 +26,14 @@ export interface ChatMessage {
     provider?: string;
     mappingUpdate?: Record<string, unknown>;
     voiceInput?: boolean;
+    kickoff?: boolean;
+    toolCalls?: Array<{
+      name: string;
+      sql: string;
+      purpose: string;
+      success: boolean;
+      durationMs: number;
+    }>;
   } | null;
   createdAt: string;
 }
@@ -42,6 +51,7 @@ export interface BatchRun {
   failedEntities: number;
   totalFields: number;
   completedFields: number;
+  currentEntityName: string | null;
   config: {
     provider?: string;
     model?: string;

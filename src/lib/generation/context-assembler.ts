@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { skill, skillContext, context } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { estimateTokens } from "@/lib/llm/token-counter";
+import { getCachedContext, setCachedContext } from "./context-cache";
 
 export interface AssembledContext {
   skillsUsed: { id: string; name: string }[];
@@ -26,20 +27,21 @@ interface MatchedSkill {
  * Match active skills against entity/field/dataType criteria.
  * Extracted from the skills/match API route for reuse in generation.
  */
-export async function matchSkills(
+export function matchSkills(
   workspaceId: string,
   entityName: string,
   fieldName?: string,
   dataType?: string
-): Promise<MatchedSkill[]> {
+): MatchedSkill[] {
   const entityLower = entityName.toLowerCase();
   const fieldLower = fieldName?.toLowerCase() || "";
   const dataUpper = dataType?.toUpperCase() || "";
 
-  const skills = await db
+  const skills = db
     .select()
     .from(skill)
-    .where(and(eq(skill.workspaceId, workspaceId), eq(skill.isActive, true)));
+    .where(and(eq(skill.workspaceId, workspaceId), eq(skill.isActive, true)))
+    .all();
 
   return skills.filter((s) => {
     const app = s.applicability as MatchedSkill["applicability"];
@@ -73,12 +75,15 @@ export async function matchSkills(
  * Assemble all context content from matched skills, grouped by role,
  * trimmed to fit within the given token budget.
  */
-export async function assembleContext(
+export function assembleContext(
   workspaceId: string,
   entityName: string,
   tokenBudget: number
-): Promise<AssembledContext> {
-  const matched = await matchSkills(workspaceId, entityName);
+): AssembledContext {
+  const cached = getCachedContext(workspaceId, entityName, tokenBudget);
+  if (cached) return cached;
+
+  const matched = matchSkills(workspaceId, entityName);
 
   const primaryContexts: AssembledContext["primaryContexts"] = [];
   const referenceContexts: AssembledContext["referenceContexts"] = [];
@@ -86,20 +91,22 @@ export async function assembleContext(
   const seenContextIds = new Set<string>();
 
   for (const s of matched) {
-    const scs = await db
+    const scs = db
       .select()
       .from(skillContext)
       .where(eq(skillContext.skillId, s.id))
-      .orderBy(skillContext.sortOrder);
+      .orderBy(skillContext.sortOrder)
+      .all();
 
     for (const sc of scs) {
       if (seenContextIds.has(sc.contextId)) continue;
       seenContextIds.add(sc.contextId);
 
-      const ctx = (await db
+      const ctx = db
         .select()
         .from(context)
-        .where(eq(context.id, sc.contextId)))[0];
+        .where(eq(context.id, sc.contextId))
+        .get();
 
       if (!ctx || !ctx.isActive || !ctx.content) continue;
 
@@ -136,11 +143,15 @@ export async function assembleContext(
     }
   }
 
-  return {
+  const result: AssembledContext = {
     skillsUsed: matched.map((s) => ({ id: s.id, name: s.name })),
     primaryContexts,
     referenceContexts: keptReference,
     supplementaryContexts: keptSupplementary,
     totalTokens,
   };
+
+  setCachedContext(workspaceId, entityName, tokenBudget, result);
+
+  return result;
 }

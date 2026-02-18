@@ -45,7 +45,7 @@ export default function SchemaDetailPage({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{schema.name}</h1>
           <p className="text-muted-foreground text-sm">
-            {schema.side} schema &middot; {schema.format} &middot;{" "}
+            {schema.side === "target" ? "ValonOS" : "ServiceMac"} ({schema.side}) &middot; {schema.format} &middot;{" "}
             {schema.entities?.length || 0} entities
           </p>
         </div>

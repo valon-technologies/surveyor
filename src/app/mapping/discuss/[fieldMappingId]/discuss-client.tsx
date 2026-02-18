@@ -1,69 +1,96 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChatMessageList } from "@/components/chat/chat-message-list";
 import { ChatInput } from "@/components/chat/chat-input";
 import { MappingStateCard } from "@/components/chat/mapping-state-card";
+import { PriorSessionsPanel } from "@/components/chat/prior-sessions-panel";
+import { SessionCompleteCard } from "@/components/chat/session-complete-card";
 import { useMapping, useUpdateMapping } from "@/queries/mapping-queries";
-import { useAcceptMapping } from "@/queries/review-queries";
-import { useCreateChatSession, useChatSession } from "@/queries/chat-queries";
+import { useExcludeMapping } from "@/queries/review-queries";
+import { useEntity } from "@/queries/entity-queries";
+import { useRippleSimilar } from "@/queries/ripple-queries";
+import { RipplePanel } from "@/components/review/ripple-panel";
+import type { ReviewCardData } from "@/types/review";
+import type { MappingStatus } from "@/lib/constants";
+import {
+  useCreateChatSession,
+  useChatSession,
+  useChatSessionsByMapping,
+} from "@/queries/chat-queries";
 import { useChatStream } from "@/lib/hooks/use-chat-stream";
-import { useVoiceOutput } from "@/lib/hooks/use-voice-output";
-import { ArrowLeft, Check, Volume2, VolumeX } from "lucide-react";
+import {
+  ArrowLeft,
+  Ban,
+  Zap,
+} from "lucide-react";
 
 export function DiscussClient() {
   const params = useParams<{ fieldMappingId: string }>();
   const router = useRouter();
   const fieldMappingId = params.fieldMappingId;
 
-  const { data: mapping } = useMapping(fieldMappingId);
+  // Track the "live" mapping ID — follows new versions after Apply (copy-on-write)
+  const [activeMappingId, setActiveMappingId] = useState(fieldMappingId);
+  const { data: mapping } = useMapping(activeMappingId);
+  const { data: priorSessions, isLoading: loadingSessions } =
+    useChatSessionsByMapping(fieldMappingId);
   const createSession = useCreateChatSession();
-  const acceptMutation = useAcceptMapping();
   const updateMapping = useUpdateMapping();
+  const excludeMutation = useExcludeMapping();
 
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const { data: sessionData } = useChatSession(sessionId);
+  // Ripple propagation state
+  const [showRipple, setShowRipple] = useState(false);
+  const [rippleMappingId, setRippleMappingId] = useState<string | null>(null);
+  const { data: similarData } = useRippleSimilar(rippleMappingId);
+
+  // Track whether user has applied an update this session
+  const [hasApplied, setHasApplied] = useState(false);
+
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [viewedPriorSessionId, setViewedPriorSessionId] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState(false);
+  const { data: sessionData } = useChatSession(activeSessionId);
 
   const {
     messages,
     isStreaming,
     streamingContent,
     pendingUpdate,
+    activeToolCall,
     sendMessage,
     setMessages,
-  } = useChatStream(sessionId);
+  } = useChatStream(activeSessionId);
 
-  const {
-    isSupported: voiceOutputSupported,
-    voiceEnabled,
-    setVoiceEnabled,
-    speak,
-  } = useVoiceOutput();
+  const [kickoffSent, setKickoffSent] = useState(false);
 
-  // Auto-speak new assistant messages when voice output is enabled
-  useEffect(() => {
-    if (!voiceEnabled || messages.length === 0) return;
-    const lastMsg = messages[messages.length - 1];
-    if (lastMsg.role === "assistant") {
-      speak(lastMsg.content);
-    }
-  }, [messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Create or load chat session on mount
-  useEffect(() => {
-    if (!fieldMappingId || sessionId) return;
+  const startNewSession = useCallback(() => {
+    if (!fieldMappingId) return;
+    setActiveSessionId(null);
+    setViewedPriorSessionId(null);
+    setKickoffSent(false);
+    setMessages([]);
+    setShowRipple(false);
+    setRippleMappingId(null);
 
     createSession.mutate(
       { fieldMappingId },
       {
         onSuccess: (session) => {
-          setSessionId(session.id);
+          setActiveSessionId(session.id);
         },
       }
     );
   }, [fieldMappingId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-create new session once prior sessions are loaded
+  useEffect(() => {
+    if (initialized || loadingSessions || !fieldMappingId) return;
+    setInitialized(true);
+    startNewSession();
+  }, [loadingSessions, fieldMappingId, initialized, startNewSession]);
 
   // Load existing messages when session loads
   useEffect(() => {
@@ -72,12 +99,29 @@ export function DiscussClient() {
     }
   }, [sessionData]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-send kickoff message to start the conversation
+  useEffect(() => {
+    if (!activeSessionId || kickoffSent || isStreaming) return;
+    // Only kick off if no user/assistant messages exist yet (fresh session)
+    const hasConversation = messages.some((m) => m.role !== "system");
+    if (hasConversation) return;
+
+    setKickoffSent(true);
+    sendMessage(
+      "Review this mapping and help me improve it. What questions do you have?",
+      { kickoff: true }
+    );
+  }, [activeSessionId, messages, kickoffSent, isStreaming]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Derive mapping state for the right panel
   const mappingState = mapping
     ? {
         mappingType: mapping.mappingType ?? null,
         sourceEntityName: mapping.sourceField?.entityName || null,
-        sourceFieldName: mapping.sourceField?.displayName || mapping.sourceField?.name || null,
+        sourceFieldName:
+          mapping.sourceField?.displayName ||
+          mapping.sourceField?.name ||
+          null,
         transform: mapping.transform ?? null,
         defaultValue: mapping.defaultValue ?? null,
         enumMapping: mapping.enumMapping ?? null,
@@ -89,21 +133,78 @@ export function DiscussClient() {
 
   const targetFieldName =
     mapping?.targetField?.displayName || mapping?.targetField?.name || "Field";
-  const entityName = "Entity";
+  const entityName =
+    mapping?.targetField?.entityName || "Entity";
+
+  // Fetch entity data for sibling field navigation (only after apply)
+  const entityId = mapping?.targetField?.entityId;
+  const { data: entityData } = useEntity(hasApplied ? entityId : undefined);
+
+  // Build sibling navigation data
+  const siblingNav = useMemo(() => {
+    if (!entityData?.fields || !mapping?.targetField?.id) return null;
+
+    const currentFieldId = mapping.targetField.id;
+    const siblings = entityData.fields.filter((f) => f.id !== currentFieldId);
+
+    // Prioritize: unmapped first, then pending/low-confidence, skip accepted/excluded
+    const actionable = siblings
+      .filter((f) => {
+        const status = f.mapping?.status ?? "unmapped";
+        return status !== "accepted" && status !== "excluded";
+      })
+      .sort((a, b) => {
+        const aStatus = a.mapping?.status ?? "unmapped";
+        const bStatus = b.mapping?.status ?? "unmapped";
+        const priority: Record<string, number> = {
+          unmapped: 0,
+          needs_discussion: 1,
+          punted: 2,
+          unreviewed: 3,
+        };
+        return (priority[aStatus] ?? 9) - (priority[bStatus] ?? 9);
+      })
+      .slice(0, 4);
+
+    const completedCount = entityData.fields.filter(
+      (f) => f.mapping?.status === "accepted" || f.mapping?.status === "excluded"
+    ).length;
+
+    return {
+      totalFields: entityData.fields.length,
+      completedFields: completedCount,
+      nextFields: actionable.map((f) => ({
+        fieldName: f.displayName || f.name,
+        dataType: f.dataType,
+        mappingId: f.mapping?.id ?? null,
+        status: (f.mapping?.status ?? "unmapped") as MappingStatus | "unmapped",
+        confidence: f.mapping?.confidence ?? null,
+      })),
+    };
+  }, [entityData, mapping?.targetField?.id]);
 
   const handleApplyUpdate = (update: Record<string, unknown>) => {
-    if (!fieldMappingId) return;
-    updateMapping.mutate({
-      id: fieldMappingId,
-      ...update,
-    });
+    if (!activeMappingId) return;
+    updateMapping.mutate(
+      { id: activeMappingId, ...update },
+      {
+        onSuccess: (newVersion) => {
+          // Copy-on-write creates a new record — follow the new ID
+          setActiveMappingId(newVersion.id);
+          // Trigger ripple similarity check
+          setRippleMappingId(newVersion.id);
+          setShowRipple(false);
+          // Show session complete navigation
+          setHasApplied(true);
+        },
+      }
+    );
   };
 
-  const handleAccept = () => {
-    acceptMutation.mutate(fieldMappingId, {
-      onSuccess: () => router.push("/mapping"),
-    });
-  };
+  // Filter out the current active session from "prior" list
+  const displayedPriorSessions = (priorSessions ?? []).filter(
+    (s) => s.id !== activeSessionId
+  );
 
   return (
     <div className="flex flex-col h-screen">
@@ -126,32 +227,20 @@ export function DiscussClient() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {voiceOutputSupported && (
-            <Button
-              size="icon"
-              variant={voiceEnabled ? "default" : "outline"}
-              onClick={() => setVoiceEnabled(!voiceEnabled)}
-              title={voiceEnabled ? "Disable voice output" : "Enable voice output"}
-              className="h-8 w-8"
-            >
-              {voiceEnabled ? (
-                <Volume2 className="h-3.5 w-3.5" />
-              ) : (
-                <VolumeX className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          )}
-          <Button
-            size="sm"
-            onClick={handleAccept}
-            disabled={acceptMutation.isPending}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            <Check className="h-3.5 w-3.5" />
-            Accept Mapping
-          </Button>
-        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() =>
+            excludeMutation.mutate({ mappingId: activeMappingId }, {
+              onSuccess: () => router.push("/mapping"),
+            })
+          }
+          disabled={excludeMutation.isPending}
+          className="text-muted-foreground hover:text-destructive hover:border-destructive"
+        >
+          <Ban className="h-3.5 w-3.5 mr-1" />
+          Exclude
+        </Button>
       </div>
 
       {/* Main content */}
@@ -162,21 +251,116 @@ export function DiscussClient() {
             messages={messages}
             streamingContent={streamingContent}
             isStreaming={isStreaming}
+            activeToolCall={activeToolCall}
           />
           <ChatInput
             onSend={sendMessage}
-            disabled={isStreaming || !sessionId}
+            disabled={isStreaming || !activeSessionId}
           />
         </div>
 
-        {/* Right: Mapping state */}
-        {mappingState && (
-          <MappingStateCard
-            targetFieldName={targetFieldName}
-            entityName={entityName}
-            mapping={mappingState}
-            pendingUpdate={pendingUpdate}
-            onApplyUpdate={handleApplyUpdate}
+        {/* Right: Mapping state + prior sessions + ripple suggestion */}
+        <div className="w-80 border-l flex flex-col overflow-y-auto">
+          {mappingState && (
+            <MappingStateCard
+              targetFieldName={targetFieldName}
+              entityName={entityName}
+              mapping={mappingState}
+              pendingUpdate={pendingUpdate}
+              onApplyUpdate={handleApplyUpdate}
+              applied={hasApplied}
+            />
+          )}
+
+          {/* Prior sessions panel */}
+          <PriorSessionsPanel
+            sessions={displayedPriorSessions}
+            viewedSessionId={viewedPriorSessionId}
+            onToggle={(id) =>
+              setViewedPriorSessionId((prev) => (prev === id ? null : id))
+            }
+          />
+
+          {/* Ripple suggestion after Apply */}
+          {similarData && similarData.similar.length > 0 && !showRipple && (
+            <div className="mx-3 mb-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <div className="flex items-center gap-2 text-sm">
+                <Zap className="h-4 w-4 text-amber-500" />
+                <span className="font-medium">
+                  {similarData.similar.length} similar field
+                  {similarData.similar.length !== 1 ? "s" : ""} found
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                This mapping pattern may apply to other fields
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowRipple(true)}
+                className="mt-2"
+              >
+                <Zap className="h-3.5 w-3.5 mr-1" />
+                Propagate to similar fields
+              </Button>
+            </div>
+          )}
+
+          {/* Session complete navigation after Apply */}
+          {hasApplied && siblingNav && (
+            <SessionCompleteCard
+              entityName={entityName}
+              totalFields={siblingNav.totalFields}
+              completedFields={siblingNav.completedFields}
+              nextFields={siblingNav.nextFields}
+              onNavigateToField={(mappingId) =>
+                router.push(`/mapping/discuss/${mappingId}`)
+              }
+              onBackToQueue={() => router.push("/mapping")}
+            />
+          )}
+        </div>
+
+        {/* Ripple panel (sheet overlay) */}
+        {showRipple && activeMappingId && mapping && (
+          <RipplePanel
+            card={
+              {
+                id: activeMappingId,
+                targetFieldId: mapping.targetField?.id || "",
+                targetFieldName:
+                  mapping.targetField?.displayName ||
+                  mapping.targetField?.name ||
+                  "",
+                targetFieldDescription: null,
+                targetFieldDataType: mapping.targetField?.dataType || null,
+                milestone: null,
+                entityId: mapping.targetField?.entityId || "",
+                entityName:
+                  mapping.targetField?.entityName || entityName,
+                status: mapping.status,
+                mappingType: mapping.mappingType ?? null,
+                confidence: mapping.confidence ?? null,
+                sourceEntityId: mapping.sourceEntityId ?? null,
+                sourceFieldId: mapping.sourceFieldId ?? null,
+                sourceEntityName:
+                  mapping.sourceField?.entityName ?? null,
+                sourceFieldName: mapping.sourceField?.name ?? null,
+                transform: mapping.transform ?? null,
+                defaultValue: mapping.defaultValue ?? null,
+                reasoning: mapping.reasoning ?? null,
+                notes: mapping.notes ?? null,
+                puntNote: null,
+                excludeReason: null,
+                createdBy: mapping.createdBy || "",
+                batchRunId: null,
+                createdAt: mapping.createdAt || "",
+              } satisfies ReviewCardData
+            }
+            onClose={() => {
+              setShowRipple(false);
+              setRippleMappingId(null);
+            }}
           />
         )}
       </div>

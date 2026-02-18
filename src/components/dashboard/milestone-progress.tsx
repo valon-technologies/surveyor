@@ -13,11 +13,11 @@ import type { MilestoneStats } from "@/types/dashboard";
 
 /** Ordered statuses for consistent stacked bar rendering (done → in-progress → unmapped) */
 const STATUS_ORDER: MappingStatus[] = [
-  "fully_closed",
+  "accepted",
   "excluded",
-  "pending",
-  "open_comment_sm",
-  "open_comment_vt",
+  "unreviewed",
+  "punted",
+  "needs_discussion",
   "unmapped",
 ];
 

@@ -1,32 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import { useDashboardStats } from "@/queries/dashboard-queries";
-import { StatsOverview } from "@/components/dashboard/stats-overview";
+import { CompactStatsRow } from "@/components/dashboard/compact-stats-row";
+import { Leaderboard } from "@/components/dashboard/leaderboard";
+import { EntityProgressTable } from "@/components/dashboard/entity-progress-table";
 import { MilestoneProgress } from "@/components/dashboard/milestone-progress";
 import { StatusDistribution } from "@/components/dashboard/status-distribution";
-import { EntityProgressCard } from "@/components/dashboard/entity-progress-card";
-import type { EntityWithStats } from "@/types/entity";
+import { MyWorkTab } from "@/components/dashboard/my-work-tab";
+import { cn } from "@/lib/utils";
 
-/** Weighted progress score: closed fields worth 3, in-progress statuses worth 1, unmapped worth 0 */
-const STATUS_WEIGHTS: Record<string, number> = {
-  fully_closed: 3,
-  pending: 1,
-  open_comment_sm: 1,
-  open_comment_vt: 1,
-  unmapped: 0,
-};
-
-function progressScore(e: EntityWithStats): number {
-  if (!e.statusBreakdown || e.fieldCount === 0) return 0;
-  let score = 0;
-  for (const [status, count] of Object.entries(e.statusBreakdown)) {
-    score += (STATUS_WEIGHTS[status] ?? 0) * count;
-  }
-  // Normalize to 0–100 scale (max possible = 3 * fieldCount)
-  return (score / (3 * e.fieldCount)) * 100;
-}
+type Tab = "overview" | "my-work";
 
 export default function DashboardPage() {
+  const [tab, setTab] = useState<Tab>("overview");
   const { data: stats, isLoading } = useDashboardStats();
 
   if (isLoading) {
@@ -34,12 +21,12 @@ export default function DashboardPage() {
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
         <div className="animate-pulse space-y-6">
           <div className="h-7 bg-muted rounded w-32" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-[88px] bg-muted rounded-xl" />
+          <div className="h-10 bg-muted rounded-lg" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-48 bg-muted rounded-xl" />
             ))}
           </div>
-          <div className="h-24 bg-muted rounded-xl" />
         </div>
       </div>
     );
@@ -58,37 +45,87 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-
-      <StatsOverview stats={stats} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {stats.milestoneStats.length > 0 && (
-          <MilestoneProgress stats={stats.milestoneStats} />
-        )}
-
-        {stats.totalEntities > 0 && <StatusDistribution stats={stats} />}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
       </div>
 
-      {stats.entities.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-muted-foreground">
-              Entities
-            </h2>
-            <span className="text-xs text-muted-foreground">
-              {stats.entities.length} total
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {[...stats.entities]
-              .sort((a, b) => progressScore(b) - progressScore(a))
-              .map((e) => (
-                <EntityProgressCard key={e.id} entity={e} />
-              ))}
-          </div>
+      {/* Tab Bar */}
+      <div className="flex gap-1 border-b">
+        <TabButton
+          active={tab === "overview"}
+          onClick={() => setTab("overview")}
+        >
+          Overview
+        </TabButton>
+        <TabButton
+          active={tab === "my-work"}
+          onClick={() => setTab("my-work")}
+        >
+          My Work
+        </TabButton>
+      </div>
+
+      {/* Tab Content */}
+      {tab === "overview" && (
+        <div className="space-y-6">
+          <CompactStatsRow stats={stats} />
+          <Leaderboard
+            data={
+              stats.leaderboard ?? {
+                mostMapped: [],
+                mostQuestionsAnswered: [],
+                mostBotCollaborations: [],
+              }
+            }
+          />
+
+          {/* Milestone + Status Distribution */}
+          {(stats.milestoneStats.length > 0 || stats.totalEntities > 0) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {stats.milestoneStats.length > 0 && (
+                <MilestoneProgress stats={stats.milestoneStats} />
+              )}
+              {stats.totalEntities > 0 && (
+                <StatusDistribution stats={stats} />
+              )}
+            </div>
+          )}
+
+          {/* Entity Progress Table */}
+          {stats.entities.length > 0 && (
+            <EntityProgressTable entities={stats.entities} />
+          )}
         </div>
       )}
+
+      {tab === "my-work" && <MyWorkTab />}
     </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "px-4 py-2 text-sm font-medium transition-colors relative",
+        active
+          ? "text-foreground"
+          : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {children}
+      {active && (
+        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground rounded-t" />
+      )}
+    </button>
   );
 }

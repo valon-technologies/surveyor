@@ -43,7 +43,7 @@ export function withAuth(handler: AuthHandler, options?: WithAuthOptions) {
     }
 
     // Check workspace membership
-    const membership = (await db
+    const membership = db
       .select()
       .from(userWorkspace)
       .where(
@@ -51,7 +51,8 @@ export function withAuth(handler: AuthHandler, options?: WithAuthOptions) {
           eq(userWorkspace.userId, session.user.id),
           eq(userWorkspace.workspaceId, workspaceId)
         )
-      ))[0];
+      )
+      .get();
 
     if (!membership) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

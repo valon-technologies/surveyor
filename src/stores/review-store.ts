@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ConfidenceLevel, ReviewStatus } from "@/lib/constants";
+import type { ConfidenceLevel, MappingStatus } from "@/lib/constants";
 import type { ReviewSortBy, ReviewSortOrder } from "@/types/review";
 
 interface ReviewState {
@@ -9,8 +9,8 @@ interface ReviewState {
   entityFilter: string | "all";
   setEntityFilter: (e: string | "all") => void;
 
-  reviewStatusFilter: ReviewStatus | "all";
-  setReviewStatusFilter: (s: ReviewStatus | "all") => void;
+  statusFilter: MappingStatus | "all";
+  setStatusFilter: (s: MappingStatus | "all") => void;
 
   sortBy: ReviewSortBy;
   setSortBy: (s: ReviewSortBy) => void;
@@ -20,6 +20,9 @@ interface ReviewState {
 
   activeBatchRunId: string | null;
   setActiveBatchRunId: (id: string | null) => void;
+
+  collapsedEntityIds: string[];
+  toggleEntityCollapsed: (entityId: string) => void;
 }
 
 export const useReviewStore = create<ReviewState>((set) => ({
@@ -29,8 +32,8 @@ export const useReviewStore = create<ReviewState>((set) => ({
   entityFilter: "all",
   setEntityFilter: (e) => set({ entityFilter: e }),
 
-  reviewStatusFilter: "all",
-  setReviewStatusFilter: (s) => set({ reviewStatusFilter: s }),
+  statusFilter: "all",
+  setStatusFilter: (s) => set({ statusFilter: s }),
 
   sortBy: "confidence",
   setSortBy: (s) => set({ sortBy: s }),
@@ -40,4 +43,12 @@ export const useReviewStore = create<ReviewState>((set) => ({
 
   activeBatchRunId: null,
   setActiveBatchRunId: (id) => set({ activeBatchRunId: id }),
+
+  collapsedEntityIds: [],
+  toggleEntityCollapsed: (entityId) =>
+    set((state) => ({
+      collapsedEntityIds: state.collapsedEntityIds.includes(entityId)
+        ? state.collapsedEntityIds.filter((id) => id !== entityId)
+        : [...state.collapsedEntityIds, entityId],
+    })),
 }));

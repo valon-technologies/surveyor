@@ -11,17 +11,17 @@ import {
 import type { EntityWithStats } from "@/types/entity";
 
 const STATUS_ORDER: MappingStatus[] = [
-  "fully_closed",
+  "accepted",
   "excluded",
-  "pending",
-  "open_comment_sm",
-  "open_comment_vt",
+  "unreviewed",
+  "punted",
+  "needs_discussion",
   "unmapped",
 ];
 
 export function EntityProgressCard({ entity }: { entity: EntityWithStats }) {
   return (
-    <Link href={`/mapping/${entity.id}`}>
+    <Link href={`/mapping?entityId=${entity.id}`}>
       <Card className="hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer h-full">
         <CardContent className="p-4 space-y-2.5">
           <div className="flex items-start justify-between gap-2">

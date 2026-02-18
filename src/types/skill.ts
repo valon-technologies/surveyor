@@ -76,3 +76,13 @@ export interface SkillContextInput {
   sortOrder?: number;
   notes?: string;
 }
+
+export interface AssemblySimulationResult {
+  skillsUsed: { id: string; name: string }[];
+  primaryContexts: { id: string; name: string; tokenCount: number }[];
+  referenceContexts: { id: string; name: string; tokenCount: number }[];
+  supplementaryContexts: { id: string; name: string; tokenCount: number }[];
+  droppedContexts: { id: string; name: string; tokenCount: number; role: string }[];
+  totalTokens: number;
+  budget: number;
+}

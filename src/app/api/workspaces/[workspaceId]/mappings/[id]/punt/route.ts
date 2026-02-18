@@ -20,12 +20,13 @@ export const POST = withAuth(
       );
     }
 
-    const mapping = (await db
+    const mapping = db
       .select()
       .from(fieldMapping)
       .where(
         and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId))
-      ))[0];
+      )
+      .get();
 
     if (!mapping) {
       return NextResponse.json(
@@ -37,23 +38,25 @@ export const POST = withAuth(
     const now = new Date().toISOString();
 
     // Update mapping
-    await db.update(fieldMapping)
+    db.update(fieldMapping)
       .set({
-        reviewStatus: "punted",
+        status: "punted",
         puntNote: parsed.data.note,
         updatedAt: now,
       })
-      .where(eq(fieldMapping.id, id));
+      .where(eq(fieldMapping.id, id))
+      .run();
 
     // Optionally create a question for SM team
     if (parsed.data.assignToSM) {
       // Resolve entity from target field
-      const targetField = (await db
+      const targetField = db
         .select()
         .from(field)
-        .where(eq(field.id, mapping.targetFieldId)))[0];
+        .where(eq(field.id, mapping.targetFieldId))
+        .get();
 
-      await db.insert(question)
+      db.insert(question)
         .values({
           workspaceId,
           entityId: targetField?.entityId || null,
@@ -64,10 +67,12 @@ export const POST = withAuth(
           priority: parsed.data.priority || "normal",
           targetForTeam: "SM",
           fieldMappingId: id,
-        });
+          createdByUserId: userId,
+        })
+        .run();
     }
 
-    await logActivity({
+    logActivity({
       workspaceId,
       fieldMappingId: id,
       entityId: null,
@@ -81,10 +86,11 @@ export const POST = withAuth(
       },
     });
 
-    const updated = (await db
+    const updated = db
       .select()
       .from(fieldMapping)
-      .where(eq(fieldMapping.id, id)))[0];
+      .where(eq(fieldMapping.id, id))
+      .get();
 
     return NextResponse.json(updated);
   },

@@ -1,12 +1,12 @@
-import { pgTable, text, integer, boolean, jsonb, index } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
 import { relations, sql } from "drizzle-orm";
 
 // Helper defaults
-const nowDefault = sql`now()`;
+const nowDefault = sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`;
 
 // ─── Auth Tables ──────────────────────────────────────────────
 
-export const user = pgTable("user", {
+export const user = sqliteTable("user", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name"),
   email: text("email").notNull().unique(),
@@ -17,7 +17,7 @@ export const user = pgTable("user", {
   updatedAt: text("updated_at").notNull().default(nowDefault),
 });
 
-export const account = pgTable(
+export const account = sqliteTable(
   "account",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -40,7 +40,7 @@ export const account = pgTable(
   ]
 );
 
-export const verificationToken = pgTable(
+export const verificationToken = sqliteTable(
   "verification_token",
   {
     identifier: text("identifier").notNull(),
@@ -52,7 +52,7 @@ export const verificationToken = pgTable(
   ]
 );
 
-export const userWorkspace = pgTable(
+export const userWorkspace = sqliteTable(
   "user_workspace",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -72,7 +72,7 @@ export const userWorkspace = pgTable(
   ]
 );
 
-export const workspaceInvite = pgTable(
+export const workspaceInvite = sqliteTable(
   "workspace_invite",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -96,7 +96,7 @@ export const workspaceInvite = pgTable(
   ]
 );
 
-export const userApiKey = pgTable(
+export const userApiKey = sqliteTable(
   "user_api_key",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -117,7 +117,7 @@ export const userApiKey = pgTable(
   ]
 );
 
-export const userBigqueryToken = pgTable(
+export const userBigqueryToken = sqliteTable(
   "user_bigquery_token",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -139,11 +139,11 @@ export const userBigqueryToken = pgTable(
 
 // ─── Tables ───────────────────────────────────────────────────
 
-export const workspace = pgTable("workspace", {
+export const workspace = sqliteTable("workspace", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
-  settings: jsonb("settings").$type<{
+  settings: text("settings", { mode: "json" }).$type<{
     tokenLimit?: number;
     defaultProvider?: string;
     bigquery?: {
@@ -156,7 +156,7 @@ export const workspace = pgTable("workspace", {
   updatedAt: text("updated_at").notNull().default(nowDefault),
 });
 
-export const schemaAsset = pgTable(
+export const schemaAsset = sqliteTable(
   "schema_asset",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -169,7 +169,7 @@ export const schemaAsset = pgTable(
     sourceFile: text("source_file"),
     format: text("format").notNull().default("csv"), // csv | json | sql_ddl
     rawContent: text("raw_content"),
-    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
   },
@@ -179,7 +179,7 @@ export const schemaAsset = pgTable(
   ]
 );
 
-export const entity = pgTable(
+export const entity = sqliteTable(
   "entity",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -193,10 +193,11 @@ export const entity = pgTable(
     displayName: text("display_name"),
     side: text("side").notNull(), // source | target (denormalized)
     description: text("description"),
+    parentEntityId: text("parent_entity_id"), // FK to entity.id — self-ref handled by migration + relations
     // Target-only fields
     status: text("status").notNull().default("not_started"), // not_started | in_progress | review | blocked | complete
     sortOrder: integer("sort_order").notNull().default(0),
-    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
   },
@@ -208,7 +209,7 @@ export const entity = pgTable(
   ]
 );
 
-export const field = pgTable(
+export const field = sqliteTable(
   "field",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -218,14 +219,14 @@ export const field = pgTable(
     name: text("name").notNull(),
     displayName: text("display_name"),
     dataType: text("data_type"), // STRING | NUMBER | DATE | ENUM | BOOLEAN | etc.
-    isRequired: boolean("is_required").notNull().default(false),
-    isKey: boolean("is_key").notNull().default(false),
+    isRequired: integer("is_required", { mode: "boolean" }).notNull().default(false),
+    isKey: integer("is_key", { mode: "boolean" }).notNull().default(false),
     description: text("description"),
     milestone: text("milestone"), // M1 | M2 | M3 | M4
-    sampleValues: jsonb("sample_values").$type<string[]>(),
-    enumValues: jsonb("enum_values").$type<string[]>(),
+    sampleValues: text("sample_values", { mode: "json" }).$type<string[]>(),
+    enumValues: text("enum_values", { mode: "json" }).$type<string[]>(),
     sortOrder: integer("sort_order").notNull().default(0),
-    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
   },
@@ -235,7 +236,7 @@ export const field = pgTable(
   ]
 );
 
-export const fieldMapping = pgTable(
+export const fieldMapping = sqliteTable(
   "field_mapping",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -246,7 +247,7 @@ export const fieldMapping = pgTable(
       .notNull()
       .references(() => field.id, { onDelete: "cascade" }),
     status: text("status").notNull().default("unmapped"),
-    // unmapped | pending | open_comment_sm | open_comment_vt | fully_closed
+    // unmapped | unreviewed | accepted | punted | needs_discussion | excluded
     mappingType: text("mapping_type"),
     // direct | rename | type_cast | enum | flatten_to_normalize | aggregate | join | derived | pivot | conditional
     assigneeId: text("assignee_id").references(() => user.id, { onDelete: "set null" }),
@@ -254,7 +255,7 @@ export const fieldMapping = pgTable(
     sourceFieldId: text("source_field_id").references(() => field.id),
     transform: text("transform"), // SQL expression
     defaultValue: text("default_value"),
-    enumMapping: jsonb("enum_mapping").$type<Record<string, string>>(),
+    enumMapping: text("enum_mapping", { mode: "json" }).$type<Record<string, string>>(),
     reasoning: text("reasoning"),
     confidence: text("confidence"), // high | medium | low
     notes: text("notes"),
@@ -262,11 +263,12 @@ export const fieldMapping = pgTable(
     generationId: text("generation_id"),
     version: integer("version").notNull().default(1),
     parentId: text("parent_id"),
-    isLatest: boolean("is_latest").notNull().default(true),
+    isLatest: integer("is_latest", { mode: "boolean" }).notNull().default(true),
     editedBy: text("edited_by"),
     changeSummary: text("change_summary"),
-    reviewStatus: text("review_status"), // accepted | punted | needs_discussion
+    // reviewStatus column dropped — status field is now unified
     puntNote: text("punt_note"),
+    excludeReason: text("exclude_reason"),
     batchRunId: text("batch_run_id"),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
@@ -278,11 +280,10 @@ export const fieldMapping = pgTable(
     index("mapping_status_idx").on(table.workspaceId, table.status),
     index("mapping_latest_idx").on(table.targetFieldId, table.isLatest),
     index("mapping_assignee_idx").on(table.assigneeId),
-    index("mapping_review_status_idx").on(table.workspaceId, table.reviewStatus),
   ]
 );
 
-export const context = pgTable(
+export const context = sqliteTable(
   "context",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -297,11 +298,11 @@ export const context = pgTable(
     content: text("content").notNull().default(""),
     contentFormat: text("content_format").notNull().default("markdown"),
     tokenCount: integer("token_count"),
-    tags: jsonb("tags").$type<string[]>(),
-    isActive: boolean("is_active").notNull().default(true),
+    tags: text("tags", { mode: "json" }).$type<string[]>(),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     importSource: text("import_source"),
-    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
   },
@@ -313,7 +314,7 @@ export const context = pgTable(
   ]
 );
 
-export const mappingContext = pgTable(
+export const mappingContext = sqliteTable(
   "mapping_context",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -333,7 +334,7 @@ export const mappingContext = pgTable(
   ]
 );
 
-export const commentThread = pgTable(
+export const commentThread = sqliteTable(
   "comment_thread",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -359,7 +360,7 @@ export const commentThread = pgTable(
   ]
 );
 
-export const comment = pgTable(
+export const comment = sqliteTable(
   "comment",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -369,7 +370,7 @@ export const comment = pgTable(
     authorName: text("author_name").notNull(),
     body: text("body").notNull(),
     bodyFormat: text("body_format").notNull().default("markdown"), // markdown | plain
-    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
     editedAt: text("edited_at"),
     createdAt: text("created_at").notNull().default(nowDefault),
   },
@@ -379,7 +380,7 @@ export const comment = pgTable(
   ]
 );
 
-export const question = pgTable(
+export const question = sqliteTable(
   "question",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -389,14 +390,22 @@ export const question = pgTable(
     entityId: text("entity_id").references(() => entity.id, { onDelete: "cascade" }),
     fieldId: text("field_id").references(() => field.id, { onDelete: "set null" }),
     question: text("question").notNull(),
-    answer: text("answer"),
-    status: text("status").notNull().default("open"), // open | answered | dismissed
+    answer: text("answer"), // backward compat — populated on resolve
+    status: text("status").notNull().default("open"), // open | resolved | dismissed
     askedBy: text("asked_by").notNull().default("user"), // user | llm
-    answeredBy: text("answered_by"),
+    answeredBy: text("answered_by"), // backward compat — populated on resolve
     priority: text("priority").notNull().default("normal"), // urgent | high | normal | low
     targetForTeam: text("target_for_team"), // SM | VT
     fieldMappingId: text("field_mapping_id").references(() => fieldMapping.id, { onDelete: "set null" }),
     chatSessionId: text("chat_session_id"),
+    schemaAssetIds: text("schema_asset_ids", { mode: "json" }).$type<string[]>(),
+    assigneeIds: text("assignee_ids", { mode: "json" }).$type<string[]>(),
+    // Threaded question fields
+    resolvedBy: text("resolved_by").references(() => user.id, { onDelete: "set null" }),
+    resolvedByName: text("resolved_by_name"),
+    resolvedAt: text("resolved_at"),
+    replyCount: integer("reply_count").notNull().default(0),
+    createdByUserId: text("created_by_user_id").references(() => user.id, { onDelete: "set null" }),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
   },
@@ -408,7 +417,29 @@ export const question = pgTable(
   ]
 );
 
-export const generation = pgTable(
+export const questionReply = sqliteTable(
+  "question_reply",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    questionId: text("question_id")
+      .notNull()
+      .references(() => question.id, { onDelete: "cascade" }),
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
+    authorName: text("author_name").notNull(),
+    authorRole: text("author_role").notNull().default("user"), // user | llm | system
+    body: text("body").notNull(),
+    isResolution: integer("is_resolution", { mode: "boolean" }).notNull().default(false),
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
+    editedAt: text("edited_at"),
+    createdAt: text("created_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("question_reply_question_idx").on(table.questionId),
+    index("question_reply_question_created_idx").on(table.questionId, table.createdAt),
+  ]
+);
+
+export const generation = sqliteTable(
   "generation",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -421,17 +452,19 @@ export const generation = pgTable(
     status: text("status").notNull().default("pending"), // pending | running | completed | failed
     provider: text("provider"),
     model: text("model"),
-    promptSnapshot: jsonb("prompt_snapshot").$type<{
+    promptSnapshot: text("prompt_snapshot", { mode: "json" }).$type<{
       systemMessage: string;
       userMessage: string;
       skillsUsed: string[];
     }>(),
     output: text("output"),
-    outputParsed: jsonb("output_parsed").$type<Record<string, unknown>>(),
+    outputParsed: text("output_parsed", { mode: "json" }).$type<Record<string, unknown>>(),
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),
     durationMs: integer("duration_ms"),
     error: text("error"),
+    validationScore: integer("validation_score"),
+    validationIssues: text("validation_issues", { mode: "json" }).$type<Record<string, unknown>[]>(),
     batchRunId: text("batch_run_id"),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
@@ -444,7 +477,7 @@ export const generation = pgTable(
   ]
 );
 
-export const skill = pgTable(
+export const skill = sqliteTable(
   "skill",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -454,14 +487,14 @@ export const skill = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     instructions: text("instructions"),
-    applicability: jsonb("applicability").$type<{
+    applicability: text("applicability", { mode: "json" }).$type<{
       entityPatterns?: string[];
       fieldPatterns?: string[];
       dataTypes?: string[];
       subcategories?: string[];
     }>(),
-    tags: jsonb("tags").$type<string[]>(),
-    isActive: boolean("is_active").notNull().default(true),
+    tags: text("tags", { mode: "json" }).$type<string[]>(),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
@@ -471,7 +504,7 @@ export const skill = pgTable(
   ]
 );
 
-export const skillContext = pgTable(
+export const skillContext = sqliteTable(
   "skill_context",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -492,7 +525,7 @@ export const skillContext = pgTable(
   ]
 );
 
-export const batchRun = pgTable(
+export const batchRun = sqliteTable(
   "batch_run",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -505,10 +538,12 @@ export const batchRun = pgTable(
     failedEntities: integer("failed_entities").notNull().default(0),
     totalFields: integer("total_fields").notNull().default(0),
     completedFields: integer("completed_fields").notNull().default(0),
-    config: jsonb("config").$type<{
+    currentEntityName: text("current_entity_name"),
+    config: text("config", { mode: "json" }).$type<{
       provider?: string;
       model?: string;
       skipAlreadyMapped?: boolean;
+      includeStatuses?: string[];
     }>(),
     startedAt: text("started_at"),
     completedAt: text("completed_at"),
@@ -524,7 +559,7 @@ export const batchRun = pgTable(
   ]
 );
 
-export const chatSession = pgTable(
+export const chatSession = sqliteTable(
   "chat_session",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -550,7 +585,7 @@ export const chatSession = pgTable(
   ]
 );
 
-export const chatMessage = pgTable(
+export const chatMessage = sqliteTable(
   "chat_message",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -559,7 +594,7 @@ export const chatMessage = pgTable(
       .references(() => chatSession.id, { onDelete: "cascade" }),
     role: text("role").notNull(), // user | assistant | system
     content: text("content").notNull(),
-    metadata: jsonb("metadata").$type<{
+    metadata: text("metadata", { mode: "json" }).$type<{
       tokens?: number;
       model?: string;
       provider?: string;
@@ -574,7 +609,74 @@ export const chatMessage = pgTable(
   ]
 );
 
-export const activity = pgTable(
+export const learning = sqliteTable(
+  "learning",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    entityId: text("entity_id").references(() => entity.id, { onDelete: "set null" }),
+    fieldName: text("field_name"),
+    scope: text("scope").notNull(), // "field" | "entity" | "workspace"
+    content: text("content").notNull(),
+    source: text("source").notNull(), // "training" | "review" | "manual"
+    sessionId: text("session_id"),
+    createdAt: text("created_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("learning_workspace_idx").on(table.workspaceId),
+    index("learning_entity_idx").on(table.entityId),
+    index("learning_scope_idx").on(table.scope),
+  ]
+);
+
+export const entityPipeline = sqliteTable(
+  "entity_pipeline",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    entityId: text("entity_id")
+      .notNull()
+      .references(() => entity.id, { onDelete: "cascade" }),
+    version: integer("version").notNull().default(1),
+    parentId: text("parent_id"),
+    isLatest: integer("is_latest", { mode: "boolean" }).notNull().default(true),
+    yamlSpec: text("yaml_spec").notNull(),
+    tableName: text("table_name").notNull(),
+    primaryKey: text("primary_key", { mode: "json" }).$type<string[]>(),
+    sources: text("sources", { mode: "json" }).$type<{
+      name: string;
+      alias: string;
+      table: string;
+      filters?: Record<string, unknown>[];
+    }[]>().notNull(),
+    joins: text("joins", { mode: "json" }).$type<{
+      left: string;
+      right: string;
+      on: string[];
+      how: string;
+    }[] | null>(),
+    concat: text("concat", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    structureType: text("structure_type").notNull().default("flat"), // flat | assembly
+    isStale: integer("is_stale", { mode: "boolean" }).notNull().default(false),
+    generationId: text("generation_id"),
+    batchRunId: text("batch_run_id"),
+    editedBy: text("edited_by"),
+    changeSummary: text("change_summary"),
+    createdAt: text("created_at").notNull().default(nowDefault),
+    updatedAt: text("updated_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("entity_pipeline_workspace_idx").on(table.workspaceId),
+    index("entity_pipeline_entity_idx").on(table.entityId),
+    index("entity_pipeline_latest_idx").on(table.entityId, table.isLatest),
+  ]
+);
+
+export const activity = sqliteTable(
   "activity",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -586,7 +688,7 @@ export const activity = pgTable(
     actorId: text("actor_id"),
     actorName: text("actor_name").notNull(),
     action: text("action").notNull(), // status_change | comment_added | thread_created | thread_resolved | mapping_saved | validation_ran | case_closed | case_reopened
-    detail: jsonb("detail").$type<Record<string, unknown>>(),
+    detail: text("detail", { mode: "json" }).$type<Record<string, unknown>>(),
     createdAt: text("created_at").notNull().default(nowDefault),
   },
   (table) => [
@@ -596,7 +698,7 @@ export const activity = pgTable(
   ]
 );
 
-export const validation = pgTable(
+export const validation = sqliteTable(
   "validation",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -608,8 +710,8 @@ export const validation = pgTable(
       .references(() => fieldMapping.id, { onDelete: "cascade" }),
     entityId: text("entity_id"),
     status: text("status").notNull(), // passed | failed | error
-    input: jsonb("input").$type<Record<string, unknown>>(),
-    output: jsonb("output").$type<Record<string, unknown>>(),
+    input: text("input", { mode: "json" }).$type<Record<string, unknown>>(),
+    output: text("output", { mode: "json" }).$type<Record<string, unknown>>(),
     errorMessage: text("error_message"),
     durationMs: integer("duration_ms"),
     ranBy: text("ran_by"),
@@ -635,6 +737,7 @@ export const workspaceRelations = relations(workspace, ({ many }) => ({
   userWorkspaces: many(userWorkspace),
   batchRuns: many(batchRun),
   chatSessions: many(chatSession),
+  learnings: many(learning),
 }));
 
 export const schemaAssetRelations = relations(schemaAsset, ({ one, many }) => ({
@@ -654,11 +757,18 @@ export const entityRelations = relations(entity, ({ one, many }) => ({
     fields: [entity.schemaAssetId],
     references: [schemaAsset.id],
   }),
+  parent: one(entity, {
+    fields: [entity.parentEntityId],
+    references: [entity.id],
+    relationName: "entityHierarchy",
+  }),
+  children: many(entity, { relationName: "entityHierarchy" }),
   fields: many(field),
   contexts: many(context),
   questions: many(question),
   generations: many(generation),
   commentThreads: many(commentThread),
+  pipelines: many(entityPipeline),
 }));
 
 export const fieldRelations = relations(field, ({ one, many }) => ({
@@ -755,7 +865,7 @@ export const commentRelations = relations(comment, ({ one }) => ({
   }),
 }));
 
-export const questionRelations = relations(question, ({ one }) => ({
+export const questionRelations = relations(question, ({ one, many }) => ({
   workspace: one(workspace, {
     fields: [question.workspaceId],
     references: [workspace.id],
@@ -767,6 +877,22 @@ export const questionRelations = relations(question, ({ one }) => ({
   field: one(field, {
     fields: [question.fieldId],
     references: [field.id],
+  }),
+  resolvedByUser: one(user, {
+    fields: [question.resolvedBy],
+    references: [user.id],
+  }),
+  replies: many(questionReply),
+}));
+
+export const questionReplyRelations = relations(questionReply, ({ one }) => ({
+  question: one(question, {
+    fields: [questionReply.questionId],
+    references: [question.id],
+  }),
+  author: one(user, {
+    fields: [questionReply.authorId],
+    references: [user.id],
   }),
 }));
 
@@ -835,6 +961,28 @@ export const chatMessageRelations = relations(chatMessage, ({ one }) => ({
   session: one(chatSession, {
     fields: [chatMessage.sessionId],
     references: [chatSession.id],
+  }),
+}));
+
+export const learningRelations = relations(learning, ({ one }) => ({
+  workspace: one(workspace, {
+    fields: [learning.workspaceId],
+    references: [workspace.id],
+  }),
+  entity: one(entity, {
+    fields: [learning.entityId],
+    references: [entity.id],
+  }),
+}));
+
+export const entityPipelineRelations = relations(entityPipeline, ({ one }) => ({
+  workspace: one(workspace, {
+    fields: [entityPipeline.workspaceId],
+    references: [workspace.id],
+  }),
+  entity: one(entity, {
+    fields: [entityPipeline.entityId],
+    references: [entity.id],
   }),
 }));
 

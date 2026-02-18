@@ -7,24 +7,29 @@ import type { FieldWithMapping } from "@/types/field";
 
 interface FieldTableProps {
   fields: FieldWithMapping[];
+  entityId: string;
+  entityName: string;
   selectedFieldId: string | null;
   onSelectField: (id: string | null) => void;
+  questionCountByFieldId?: Map<string, number>;
 }
 
-export function FieldTable({ fields, selectedFieldId, onSelectField }: FieldTableProps) {
+export function FieldTable({ fields, entityId, entityName, selectedFieldId, onSelectField, questionCountByFieldId }: FieldTableProps) {
   // Group by mapping status — ordered by attention priority
-  const openCommentSm = fields.filter((f) => f.mapping?.status === "open_comment_sm");
-  const openCommentVt = fields.filter((f) => f.mapping?.status === "open_comment_vt");
+  const needsDiscussion = fields.filter((f) => f.mapping?.status === "needs_discussion");
+  const punted = fields.filter((f) => f.mapping?.status === "punted");
   const unmapped = fields.filter((f) => !f.mapping || f.mapping.status === "unmapped");
-  const pending = fields.filter((f) => f.mapping?.status === "pending");
-  const fullyClosed = fields.filter((f) => f.mapping?.status === "fully_closed");
+  const unreviewed = fields.filter((f) => f.mapping?.status === "unreviewed");
+  const accepted = fields.filter((f) => f.mapping?.status === "accepted");
+  const excluded = fields.filter((f) => f.mapping?.status === "excluded");
 
   const sections = [
-    { label: "Open Comment (SM)", fields: openCommentSm, color: MAPPING_STATUS_COLORS.open_comment_sm },
-    { label: "Open Comment (VT)", fields: openCommentVt, color: MAPPING_STATUS_COLORS.open_comment_vt },
+    { label: "Needs Discussion", fields: needsDiscussion, color: MAPPING_STATUS_COLORS.needs_discussion },
+    { label: "Punted", fields: punted, color: MAPPING_STATUS_COLORS.punted },
     { label: "Unmapped", fields: unmapped, color: MAPPING_STATUS_COLORS.unmapped },
-    { label: "Pending", fields: pending, color: MAPPING_STATUS_COLORS.pending },
-    { label: "Fully Closed", fields: fullyClosed, color: MAPPING_STATUS_COLORS.fully_closed },
+    { label: "Unreviewed", fields: unreviewed, color: MAPPING_STATUS_COLORS.unreviewed },
+    { label: "Accepted", fields: accepted, color: MAPPING_STATUS_COLORS.accepted },
+    { label: "Excluded", fields: excluded, color: MAPPING_STATUS_COLORS.excluded },
   ].filter((s) => s.fields.length > 0);
 
   return (
@@ -57,10 +62,13 @@ export function FieldTable({ fields, selectedFieldId, onSelectField }: FieldTabl
                 <FieldRow
                   key={f.id}
                   field={f}
+                  entityId={entityId}
+                  entityName={entityName}
                   isSelected={f.id === selectedFieldId}
                   onClick={() =>
                     onSelectField(f.id === selectedFieldId ? null : f.id)
                   }
+                  openQuestionCount={questionCountByFieldId?.get(f.id)}
                 />
               ))}
             </tbody>

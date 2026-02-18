@@ -12,39 +12,42 @@ function deriveEntityStatus(
 ): EntityStatus {
   if (fieldCount === 0) return "not_started";
 
-  const closed = statusBreakdown["fully_closed"] || 0;
-  const pending = statusBreakdown["pending"] || 0;
-  const commentSm = statusBreakdown["open_comment_sm"] || 0;
-  const commentVt = statusBreakdown["open_comment_vt"] || 0;
+  const accepted = statusBreakdown["accepted"] || 0;
+  const excluded = statusBreakdown["excluded"] || 0;
+  const unreviewed = statusBreakdown["unreviewed"] || 0;
+  const punted = statusBreakdown["punted"] || 0;
+  const needsDiscussion = statusBreakdown["needs_discussion"] || 0;
 
-  if (closed === fieldCount) return "complete";
-  if (commentSm > 0 || commentVt > 0) return "review";
-  if (closed > 0 || pending > 0) return "in_progress";
+  if (accepted + excluded === fieldCount) return "complete";
+  if (punted > 0 || needsDiscussion > 0) return "review";
+  if (accepted > 0 || unreviewed > 0) return "in_progress";
   return "not_started";
 }
 
 export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   const { id } = await ctx.params;
 
-  const ent = (await db
+  const ent = db
     .select()
     .from(entity)
-    .where(and(eq(entity.id, id), eq(entity.workspaceId, workspaceId))))[0];
+    .where(and(eq(entity.id, id), eq(entity.workspaceId, workspaceId)))
+    .get();
 
   if (!ent) {
     return NextResponse.json({ error: "Entity not found" }, { status: 404 });
   }
 
   // Get fields with their latest mappings
-  const fields = await db
+  const fields = db
     .select()
     .from(field)
     .where(eq(field.entityId, id))
-    .orderBy(field.sortOrder);
+    .orderBy(field.sortOrder)
+    .all();
 
   const fieldsWithMappings = [];
   for (const f of fields) {
-    const mapping = (await db
+    const mapping = db
       .select()
       .from(fieldMapping)
       .where(
@@ -52,39 +55,44 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
           eq(fieldMapping.targetFieldId, f.id),
           eq(fieldMapping.isLatest, true)
         )
-      ))[0];
+      )
+      .get();
 
     // If we have a mapping with source field, get the source names
     let sourceEntityName: string | undefined;
     let sourceFieldName: string | undefined;
     if (mapping?.sourceFieldId) {
-      const sf = (await db
+      const sf = db
         .select()
         .from(field)
-        .where(eq(field.id, mapping.sourceFieldId)))[0];
+        .where(eq(field.id, mapping.sourceFieldId))
+        .get();
       if (sf) {
         sourceFieldName = sf.name;
-        const se = (await db
+        const se = db
           .select()
           .from(entity)
-          .where(eq(entity.id, sf.entityId)))[0];
+          .where(eq(entity.id, sf.entityId))
+          .get();
         sourceEntityName = se?.name;
       }
     } else if (mapping?.sourceEntityId) {
-      const se = (await db
+      const se = db
         .select()
         .from(entity)
-        .where(eq(entity.id, mapping.sourceEntityId)))[0];
+        .where(eq(entity.id, mapping.sourceEntityId))
+        .get();
       sourceEntityName = se?.name;
     }
 
     // Resolve assignee name
     let assigneeName: string | null = null;
     if (mapping?.assigneeId) {
-      const assignee = (await db
+      const assignee = db
         .select({ name: user.name })
         .from(user)
-        .where(eq(user.id, mapping.assigneeId)))[0];
+        .where(eq(user.id, mapping.assigneeId))
+        .get();
       assigneeName = assignee?.name || null;
     }
 
@@ -120,19 +128,21 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   }
 
   // Stats
-  const openQs = (await db
+  const openQs = db
     .select({ cnt: count() })
     .from(question)
-    .where(and(eq(question.entityId, id), eq(question.status, "open"))))[0];
+    .where(and(eq(question.entityId, id), eq(question.status, "open")))
+    .get();
 
-  const mappedCount = statusBreakdown["fully_closed"] || 0;
+  const mappedCount = statusBreakdown["accepted"] || 0;
 
   // Auto-derive entity status (preserve manual "blocked" override)
   const computedStatus = deriveEntityStatus(statusBreakdown, fields.length);
   if (ent.status !== "blocked" && ent.status !== computedStatus) {
-    await db.update(entity)
+    db.update(entity)
       .set({ status: computedStatus, updatedAt: new Date().toISOString() })
-      .where(eq(entity.id, id));
+      .where(eq(entity.id, id))
+      .run();
   }
 
   const effectiveStatus = ent.status === "blocked" ? "blocked" : computedStatus;
@@ -166,11 +176,12 @@ export const PATCH = withAuth(
       );
     }
 
-    const [updated] = await db
+    const [updated] = db
       .update(entity)
       .set({ ...parsed.data, updatedAt: new Date().toISOString() })
       .where(and(eq(entity.id, id), eq(entity.workspaceId, workspaceId)))
-      .returning();
+      .returning()
+      .all();
 
     if (!updated) {
       return NextResponse.json(

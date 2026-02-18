@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api-client";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
-import type { Question } from "@/types/question";
+import type { Question, QuestionReply } from "@/types/question";
 
 export function useQuestions(filters?: { status?: string; entityId?: string }) {
   const { workspaceId } = useWorkspace();
@@ -34,6 +34,59 @@ export function useUpdateQuestion() {
   return useMutation({
     mutationFn: ({ id, ...data }: { id: string } & Record<string, unknown>) =>
       api.patch<Question>(`${basePath}/${id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["questions"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useQuestionReplies(questionId: string | null) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "questions");
+  return useQuery({
+    queryKey: ["questionReplies", workspaceId, questionId],
+    queryFn: () => api.get<QuestionReply[]>(`${basePath}/${questionId}/replies`),
+    enabled: !!questionId,
+  });
+}
+
+export function useCreateQuestionReply(questionId: string) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "questions");
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { body: string }) =>
+      api.post<QuestionReply>(`${basePath}/${questionId}/replies`, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["questionReplies", workspaceId, questionId] });
+      qc.invalidateQueries({ queryKey: ["questions"] });
+    },
+  });
+}
+
+export function useResolveQuestion() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "questions");
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body?: string }) =>
+      api.post<Question>(`${basePath}/${id}/resolve`, { body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["questions"] });
+      qc.invalidateQueries({ queryKey: ["questionReplies"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useReopenQuestion() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "questions");
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.post<Question>(`${basePath}/${id}/reopen`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["questions"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });

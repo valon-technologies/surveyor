@@ -10,13 +10,13 @@
  * Usage: npx tsx scripts/create-prototype-skills.ts
  */
 
-import postgres from "postgres";
+import Database from "better-sqlite3";
 import path from "path";
 import crypto from "crypto";
-import "dotenv/config";
 
-const WORKSPACE_ID = "847602b2-188d-4fca-b1b1-d6098bb22aba";
-const client = postgres(process.env.DATABASE_URL!, { prepare: false });
+const DB_PATH = path.resolve(process.cwd(), "surveyor.db");
+const WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
+const db = new Database(DB_PATH);
 
 function makeId(): string {
   return crypto.randomUUID();
@@ -79,7 +79,7 @@ const skills: SkillDef[] = [
   {
     name: "Mapping: Loan Entity",
     description:
-      "Maps source data to the VDS loan entity -- the central table with 80+ fields covering identifiers, terms, dates, rates, booleans, investor data, and government insurance. Use when mapping loan-level data including loan numbers, interest rates, balances, MERS registration, or loan status.",
+      "Maps source data to the VDS loan entity — the central table with 80+ fields covering identifiers, terms, dates, rates, booleans, investor data, and government insurance. Use when mapping loan-level data including loan numbers, interest rates, balances, MERS registration, or loan status.",
     instructions: `## Mapping Approach
 
 This is the most complex VDS entity with 80+ fields. You MUST map ALL fields, not just common ones.
@@ -98,13 +98,13 @@ LEFT JOIN Arm a ON l.LoanNumber = a.LoanNumber                        -- ARM fie
 2. **Terms** (~10): note_rate, original_loan_amount, amortization_term, remaining_term
 3. **Dates** (~12): effective_transfer_date, maturity_date, next_payment_due_date, inactive_date
 4. **Rates** (~6): note_rate, guaranty_fee_rate, margin_rate, hamp_step_rate
-5. **Booleans** (~18): is_assumable, is_balloon, is_charged_off, is_option_arm -- mostly from StopsFlagsAndIndicators
+5. **Booleans** (~18): is_assumable, is_balloon, is_charged_off, is_option_arm — mostly from StopsFlagsAndIndicators
 6. **Investor** (~8): fannie_holding_type, note_holder_current, vesting_name
 7. **Enums** (~10): status, mortgage_classification, product_type, other_agency_type
 
 ### Key Rules
-- Status lifecycle: INITIATED -> IN_PROGRESS -> COMPLETED | CHARGED_OFF | OFFBOARDED
-- ACDC dates are already YYYY-MM-DD -- no conversion needed
+- Status lifecycle: INITIATED → IN_PROGRESS → COMPLETED | CHARGED_OFF | OFFBOARDED
+- ACDC dates are already YYYY-MM-DD — no conversion needed
 - Skip system-generated fields (sid, created_at, updated_at, deleted_at)
 - Verify every field name and data type against VDS schema CSV`,
     applicability: {
@@ -121,8 +121,8 @@ LEFT JOIN Arm a ON l.LoanNumber = a.LoanNumber                        -- ARM fie
     },
     tags: ["vds", "core-loan", "loan", "mapping"],
     contexts: [
-      { contextId: CTX.loan, role: "primary", notes: "VDS loan entity -- 80+ fields, enums, mapping patterns" },
-      { contextId: CTX.coreLoan, role: "reference", notes: "Core Loan category overview -- related entities" },
+      { contextId: CTX.loan, role: "primary", notes: "VDS loan entity — 80+ fields, enums, mapping patterns" },
+      { contextId: CTX.coreLoan, role: "reference", notes: "Core Loan category overview — related entities" },
       { contextId: CTX.mers, role: "supplementary", notes: "MERS registration requirements for MERS fields" },
       { contextId: CTX.fannieReporting, role: "supplementary", notes: "Fannie Mae investor reporting for GSE fields" },
       { contextId: CTX.freddieReporting, role: "supplementary", notes: "Freddie Mac investor reporting for GSE fields" },
@@ -132,14 +132,14 @@ LEFT JOIN Arm a ON l.LoanNumber = a.LoanNumber                        -- ARM fie
   {
     name: "Mapping: Escrow Analysis",
     description:
-      "Maps source data to the VDS escrow_analysis entity -- records annual/on-demand escrow analysis results using CFPB RESPA aggregate method. Use when mapping escrow analysis data, shortage/overage calculations, payment impact determinations, or cushion amounts.",
+      "Maps source data to the VDS escrow_analysis entity — records annual/on-demand escrow analysis results using CFPB RESPA aggregate method. Use when mapping escrow analysis data, shortage/overage calculations, payment impact determinations, or cushion amounts.",
     instructions: `## Mapping Approach
 
-Escrow analysis is heavily regulated by RESPA (12 CFR 1024.17). The mapping must capture both the numerical results and the action determination.
+Escrow analysis is heavily regulated by RESPA (12 CFR § 1024.17). The mapping must capture both the numerical results and the action determination.
 
 ### Key Mapping Decisions
-1. **analysis_date_as_of**: The date of the escrow analysis -- map from source analysis date
-2. **impact_to_payment** (enum): The action taken -- NO_FURTHER_ACTION, OVERAGE_REFUND_BORROWER, SHORTAGE_MAKE_SINGLE_PAYMENT, SHORTAGE_INCREASE_MONTHLY_PAYMENT
+1. **analysis_date_as_of**: The date of the escrow analysis — map from source analysis date
+2. **impact_to_payment** (enum): The action taken — NO_FURTHER_ACTION, OVERAGE_REFUND_BORROWER, SHORTAGE_MAKE_SINGLE_PAYMENT, SHORTAGE_INCREASE_MONTHLY_PAYMENT
 3. **amount_new_monthly_payment**: The new escrow portion after analysis
 4. **total_shortage_or_overage_amount**: Positive = overage, negative = shortage
 
@@ -168,10 +168,10 @@ Escrow analyses typically come from a history table with one row per analysis ev
     },
     tags: ["vds", "escrow", "escrow-analysis", "mapping", "respa"],
     contexts: [
-      { contextId: CTX.escrowAnalysis, role: "primary", notes: "VDS escrow_analysis entity -- fields, enums, patterns" },
-      { contextId: CTX.escrow, role: "reference", notes: "Escrow category overview -- related entities" },
-      { contextId: CTX.cfpbEscrow, role: "supplementary", notes: "CFPB RESPA escrow rules -- aggregate analysis method, cushion limits" },
-      { contextId: CTX.stateEscrow, role: "supplementary", notes: "State-specific escrow requirements -- cushion variations" },
+      { contextId: CTX.escrowAnalysis, role: "primary", notes: "VDS escrow_analysis entity — fields, enums, patterns" },
+      { contextId: CTX.escrow, role: "reference", notes: "Escrow category overview — related entities" },
+      { contextId: CTX.cfpbEscrow, role: "supplementary", notes: "CFPB RESPA escrow rules — aggregate analysis method, cushion limits" },
+      { contextId: CTX.stateEscrow, role: "supplementary", notes: "State-specific escrow requirements — cushion variations" },
       { contextId: CTX.fannieEscrow, role: "supplementary", notes: "Fannie Mae escrow requirements" },
       { contextId: CTX.freddieEscrow, role: "supplementary", notes: "Freddie Mac escrow requirements" },
     ],
@@ -180,18 +180,18 @@ Escrow analyses typically come from a history table with one row per analysis ev
   {
     name: "Mapping: Borrower",
     description:
-      "Maps source data to the VDS borrower entity -- the central customer record with 25+ fields for identity, contact info, demographics, and SCRA protection. Use when mapping borrower PII, contact information, demographic data, or military service status.",
+      "Maps source data to the VDS borrower entity — the central customer record with 25+ fields for identity, contact info, demographics, and SCRA protection. Use when mapping borrower PII, contact information, demographic data, or military service status.",
     instructions: `## Mapping Approach
 
 The borrower entity contains sensitive PII/SPI. Pay special attention to data handling and regulatory requirements.
 
 ### Key Mapping Decisions
 1. **De-duplication**: One borrower can have many loans (via borrower_to_loan). Match on SSN first, then name+secondary identifiers
-2. **PII fields**: social_security_number, date_of_birth -- ensure proper masking/encryption in transit
-3. **Address**: Mailing address stored via mailing_address_sid FK to address entity -- map addresses separately
-4. **Demographics**: Race, ethnicity, gender are HMDA-reportable -- map if available but check enum values carefully
+2. **PII fields**: social_security_number, date_of_birth — ensure proper masking/encryption in transit
+3. **Address**: Mailing address stored via mailing_address_sid FK to address entity — map addresses separately
+4. **Demographics**: Race, ethnicity, gender are HMDA-reportable — map if available but check enum values carefully
 
-### Pattern: One Borrower -> Many Loans
+### Pattern: One Borrower → Many Loans
 The borrower entity is de-duplicated across loans. The borrower_to_loan junction entity tracks the relationship and role (primary borrower, co-borrower, etc.).
 
 ### Related Entity Mapping Order
@@ -204,7 +204,7 @@ The borrower entity is de-duplicated across loans. The borrower_to_loan junction
 ### Regulatory Context
 - FCRA: Credit reporting obligations for borrower data
 - GLBA: Privacy notice requirements
-- SCRA: Military service protection -- check is_scra_protected flag
+- SCRA: Military service protection — check is_scra_protected flag
 - TCPA: Phone contact consent requirements`,
     applicability: {
       entityPatterns: ["borrower"],
@@ -220,30 +220,30 @@ The borrower entity is de-duplicated across loans. The borrower_to_loan junction
     },
     tags: ["vds", "borrower-party", "borrower", "mapping", "pii"],
     contexts: [
-      { contextId: CTX.borrower, role: "primary", notes: "VDS borrower entity -- 25+ fields, de-dup logic, enums" },
-      { contextId: CTX.borrowerParty, role: "reference", notes: "Borrower Party category -- related entities (phone, credit, address)" },
+      { contextId: CTX.borrower, role: "primary", notes: "VDS borrower entity — 25+ fields, de-dup logic, enums" },
+      { contextId: CTX.borrowerParty, role: "reference", notes: "Borrower Party category — related entities (phone, credit, address)" },
       { contextId: CTX.fcra, role: "supplementary", notes: "FCRA credit reporting obligations for borrower data" },
       { contextId: CTX.glba, role: "supplementary", notes: "GLBA privacy requirements for borrower PII" },
-      { contextId: CTX.scra, role: "supplementary", notes: "SCRA military protections -- is_scra_protected field" },
-      { contextId: CTX.tcpa, role: "supplementary", notes: "TCPA phone contact consent -- borrower phone mapping" },
+      { contextId: CTX.scra, role: "supplementary", notes: "SCRA military protections — is_scra_protected field" },
+      { contextId: CTX.tcpa, role: "supplementary", notes: "TCPA phone contact consent — borrower phone mapping" },
     ],
   },
 
   {
     name: "Mapping: Foreclosure",
     description:
-      "Maps source data to the VDS foreclosure entity -- the primary foreclosure case tracking record with 80+ fields covering status, judicial standing, timeline dates, attorney/auction info, and holds. Use when mapping foreclosure cases, sale dates, referral data, judgment amounts, or redemption periods.",
+      "Maps source data to the VDS foreclosure entity — the primary foreclosure case tracking record with 80+ fields covering status, judicial standing, timeline dates, attorney/auction info, and holds. Use when mapping foreclosure cases, sale dates, referral data, judgment amounts, or redemption periods.",
     instructions: `## Mapping Approach
 
 Foreclosure is one of the most complex entities with 80+ fields, a 23-value status enum, and deep regulatory requirements that vary by state and investor.
 
 ### Key Mapping Decisions
-1. **referral_date**: MUST be set -- this is the anchor for point-in-time active queries
+1. **referral_date**: MUST be set — this is the anchor for point-in-time active queries
 2. **status** (23 values): Map carefully. Active (17), Pending (3), Terminal (4)
-3. **judicial_standing**: JUDICIAL or NON_JUDICIAL -- determines which timeline fields apply
+3. **judicial_standing**: JUDICIAL or NON_JUDICIAL — determines which timeline fields apply
 4. **Timeline dates** (~23 fields): notification, legal action, judgment, mediation, sale, redemption, reinstatement, title, deed, deficiency
 
-### Source Pattern: Event Log -> Status
+### Source Pattern: Event Log → Status
 ServiceMac foreclosure data often uses Step codes (event log pattern). You need to:
 1. Identify the current status from the most recent step
 2. Extract dates from step history for the 23 timeline fields
@@ -276,58 +276,61 @@ Multiple regulatory frameworks apply simultaneously to any foreclosure:
     },
     tags: ["vds", "foreclosure", "mapping", "regulatory"],
     contexts: [
-      { contextId: CTX.foreclosure, role: "primary", notes: "VDS foreclosure entity -- 80+ fields, 23-value status enum, timeline" },
-      { contextId: CTX.foreclosureCategory, role: "reference", notes: "Foreclosure category -- related entities (sale, hold, bid, etc.)" },
-      { contextId: CTX.stateForeclosure, role: "supplementary", notes: "State foreclosure requirements -- judicial vs non-judicial, timelines" },
+      { contextId: CTX.foreclosure, role: "primary", notes: "VDS foreclosure entity — 80+ fields, 23-value status enum, timeline" },
+      { contextId: CTX.foreclosureCategory, role: "reference", notes: "Foreclosure category — related entities (sale, hold, bid, etc.)" },
+      { contextId: CTX.stateForeclosure, role: "supplementary", notes: "State foreclosure requirements — judicial vs non-judicial, timelines" },
       { contextId: CTX.fannieForeclosure, role: "supplementary", notes: "Fannie Mae foreclosure process and timeline requirements" },
       { contextId: CTX.freddieForeclosure, role: "supplementary", notes: "Freddie Mac foreclosure process and requirements" },
-      { contextId: CTX.fhaForeclosure, role: "supplementary", notes: "FHA foreclosure -- CWCOT, special processes" },
-      { contextId: CTX.vaForeclosure, role: "supplementary", notes: "VA foreclosure -- guaranty claims, purchase programs" },
-      { contextId: CTX.bankruptcy, role: "supplementary", notes: "Bankruptcy proceedings -- foreclosure holds and stay requirements" },
+      { contextId: CTX.fhaForeclosure, role: "supplementary", notes: "FHA foreclosure — CWCOT, special processes" },
+      { contextId: CTX.vaForeclosure, role: "supplementary", notes: "VA foreclosure — guaranty claims, purchase programs" },
+      { contextId: CTX.bankruptcy, role: "supplementary", notes: "Bankruptcy proceedings — foreclosure holds and stay requirements" },
     ],
   },
 ];
 
 // --- Insert ---
 
-async function main() {
-  await client.begin(async (tx) => {
-    for (let idx = 0; idx < skills.length; idx++) {
-      const skill = skills[idx];
-      const skillId = makeId();
+const insertSkill = db.prepare(`
+  INSERT OR IGNORE INTO skill (id, workspace_id, name, description, instructions, applicability, tags, is_active, sort_order)
+  VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+`);
 
-      await tx`
-        INSERT INTO skill (id, workspace_id, name, description, instructions, applicability, tags, is_active, sort_order)
-        VALUES (${skillId}, ${WORKSPACE_ID}, ${skill.name}, ${skill.description},
-                ${skill.instructions}, ${JSON.stringify(skill.applicability)}, ${JSON.stringify(skill.tags)}, true, ${idx})
-        ON CONFLICT (id) DO NOTHING
-      `;
+const insertSkillContext = db.prepare(`
+  INSERT OR IGNORE INTO skill_context (id, skill_id, context_id, role, sort_order, notes)
+  VALUES (?, ?, ?, ?, ?, ?)
+`);
 
-      console.log(`Created skill: ${skill.name} (${skillId})`);
+const insertAll = db.transaction(() => {
+  skills.forEach((skill, idx) => {
+    const skillId = makeId();
 
-      for (let ctxIdx = 0; ctxIdx < skill.contexts.length; ctxIdx++) {
-        const ctx = skill.contexts[ctxIdx];
-        const scId = makeId();
-        await tx`
-          INSERT INTO skill_context (id, skill_id, context_id, role, sort_order, notes)
-          VALUES (${scId}, ${skillId}, ${ctx.contextId}, ${ctx.role}, ${ctxIdx}, ${ctx.notes ?? null})
-          ON CONFLICT (id) DO NOTHING
-        `;
-        console.log(`  -> Linked context: ${ctx.role} (${ctx.contextId.slice(0, 8)}...)`);
-      }
-    }
+    insertSkill.run(
+      skillId,
+      WORKSPACE_ID,
+      skill.name,
+      skill.description,
+      skill.instructions,
+      JSON.stringify(skill.applicability),
+      JSON.stringify(skill.tags),
+      idx
+    );
+
+    console.log(`Created skill: ${skill.name} (${skillId})`);
+
+    skill.contexts.forEach((ctx, ctxIdx) => {
+      const scId = makeId();
+      insertSkillContext.run(scId, skillId, ctx.contextId, ctx.role, ctxIdx, ctx.notes ?? null);
+      console.log(`  → Linked context: ${ctx.role} (${ctx.contextId.slice(0, 8)}...)`);
+    });
   });
-
-  // Verify
-  const count = (await client`SELECT COUNT(*) as cnt FROM skill`)[0] as { cnt: number };
-  const scCount = (await client`SELECT COUNT(*) as cnt FROM skill_context`)[0] as { cnt: number };
-  console.log(`\nTotal skills: ${count.cnt}`);
-  console.log(`Total skill-context links: ${scCount.cnt}`);
-
-  await client.end();
-}
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
 });
+
+insertAll();
+
+// Verify
+const count = db.prepare("SELECT COUNT(*) as cnt FROM skill").get() as { cnt: number };
+const scCount = db.prepare("SELECT COUNT(*) as cnt FROM skill_context").get() as { cnt: number };
+console.log(`\nTotal skills: ${count.cnt}`);
+console.log(`Total skill-context links: ${scCount.cnt}`);
+
+db.close();

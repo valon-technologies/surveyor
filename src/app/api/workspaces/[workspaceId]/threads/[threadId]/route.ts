@@ -10,20 +10,22 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   const params = await ctx.params;
   const { threadId } = params;
 
-  const thread = (await db
+  const thread = db
     .select()
     .from(commentThread)
-    .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId))))[0];
+    .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId)))
+    .get();
 
   if (!thread) {
     return NextResponse.json({ error: "Thread not found" }, { status: 404 });
   }
 
-  const comments = await db
+  const comments = db
     .select()
     .from(comment)
     .where(eq(comment.threadId, threadId))
-    .orderBy(asc(comment.createdAt));
+    .orderBy(asc(comment.createdAt))
+    .all();
 
   return NextResponse.json({ ...thread, comments });
 });
@@ -39,10 +41,11 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId }) => {
   }
 
   // Get existing thread before update
-  const existingThread = (await db
+  const existingThread = db
     .select()
     .from(commentThread)
-    .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId))))[0];
+    .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId)))
+    .get();
 
   const updateData: Record<string, unknown> = {
     ...parsed.data,
@@ -57,11 +60,12 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId }) => {
     }
   }
 
-  const [updated] = await db
+  const [updated] = db
     .update(commentThread)
     .set(updateData)
     .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId)))
-    .returning();
+    .returning()
+    .all();
 
   if (!updated) {
     return NextResponse.json({ error: "Thread not found" }, { status: 404 });
@@ -69,7 +73,7 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId }) => {
 
   // Log thread_resolved activity
   if (parsed.data.status === "resolved" && existingThread?.status !== "resolved") {
-    await logActivity({
+    logActivity({
       workspaceId,
       fieldMappingId: updated.fieldMappingId || null,
       entityId: updated.entityId || null,
@@ -87,8 +91,9 @@ export const DELETE = withAuth(async (_req, ctx, { workspaceId }) => {
   const params = await ctx.params;
   const { threadId } = params;
 
-  await db.delete(commentThread)
-    .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId)));
+  db.delete(commentThread)
+    .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId)))
+    .run();
 
   return NextResponse.json({ success: true });
 }, { requiredRole: "editor" });

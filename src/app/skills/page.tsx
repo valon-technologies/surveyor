@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { SkillList } from "@/components/skills/skill-list";
+import { AssemblySimulator } from "@/components/skills/assembly-simulator";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
@@ -24,6 +25,10 @@ export default function SkillsPage() {
       </div>
 
       <SkillList />
+
+      <div className="border-t pt-6">
+        <AssemblySimulator />
+      </div>
     </div>
   );
 }

@@ -8,10 +8,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const params = await ctx.params;
   const id = params.id;
 
-  const run = (await db
+  const run = db
     .select()
     .from(batchRun)
-    .where(and(eq(batchRun.id, id), eq(batchRun.workspaceId, workspaceId))))[0];
+    .where(and(eq(batchRun.id, id), eq(batchRun.workspaceId, workspaceId)))
+    .get();
 
   if (!run) {
     return NextResponse.json({ error: "Batch run not found" }, { status: 404 });

@@ -6,7 +6,7 @@ import { useVoiceInput } from "@/lib/hooks/use-voice-input";
 import { Send, Mic, MicOff } from "lucide-react";
 
 interface ChatInputProps {
-  onSend: (content: string, voiceInput?: boolean) => void;
+  onSend: (content: string, options?: { voiceInput?: boolean }) => void;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -36,7 +36,7 @@ export function ChatInput({
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
-    onSend(trimmed, isListening);
+    onSend(trimmed, isListening ? { voiceInput: true } : undefined);
     setValue("");
     if (isListening) stopListening();
     if (textareaRef.current) {

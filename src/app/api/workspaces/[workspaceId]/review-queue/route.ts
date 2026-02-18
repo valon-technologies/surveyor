@@ -7,7 +7,7 @@ import type { ReviewCardData } from "@/types/review";
 
 export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const searchParams = req.nextUrl.searchParams;
-  const reviewStatus = searchParams.get("reviewStatus");
+  const statusFilter = searchParams.get("status");
   const confidence = searchParams.get("confidence");
   const entityId = searchParams.get("entityId");
   const sortBy = searchParams.get("sortBy") || "createdAt";
@@ -19,29 +19,42 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     eq(fieldMapping.isLatest, true),
   ];
 
-  const mappings = await db
+  const allMappings = db
     .select()
     .from(fieldMapping)
-    .where(and(...conditions));
+    .where(and(...conditions))
+    .all();
+
+  // Deduplicate by targetFieldId — keep only the most recent version
+  const byTarget = new Map<string, typeof allMappings[number]>();
+  for (const m of allMappings) {
+    const existing = byTarget.get(m.targetFieldId);
+    if (!existing || m.createdAt > existing.createdAt) {
+      byTarget.set(m.targetFieldId, m);
+    }
+  }
+  const mappings = Array.from(byTarget.values());
 
   // Load field + entity data for each mapping
   const cards: ReviewCardData[] = [];
 
   for (const m of mappings) {
-    const targetField = (await db
+    const targetField = db
       .select()
       .from(field)
-      .where(eq(field.id, m.targetFieldId)))[0];
+      .where(eq(field.id, m.targetFieldId))
+      .get();
     if (!targetField) continue;
 
-    const targetEntity = (await db
+    const targetEntity = db
       .select()
       .from(entity)
-      .where(eq(entity.id, targetField.entityId)))[0];
+      .where(eq(entity.id, targetField.entityId))
+      .get();
     if (!targetEntity) continue;
 
     // Apply filters
-    if (reviewStatus && m.reviewStatus !== reviewStatus) continue;
+    if (statusFilter && m.status !== statusFilter) continue;
     if (confidence && m.confidence !== confidence) continue;
     if (entityId && targetEntity.id !== entityId) continue;
 
@@ -50,11 +63,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     let sourceFieldName: string | null = null;
 
     if (m.sourceEntityId) {
-      const se = (await db.select().from(entity).where(eq(entity.id, m.sourceEntityId)))[0];
+      const se = db.select().from(entity).where(eq(entity.id, m.sourceEntityId)).get();
       sourceEntityName = se?.displayName || se?.name || null;
     }
     if (m.sourceFieldId) {
-      const sf = (await db.select().from(field).where(eq(field.id, m.sourceFieldId)))[0];
+      const sf = db.select().from(field).where(eq(field.id, m.sourceFieldId)).get();
       sourceFieldName = sf?.displayName || sf?.name || null;
     }
 
@@ -68,9 +81,10 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
       entityId: targetEntity.id,
       entityName: targetEntity.displayName || targetEntity.name,
       status: m.status as ReviewCardData["status"],
-      reviewStatus: m.reviewStatus as ReviewCardData["reviewStatus"],
       mappingType: m.mappingType as ReviewCardData["mappingType"],
       confidence: m.confidence as ReviewCardData["confidence"],
+      sourceEntityId: m.sourceEntityId ?? null,
+      sourceFieldId: m.sourceFieldId ?? null,
       sourceEntityName,
       sourceFieldName,
       transform: m.transform,
@@ -78,6 +92,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
       reasoning: m.reasoning,
       notes: m.notes,
       puntNote: m.puntNote ?? null,
+      excludeReason: m.excludeReason ?? null,
       createdBy: m.createdBy,
       batchRunId: m.batchRunId ?? null,
       createdAt: m.createdAt,

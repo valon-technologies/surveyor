@@ -16,25 +16,26 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   if (status) conditions.push(eq(entity.status, status));
   if (search) conditions.push(like(entity.name, `%${search}%`));
 
-  const entities = await db
+  const entities = db
     .select()
     .from(entity)
     .where(and(...conditions))
-    .orderBy(entity.sortOrder);
+    .orderBy(entity.sortOrder)
+    .all();
 
   // Add field counts and status breakdown
-  const result = [];
-  for (const ent of entities) {
-    const fields = await db
+  const result = entities.map((ent) => {
+    const fields = db
       .select({ id: field.id })
       .from(field)
-      .where(eq(field.entityId, ent.id));
+      .where(eq(field.entityId, ent.id))
+      .all();
 
     const fieldIds = fields.map((f) => f.id);
     const statusBreakdown: Record<string, number> = {};
 
     if (fieldIds.length > 0) {
-      const rows = await db
+      const rows = db
         .select({
           status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
           cnt: count(),
@@ -53,19 +54,20 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
             sql`, `
           )})`
         )
-        .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`);
+        .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
+        .all();
 
       for (const r of rows) {
         statusBreakdown[r.status] = r.cnt;
       }
     }
 
-    result.push({
+    return {
       ...ent,
       fieldCount: fields.length,
       statusBreakdown,
-    });
-  }
+    };
+  });
 
   return NextResponse.json(result);
 });

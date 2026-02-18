@@ -7,13 +7,14 @@
  * Usage: npx tsx scripts/fix-context-names.ts [--dry-run]
  */
 
-import postgres from "postgres";
-import "dotenv/config";
+import Database from "better-sqlite3";
+import path from "path";
 
-const client = postgres(process.env.DATABASE_URL!, { prepare: false });
+const DB_PATH = path.resolve(process.cwd(), "surveyor.db");
+const db = new Database(DB_PATH);
 const dryRun = process.argv.includes("--dry-run");
 
-// Map of wrong -> correct for known acronyms.
+// Map of wrong → correct for known acronyms.
 // Order matters: longer patterns first to avoid partial matches.
 const ACRONYM_FIXES: [RegExp, string][] = [
   // Federal regulatory bodies & laws
@@ -46,13 +47,13 @@ const ACRONYM_FIXES: [RegExp, string][] = [
   [/\bMi\b/g, "MI"],
   [/\bPmi\b/g, "PMI"],
 
-  // Geographic -- be careful with "Va" (Veterans Affairs vs Virginia)
+  // Geographic — be careful with "Va" (Veterans Affairs vs Virginia)
   // Only fix "Va" when it's NOT followed by a lowercase letter (i.e., not part of "Valon", "Valuation", etc.)
   // In our data, "Va" only appears as "Government Insurers > Va > ..." path segments
   [/\bVa\b(?!\w)/g, "VA"],
   [/\bDc\b/g, "DC"],
 
-  // Fix "District Of Columbia" -> "District of Columbia" (lowercase preposition)
+  // Fix "District Of Columbia" → "District of Columbia" (lowercase preposition)
   [/\bDistrict Of Columbia\b/g, "District of Columbia"],
 ];
 
@@ -64,53 +65,49 @@ function fixName(name: string): string {
   return fixed;
 }
 
-async function main() {
-  // Fetch all contexts
-  const rows = await client`SELECT id, name FROM context` as { id: string; name: string }[];
+// Fetch all contexts
+const rows = db
+  .prepare("SELECT id, name FROM context")
+  .all() as { id: string; name: string }[];
 
-  const updates: { id: string; oldName: string; newName: string }[] = [];
+const updates: { id: string; oldName: string; newName: string }[] = [];
 
-  for (const row of rows) {
-    const newName = fixName(row.name);
-    if (newName !== row.name) {
-      updates.push({ id: row.id, oldName: row.name, newName });
-    }
+for (const row of rows) {
+  const newName = fixName(row.name);
+  if (newName !== row.name) {
+    updates.push({ id: row.id, oldName: row.name, newName });
   }
-
-  console.log(`Found ${updates.length} names to fix out of ${rows.length} total contexts.\n`);
-
-  if (updates.length === 0) {
-    console.log("Nothing to do.");
-    await client.end();
-    process.exit(0);
-  }
-
-  // Show preview
-  for (const u of updates) {
-    console.log(`  "${u.oldName}"`);
-    console.log(`  -> "${u.newName}"\n`);
-  }
-
-  if (dryRun) {
-    console.log("Dry run -- no changes made.");
-    await client.end();
-    process.exit(0);
-  }
-
-  // Apply updates
-  const now = new Date().toISOString();
-
-  await client.begin(async (tx) => {
-    for (const u of updates) {
-      await tx`UPDATE context SET name = ${u.newName}, updated_at = ${now} WHERE id = ${u.id}`;
-    }
-  });
-
-  console.log(`Updated ${updates.length} context names.`);
-  await client.end();
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+console.log(`Found ${updates.length} names to fix out of ${rows.length} total contexts.\n`);
+
+if (updates.length === 0) {
+  console.log("Nothing to do.");
+  process.exit(0);
+}
+
+// Show preview
+for (const u of updates) {
+  console.log(`  "${u.oldName}"`);
+  console.log(`  → "${u.newName}"\n`);
+}
+
+if (dryRun) {
+  console.log("Dry run — no changes made.");
+  process.exit(0);
+}
+
+// Apply updates
+const stmt = db.prepare("UPDATE context SET name = ?, updated_at = ? WHERE id = ?");
+const now = new Date().toISOString();
+
+const applyAll = db.transaction(() => {
+  for (const u of updates) {
+    stmt.run(u.newName, now, u.id);
+  }
 });
+
+applyAll();
+console.log(`Updated ${updates.length} context names.`);
+
+db.close();

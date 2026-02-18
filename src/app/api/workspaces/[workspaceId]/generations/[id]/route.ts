@@ -7,10 +7,11 @@ import { eq, and } from "drizzle-orm";
 export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   const { id } = await ctx.params;
 
-  const gen = (await db
+  const gen = db
     .select()
     .from(generation)
-    .where(and(eq(generation.id, id), eq(generation.workspaceId, workspaceId))))[0];
+    .where(and(eq(generation.id, id), eq(generation.workspaceId, workspaceId)))
+    .get();
 
   if (!gen) {
     return NextResponse.json({ error: "Generation not found" }, { status: 404 });

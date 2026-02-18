@@ -4,6 +4,7 @@ import { skillContext } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { updateSkillContextSchema } from "@/lib/validators/skill";
 import { withAuth } from "@/lib/auth/api-auth";
+import { invalidateWorkspaceContextCache } from "@/lib/generation/context-cache";
 
 export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const params = await ctx.params;
@@ -15,16 +16,18 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const [updated] = await db
+  const [updated] = db
     .update(skillContext)
     .set(parsed.data)
     .where(eq(skillContext.id, scId))
-    .returning();
+    .returning()
+    .all();
 
   if (!updated) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  invalidateWorkspaceContextCache(workspaceId);
   return NextResponse.json(updated);
 }, { requiredRole: "editor" });
 
@@ -32,7 +35,8 @@ export const DELETE = withAuth(async (req, ctx, { userId, workspaceId, role }) =
   const params = await ctx.params;
   const { scId } = params;
 
-  await db.delete(skillContext).where(eq(skillContext.id, scId));
+  db.delete(skillContext).where(eq(skillContext.id, scId)).run();
 
+  invalidateWorkspaceContextCache(workspaceId);
   return NextResponse.json({ success: true });
 }, { requiredRole: "editor" });

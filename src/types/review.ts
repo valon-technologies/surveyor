@@ -1,4 +1,4 @@
-import type { ReviewStatus, MappingType, ConfidenceLevel, MappingStatus } from "@/lib/constants";
+import type { MappingType, ConfidenceLevel, MappingStatus } from "@/lib/constants";
 
 export interface ReviewCardData {
   id: string; // fieldMapping.id
@@ -10,9 +10,10 @@ export interface ReviewCardData {
   entityId: string;
   entityName: string;
   status: MappingStatus;
-  reviewStatus: ReviewStatus | null;
   mappingType: MappingType | null;
   confidence: ConfidenceLevel | null;
+  sourceEntityId: string | null;
+  sourceFieldId: string | null;
   sourceEntityName: string | null;
   sourceFieldName: string | null;
   transform: string | null;
@@ -20,6 +21,7 @@ export interface ReviewCardData {
   reasoning: string | null;
   notes: string | null;
   puntNote: string | null;
+  excludeReason: string | null;
   createdBy: string;
   batchRunId: string | null;
   createdAt: string;

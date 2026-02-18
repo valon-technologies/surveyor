@@ -17,6 +17,7 @@ interface TopologyState {
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
   toggleEntity: (id: string) => void;
+  selectEntity: (entityId: string) => void;
   selectField: (
     entityId: string,
     fieldId: string,
@@ -55,6 +56,16 @@ export const useTopologyStore = create<TopologyState>((set) => ({
       expandedEntityIds: s.expandedEntityIds.includes(id)
         ? s.expandedEntityIds.filter((e) => e !== id)
         : [...s.expandedEntityIds, id],
+    })),
+
+  selectEntity: (entityId) =>
+    set((s) => ({
+      selectedEntityId: entityId,
+      selectedFieldId: null,
+      selectedMappingId: null,
+      expandedEntityIds: s.expandedEntityIds.includes(entityId)
+        ? s.expandedEntityIds
+        : [...s.expandedEntityIds, entityId],
     })),
 
   selectField: (entityId, fieldId, mappingId) =>

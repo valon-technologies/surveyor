@@ -12,5 +12,16 @@ export const puntMappingSchema = z.object({
   priority: z.enum(QUESTION_PRIORITIES).optional().default("normal"),
 });
 
+export const excludeMappingSchema = z.object({
+  reason: z.string().optional().default(""),
+});
+
+export const batchExcludeSchema = z.object({
+  mappingIds: z.array(z.string()).min(1),
+  reason: z.string().optional().default(""),
+});
+
 export type AcceptMappingInput = z.infer<typeof acceptMappingSchema>;
 export type PuntMappingInput = z.infer<typeof puntMappingSchema>;
+export type ExcludeMappingInput = z.infer<typeof excludeMappingSchema>;
+export type BatchExcludeInput = z.infer<typeof batchExcludeSchema>;

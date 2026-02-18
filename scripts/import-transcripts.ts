@@ -4,16 +4,16 @@
  * Usage: npx tsx scripts/import-transcripts.ts
  */
 
-import postgres from "postgres";
+import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import "dotenv/config";
 
+const DB_PATH = path.resolve(process.cwd(), "surveyor.db");
 const TRANSCRIPTS_DIR = "/Users/grantlee/Dev/mapping-skills/servicemac-m1/transcripts";
-const WORKSPACE_ID = "847602b2-188d-4fca-b1b1-d6098bb22aba";
+const WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
 
-const client = postgres(process.env.DATABASE_URL!, { prepare: false });
+const db = new Database(DB_PATH);
 
 const transcripts = [
   { file: "day-1-morning-mapping.md", name: "ServiceMac > Day 1 Morning — Loan, Escrow, Investor" },
@@ -22,50 +22,56 @@ const transcripts = [
   { file: "day-2-afternoon-mapping.md", name: "ServiceMac > Day 2 Afternoon — REO, Makeup Sessions" },
 ];
 
-async function main() {
-  let imported = 0;
-  let skipped = 0;
+const insertContext = db.prepare(`
+  INSERT OR IGNORE INTO context (
+    id, workspace_id, name, category, subcategory, entity_id, field_id,
+    content, content_format, token_count, tags, is_active, sort_order,
+    import_source, metadata, created_at, updated_at
+  ) VALUES (
+    @id, @workspace_id, @name, 'adhoc', 'transcript', NULL, NULL,
+    @content, 'markdown', @token_count, @tags, 1, @sort_order,
+    @import_source, NULL,
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  )
+`);
 
-  await client.begin(async (tx) => {
-    for (let i = 0; i < transcripts.length; i++) {
-      const t = transcripts[i];
-      const filePath = path.join(TRANSCRIPTS_DIR, t.file);
-      const content = fs.readFileSync(filePath, "utf-8").trim();
+let imported = 0;
+let skipped = 0;
 
-      const hash = crypto.createHash("md5").update(`transcript/${t.file}`).digest("hex");
-      const uuid = [hash.slice(0, 8), hash.slice(8, 12), hash.slice(12, 16), hash.slice(16, 20), hash.slice(20, 32)].join("-");
+const importAll = db.transaction(() => {
+  for (let i = 0; i < transcripts.length; i++) {
+    const t = transcripts[i];
+    const filePath = path.join(TRANSCRIPTS_DIR, t.file);
+    const content = fs.readFileSync(filePath, "utf-8").trim();
 
-      const tokenCount = Math.round(content.length / 4);
+    const hash = crypto.createHash("md5").update(`transcript/${t.file}`).digest("hex");
+    const uuid = [hash.slice(0, 8), hash.slice(8, 12), hash.slice(12, 16), hash.slice(16, 20), hash.slice(20, 32)].join("-");
 
-      const result = await tx`
-        INSERT INTO context (
-          id, workspace_id, name, category, subcategory, entity_id, field_id,
-          content, content_format, token_count, tags, is_active, sort_order,
-          import_source, metadata, created_at, updated_at
-        ) VALUES (
-          ${uuid}, ${WORKSPACE_ID}, ${t.name}, 'adhoc', 'transcript', NULL, NULL,
-          ${content}, 'markdown', ${tokenCount}, ${JSON.stringify(["servicemac", "transcript", "mapping-session"])}, true, ${i},
-          ${"servicemac-m1/transcripts/" + t.file}, NULL,
-          NOW(), NOW()
-        )
-        ON CONFLICT (id) DO NOTHING
-      `;
+    const tokenCount = Math.round(content.length / 4);
 
-      if (result.count > 0) {
-        imported++;
-        console.log(`  [+] ${t.name} (${tokenCount} tokens)`);
-      } else {
-        skipped++;
-        console.log(`  [=] ${t.name} (already exists)`);
-      }
+    const result = insertContext.run({
+      id: uuid,
+      workspace_id: WORKSPACE_ID,
+      name: t.name,
+      content,
+      token_count: tokenCount,
+      tags: JSON.stringify(["servicemac", "transcript", "mapping-session"]),
+      sort_order: i,
+      import_source: `servicemac-m1/transcripts/${t.file}`,
+    });
+
+    if (result.changes > 0) {
+      imported++;
+      console.log(`  [+] ${t.name} (${tokenCount} tokens)`);
+    } else {
+      skipped++;
+      console.log(`  [=] ${t.name} (already exists)`);
     }
-  });
-
-  console.log(`\nImport complete: ${imported} created, ${skipped} skipped.`);
-  await client.end();
-}
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+  }
 });
+
+importAll();
+
+console.log(`\nImport complete: ${imported} created, ${skipped} skipped.`);
+db.close();

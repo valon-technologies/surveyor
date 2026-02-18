@@ -1,4 +1,12 @@
 import type { Context } from "@/types/context";
+import {
+  CONTEXT_TAG_GROUPS,
+  CONTEXT_TAG_LABELS,
+  type ContextTag,
+} from "@/lib/constants";
+
+/** Source-system tags that drive automatic tree grouping. */
+const SOURCE_SYSTEM_TAGS = new Set<string>(CONTEXT_TAG_GROUPS.source_system);
 
 export interface ContextTreeNode {
   label: string;
@@ -10,14 +18,39 @@ export interface ContextTreeNode {
 }
 
 /**
+ * Derive a top-level group label from the context's source_system tags.
+ * Returns null if the context has no source_system tag or its name
+ * already starts with that label (avoiding double-nesting).
+ */
+function sourceSystemPrefix(ctx: Context): string | null {
+  const tags = ctx.tags;
+  if (!tags || tags.length === 0) return null;
+
+  const systemTag = tags.find((t) => SOURCE_SYSTEM_TAGS.has(t));
+  if (!systemTag) return null;
+
+  const label = CONTEXT_TAG_LABELS[systemTag as ContextTag];
+  // Don't double-nest if the name already starts with the label
+  const firstName = ctx.name.split(" > ")[0].trim();
+  if (firstName.toLowerCase() === label.toLowerCase()) return null;
+
+  return label;
+}
+
+/**
  * Build a tree from contexts by splitting names on " > ".
  * e.g. "Federal > CFPB > Escrow" becomes three nested levels.
+ *
+ * Contexts with a source_system tag are automatically nested under
+ * that system's label if their name doesn't already include it.
  */
 export function buildContextTree(contexts: Context[]): ContextTreeNode[] {
   const root: ContextTreeNode[] = [];
 
   for (const ctx of contexts) {
-    const segments = ctx.name.split(" > ").map((s) => s.trim());
+    const prefix = sourceSystemPrefix(ctx);
+    const nameSegments = ctx.name.split(" > ").map((s) => s.trim());
+    const segments = prefix ? [prefix, ...nameSegments] : nameSegments;
     let currentLevel = root;
 
     for (let i = 0; i < segments.length; i++) {

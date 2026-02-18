@@ -18,16 +18,17 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
 
   for (const input of inputs) {
     // Mark existing as not latest
-    await db.update(fieldMapping)
+    db.update(fieldMapping)
       .set({ isLatest: false })
       .where(
         and(
           eq(fieldMapping.targetFieldId, input.targetFieldId),
           eq(fieldMapping.isLatest, true)
         )
-      );
+      )
+      .run();
 
-    const [mapping] = await db
+    const [mapping] = db
       .insert(fieldMapping)
       .values({
         workspaceId,
@@ -48,15 +49,16 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
         version: 1,
         isLatest: true,
       })
-      .returning();
+      .returning()
+      .all();
 
     created.push(mapping);
 
     // Auto-create review thread for non-high-confidence mappings with reviewComment
     if (input.reviewComment && input.confidence !== "high") {
-      const targetField = (await db.select().from(field).where(eq(field.id, input.targetFieldId)))[0];
+      const targetField = db.select().from(field).where(eq(field.id, input.targetFieldId)).get();
 
-      const [thread] = await db
+      const [thread] = db
         .insert(commentThread)
         .values({
           workspaceId,
@@ -66,15 +68,17 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
           createdBy: "AI Auto-Map",
           commentCount: 1,
         })
-        .returning();
+        .returning()
+        .all();
 
-      await db.insert(comment)
+      db.insert(comment)
         .values({
           threadId: thread.id,
           authorName: "AI Auto-Map",
           body: input.reviewComment,
           bodyFormat: "markdown",
-        });
+        })
+        .run();
     }
   }
 

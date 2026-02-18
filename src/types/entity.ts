@@ -8,6 +8,7 @@ export interface Entity {
   displayName: string | null;
   side: SchemaSide;
   description: string | null;
+  parentEntityId: string | null;
   status: EntityStatus;
   sortOrder: number;
   metadata: Record<string, unknown> | null;

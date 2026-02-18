@@ -12,11 +12,11 @@ import type { Entity } from "@/types/entity";
 import type { FieldWithMapping } from "@/types/field";
 
 const STATUS_ORDER: MappingStatus[] = [
-  "fully_closed",
+  "accepted",
   "excluded",
-  "pending",
-  "open_comment_sm",
-  "open_comment_vt",
+  "unreviewed",
+  "punted",
+  "needs_discussion",
   "unmapped",
 ];
 

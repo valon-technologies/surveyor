@@ -1,70 +1,48 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAcceptMapping, useExcludeMapping, useUndoReview } from "@/queries/review-queries";
-import { CONFIDENCE_COLORS, MAPPING_TYPE_LABELS } from "@/lib/constants";
+import { useAcceptMapping, useUndoReview } from "@/queries/review-queries";
+import { CONFIDENCE_COLORS, MAPPING_TYPE_LABELS, MAPPING_STATUS_LABELS, MAPPING_STATUS_COLORS } from "@/lib/constants";
 import type { ReviewCardData } from "@/types/review";
-import type { ConfidenceLevel, MappingType } from "@/lib/constants";
-import { MilestoneBadge } from "@/components/shared/tier-badge";
-import { MessageSquare, Check, ArrowRight, ArchiveX, Undo2 } from "lucide-react";
-
-/**
- * Build a complete SQL SELECT statement from the mapping data.
- * e.g. SELECT source_table.source_col AS target_col FROM source_table
- *      SELECT CAST(src.field AS DATE) AS target_col FROM src
- *      SELECT 'default_value' AS target_col  -- no source
- */
-function buildSqlPreview(card: ReviewCardData): string | null {
-  const targetCol = card.targetFieldName;
-  const sourceTable = card.sourceEntityName;
-  const sourceCol = card.sourceFieldName;
-  const transform = card.transform;
-  const defaultValue = card.defaultValue;
-
-  // Nothing to show for unmapped fields with no info
-  if (!sourceCol && !transform && !defaultValue) return null;
-
-  let selectExpr: string;
-
-  if (transform) {
-    // Transform is a SQL expression — use it as the SELECT expression
-    selectExpr = transform;
-  } else if (sourceTable && sourceCol) {
-    // Direct column reference
-    selectExpr = `${sourceTable}.${sourceCol}`;
-  } else if (sourceCol) {
-    selectExpr = sourceCol;
-  } else if (defaultValue) {
-    // No source, just a default
-    selectExpr = `'${defaultValue}'`;
-  } else {
-    return null;
-  }
-
-  // Build the full statement
-  const parts: string[] = [];
-  parts.push(`SELECT ${selectExpr} AS ${targetCol}`);
-
-  if (sourceTable) {
-    parts.push(`FROM ${sourceTable}`);
-  }
-
-  return parts.join("\n");
-}
+import type { ConfidenceLevel, MappingType, MappingStatus } from "@/lib/constants";
+import { cn } from "@/lib/utils";
+import { MessageSquare, Check, ArrowRight, Ban, Undo2, ChevronRight, ChevronDown } from "lucide-react";
 
 interface ReviewCardProps {
   card: ReviewCardData;
   onPunt: (card: ReviewCardData) => void;
+  onExclude: (card: ReviewCardData) => void;
+  onAcceptWithRipple?: (card: ReviewCardData) => void;
 }
 
-export function ReviewCard({ card, onPunt }: ReviewCardProps) {
+function buildSqlPreview(card: ReviewCardData): string | null {
+  if (!card.sourceFieldName && !card.transform && !card.defaultValue) return null;
+
+  if (card.transform) return card.transform;
+
+  const src = card.sourceEntityName && card.sourceFieldName
+    ? `${card.sourceEntityName}.${card.sourceFieldName}`
+    : card.sourceFieldName || null;
+
+  if (!src) return card.defaultValue ? `DEFAULT ${card.defaultValue}` : null;
+
+  const target = `${card.entityName}.${card.targetFieldName}`;
+  return `${target} ← ${src}`;
+}
+
+export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple }: ReviewCardProps) {
   const router = useRouter();
   const acceptMutation = useAcceptMapping();
-  const excludeMutation = useExcludeMapping();
   const undoMutation = useUndoReview();
+  const [expanded, setExpanded] = useState(false);
+
+  const isExcluded = card.status === "excluded";
+  const isAccepted = card.status === "accepted";
+  const isPunted = card.status === "punted";
+  const showUndo = isAccepted || isPunted || card.status === "needs_discussion" || isExcluded;
 
   const confidenceColor = card.confidence
     ? CONFIDENCE_COLORS[card.confidence as ConfidenceLevel]
@@ -74,165 +52,200 @@ export function ReviewCard({ card, onPunt }: ReviewCardProps) {
     ? MAPPING_TYPE_LABELS[card.mappingType as MappingType]
     : "Unmapped";
 
+  const isUnmapped = card.status === "unmapped";
   const hasSource = card.sourceEntityName || card.sourceFieldName;
-
-  // Build a complete SQL preview from the mapping data
   const sqlPreview = buildSqlPreview(card);
+  const hasExpandableDetails = card.notes || card.puntNote;
+  const hasMappingSummary = sqlPreview || card.reasoning || card.defaultValue;
+
+  // Excluded: dim row, only show undo
+  if (isExcluded) {
+    return (
+      <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/40 text-muted-foreground">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-stone-400 shrink-0" />
+        <code className="text-xs line-through">
+          {card.targetFieldName}
+        </code>
+        <Badge variant="outline" className="text-[10px] border-stone-300 text-stone-400">
+          Excluded
+        </Badge>
+        {card.excludeReason && (
+          <span className="text-[11px] text-stone-400 truncate max-w-[200px]" title={card.excludeReason}>
+            {card.excludeReason}
+          </span>
+        )}
+        <span className="ml-auto" />
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+          onClick={() => undoMutation.mutate(card.id)}
+          disabled={undoMutation.isPending}
+          title="Undo exclude"
+        >
+          <Undo2 className="h-3 w-3" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <Card className="group hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-4">
-          {/* Left: mapping detail */}
-          <div className="flex-1 min-w-0 space-y-2">
-            {/* Header: target table.field → source table.field */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span
-                className="inline-block w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: confidenceColor }}
-                title={`Confidence: ${card.confidence || "unknown"}`}
-              />
-              <code className="text-sm font-semibold text-foreground">
-                {card.entityName}.{card.targetFieldName}
-              </code>
-              {card.targetFieldDataType && (
-                <span className="text-[10px] text-muted-foreground font-mono">
-                  {card.targetFieldDataType}
-                </span>
-              )}
-              {hasSource && (
-                <>
-                  <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0 mx-0.5" />
-                  <code className="text-sm text-muted-foreground">
-                    {card.sourceEntityName || "?"}.{card.sourceFieldName || "?"}
-                  </code>
-                </>
-              )}
-            </div>
-
-            {/* Mapping type + confidence + milestone */}
-            <div className="flex items-center gap-2">
-              <MilestoneBadge milestone={card.milestone} />
-              <Badge variant="outline" className="text-[10px] font-normal">
-                {mappingTypeLabel}
-              </Badge>
-              <Badge
-                variant="outline"
-                className="text-[10px] font-normal"
-                style={{ borderColor: confidenceColor, color: confidenceColor }}
-              >
-                {card.confidence || "unknown"}
-              </Badge>
-              {card.defaultValue && (
-                <span className="text-[10px] text-muted-foreground">
-                  default: <code>{card.defaultValue}</code>
-                </span>
-              )}
-            </div>
-
-            {/* SQL preview — complete SELECT statement */}
-            {sqlPreview && (
-              <div className="bg-muted rounded px-2.5 py-1.5">
-                <code className="text-xs text-foreground whitespace-pre-wrap break-all">
-                  {sqlPreview}
-                </code>
-              </div>
+    <div
+      className={cn(
+        "rounded-lg border transition-colors",
+        isAccepted
+          ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
+          : isPunted
+            ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900"
+            : "bg-background border-border hover:border-foreground/20"
+      )}
+    >
+      {/* Header row */}
+      <div className="flex items-center gap-3 px-3 py-2">
+        {/* Expand toggle (for notes/punt note) */}
+        {hasExpandableDetails ? (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-muted-foreground hover:text-foreground shrink-0"
+          >
+            {expanded ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5" />
             )}
+          </button>
+        ) : (
+          <span className="w-3.5 shrink-0" />
+        )}
 
-            {/* Reasoning */}
-            {card.reasoning && (
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {card.reasoning}
-              </p>
-            )}
+        {/* Confidence dot */}
+        <span
+          className="inline-block w-2 h-2 rounded-full shrink-0"
+          style={{ backgroundColor: confidenceColor }}
+          title={`Confidence: ${card.confidence || "unknown"}`}
+        />
 
-            {/* Notes — often contain caveats or open questions */}
-            {card.notes && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
-                {card.notes}
-              </p>
-            )}
-          </div>
-
-          {/* Right: actions */}
-          <div className="flex flex-col items-center gap-1 shrink-0">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() =>
-                router.push(`/mapping/discuss/${card.id}`)
-              }
-              title="Discuss with AI"
-            >
-              <MessageSquare className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-green-600 hover:text-green-700 hover:bg-green-50"
-              onClick={() => acceptMutation.mutate(card.id)}
-              disabled={acceptMutation.isPending}
-              title="Accept mapping"
-            >
-              <Check className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-              onClick={() => onPunt(card)}
-              title="Punt / delegate"
-            >
-              Punt
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-stone-500 hover:text-stone-600 hover:bg-stone-50"
-              onClick={() => excludeMutation.mutate(card.id)}
-              disabled={excludeMutation.isPending}
-              title="Exclude — not needed"
-            >
-              <ArchiveX className="h-4 w-4" />
-            </Button>
-            {card.reviewStatus && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-muted-foreground hover:text-foreground"
-                onClick={() => undoMutation.mutate(card.id)}
-                disabled={undoMutation.isPending}
-                title="Undo review action"
-              >
-                <Undo2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+        {/* Field name */}
+        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          <code className="text-xs font-semibold text-foreground truncate">
+            {card.targetFieldName}
+          </code>
+          {card.targetFieldDataType && (
+            <span className="text-[10px] text-muted-foreground font-mono hidden sm:inline">
+              {card.targetFieldDataType}
+            </span>
+          )}
         </div>
 
-        {/* Review status indicator */}
-        {card.reviewStatus && (
-          <div className="mt-2 pt-2 border-t">
+        {/* Badges */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Badge variant="outline" className="text-[10px] font-normal h-5">
+            {mappingTypeLabel}
+          </Badge>
+          {card.status !== "unmapped" && card.status !== "unreviewed" && (
             <Badge
-              variant={
-                card.reviewStatus === "accepted"
-                  ? "default"
-                  : card.reviewStatus === "punted"
-                    ? "secondary"
-                    : "outline"
-              }
-              className="text-[10px]"
+              variant="outline"
+              className="text-[10px] h-5"
+              style={{
+                borderColor: MAPPING_STATUS_COLORS[card.status as MappingStatus],
+                color: MAPPING_STATUS_COLORS[card.status as MappingStatus],
+              }}
             >
-              {card.reviewStatus}
+              {MAPPING_STATUS_LABELS[card.status as MappingStatus] || card.status}
             </Badge>
-            {card.puntNote && (
-              <span className="text-xs text-muted-foreground ml-2">
-                {card.puntNote}
-              </span>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          {showUndo ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => undoMutation.mutate(card.id)}
+              disabled={undoMutation.isPending}
+              title="Undo"
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+            </Button>
+          ) : (
+            <>
+              {!isUnmapped && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  onClick={() =>
+                    acceptMutation.mutateAsync(card.id).then(() => onAcceptWithRipple?.(card))
+                  }
+                  disabled={acceptMutation.isPending}
+                  title="Accept"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                onClick={() => onExclude(card)}
+                title="Exclude"
+              >
+                <Ban className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => router.push(`/mapping/discuss/${card.id}`)}
+            title="Discuss"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Always-visible mapping summary */}
+      {hasMappingSummary && (
+        <div className="px-3 pb-2 ml-9 space-y-1">
+          {sqlPreview && (
+            <pre className="text-xs font-mono text-foreground/80 bg-muted/50 rounded px-2 py-1 whitespace-pre-wrap break-all">
+              {sqlPreview}
+            </pre>
+          )}
+          {!sqlPreview && card.defaultValue && (
+            <code className="text-xs text-foreground/80 bg-muted/50 rounded px-2 py-1 block">
+              DEFAULT {card.defaultValue}
+            </code>
+          )}
+          {card.reasoning && (
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {card.reasoning}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Expandable extras (notes, punt note) */}
+      {expanded && hasExpandableDetails && (
+        <div className="px-3 pb-3 ml-9 space-y-1.5 border-t border-border/50 pt-2">
+          {card.notes && (
+            <div>
+              <span className="text-[10px] uppercase tracking-wider text-amber-600">Notes</span>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">{card.notes}</p>
+            </div>
+          )}
+          {card.puntNote && (
+            <div>
+              <span className="text-[10px] uppercase tracking-wider text-amber-600">Punt Note</span>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">{card.puntNote}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

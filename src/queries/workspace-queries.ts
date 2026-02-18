@@ -37,3 +37,32 @@ export function useTestBqConnection() {
       ),
   });
 }
+
+export function useBqAuthStatus() {
+  const { workspaceId } = useWorkspace();
+  return useQuery({
+    queryKey: ["bq-auth-status", workspaceId],
+    queryFn: () =>
+      api.get<{ status: "valid" | "expired" | "missing"; error?: string }>(
+        workspacePath(workspaceId, "settings/bigquery-auth")
+      ),
+  });
+}
+
+export function useBqAuthLogin() {
+  const { workspaceId } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<{ ok: boolean; message?: string; error?: string }>(
+        workspacePath(workspaceId, "settings/bigquery-auth"),
+        {}
+      ),
+    onSuccess: () => {
+      // Re-check auth status after a delay (user needs to complete browser flow)
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ["bq-auth-status"] });
+      }, 5000);
+    },
+  });
+}

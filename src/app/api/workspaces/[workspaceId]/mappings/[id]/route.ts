@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { fieldMapping, mappingContext, field, entity, context, userWorkspace } from "@/lib/db/schema";
+import { fieldMapping, mappingContext, field, entity, context, userWorkspace, entityPipeline } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { updateMappingSchema } from "@/lib/validators/mapping";
 import { logActivity } from "@/lib/activity/log-activity";
@@ -11,42 +11,44 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const mapping = (await db
+  const mapping = db
     .select()
     .from(fieldMapping)
-    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId))))[0];
+    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
+    .get();
 
   if (!mapping) {
     return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
   }
 
   // Get target field info
-  const targetField = (await db.select().from(field).where(eq(field.id, mapping.targetFieldId)))[0];
+  const targetField = db.select().from(field).where(eq(field.id, mapping.targetFieldId)).get();
   const targetEntity = targetField
-    ? (await db.select().from(entity).where(eq(entity.id, targetField.entityId)))[0]
+    ? db.select().from(entity).where(eq(entity.id, targetField.entityId)).get()
     : null;
 
   // Get source field info
   let sourceField = null;
   if (mapping.sourceFieldId) {
-    const sf = (await db.select().from(field).where(eq(field.id, mapping.sourceFieldId)))[0];
+    const sf = db.select().from(field).where(eq(field.id, mapping.sourceFieldId)).get();
     if (sf) {
-      const se = (await db.select().from(entity).where(eq(entity.id, sf.entityId)))[0];
+      const se = db.select().from(entity).where(eq(entity.id, sf.entityId)).get();
       sourceField = { ...sf, entityName: se?.name };
     }
   }
 
   // Get contexts
-  const contexts = await db
+  const contexts = db
     .select()
     .from(mappingContext)
-    .where(eq(mappingContext.fieldMappingId, id));
+    .where(eq(mappingContext.fieldMappingId, id))
+    .all();
 
   const contextsWithNames = [];
   for (const c of contexts) {
     let contextName: string | undefined;
     if (c.contextId) {
-      const cDoc = (await db.select({ name: context.name }).from(context).where(eq(context.id, c.contextId)))[0];
+      const cDoc = db.select({ name: context.name }).from(context).where(eq(context.id, c.contextId)).get();
       contextName = cDoc?.name;
     }
     contextsWithNames.push({ ...c, contextName });
@@ -122,10 +124,11 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const existing = (await db
+  const existing = db
     .select()
     .from(fieldMapping)
-    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId))))[0];
+    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
+    .get();
 
   if (!existing) {
     return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
@@ -144,15 +147,16 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
   );
 
   // Get target field for entity context
-  const targetField = (await db.select().from(field).where(eq(field.id, existing.targetFieldId)))[0];
+  const targetField = db.select().from(field).where(eq(field.id, existing.targetFieldId)).get();
 
   // Mark existing version as not latest
-  await db.update(fieldMapping)
+  db.update(fieldMapping)
     .set({ isLatest: false, updatedAt: new Date().toISOString() })
-    .where(eq(fieldMapping.id, id));
+    .where(eq(fieldMapping.id, id))
+    .run();
 
   // Create new version (copy-on-write)
-  const [newVersion] = await db
+  const [newVersion] = db
     .insert(fieldMapping)
     .values({
       workspaceId: existing.workspaceId,
@@ -176,12 +180,26 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
       editedBy: editedBy || null,
       changeSummary,
     })
-    .returning();
+    .returning()
+    .all();
+
+  // Mark entity pipeline as stale
+  if (targetField?.entityId) {
+    db.update(entityPipeline)
+      .set({ isStale: true, updatedAt: new Date().toISOString() })
+      .where(
+        and(
+          eq(entityPipeline.entityId, targetField.entityId),
+          eq(entityPipeline.isLatest, true)
+        )
+      )
+      .run();
+  }
 
   const actorName = editedBy || "Unknown";
 
   // Log mapping_saved activity
-  await logActivity({
+  logActivity({
     workspaceId,
     fieldMappingId: newVersion.id,
     entityId: targetField?.entityId || null,
@@ -193,7 +211,7 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
 
   // Log status_change if status changed
   if (finalStatus !== existing.status) {
-    await logActivity({
+    logActivity({
       workspaceId,
       fieldMappingId: newVersion.id,
       entityId: targetField?.entityId || null,
@@ -211,8 +229,9 @@ export const DELETE = withAuth(async (req, ctx, { userId, workspaceId, role }) =
   const params = await ctx.params;
   const { id } = params;
 
-  await db.delete(fieldMapping)
-    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)));
+  db.delete(fieldMapping)
+    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
+    .run();
 
   return NextResponse.json({ success: true });
 }, { requiredRole: "editor" });

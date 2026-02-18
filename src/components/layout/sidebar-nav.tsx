@@ -50,10 +50,17 @@ export function SidebarNav() {
       {/* Nav items */}
       <nav className="flex-1 p-2 space-y-0.5">
         {navItems.map((item) => {
+          // Check if another nav item is a more specific match (longer prefix)
           const isActive =
             item.href === "/"
               ? pathname === "/"
-              : pathname.startsWith(item.href);
+              : pathname.startsWith(item.href) &&
+                !navItems.some(
+                  (other) =>
+                    other.href !== item.href &&
+                    other.href.startsWith(item.href) &&
+                    pathname.startsWith(other.href)
+                );
           const Icon = item.icon;
 
           const badgeCount = item.badge ? (openQuestions?.length || 0) : 0;

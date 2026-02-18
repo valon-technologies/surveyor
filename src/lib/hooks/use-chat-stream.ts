@@ -4,12 +4,40 @@ import { useState, useCallback, useRef } from "react";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import type { ChatMessage } from "@/types/chat";
 
+export interface ToolExecution {
+  toolName: string;
+  purpose: string;
+  sql?: string;
+  status: "running" | "complete" | "error";
+  result?: {
+    success: boolean;
+    rowCount?: number;
+    error?: string;
+    durationMs?: number;
+    preview?: Record<string, unknown>[];
+  };
+}
+
 interface StreamEvent {
-  type: "text" | "usage" | "mapping_update" | "done" | "error";
+  type: "text" | "usage" | "mapping_update" | "tool_start" | "tool_result" | "done" | "error";
   content?: string | Record<string, unknown>;
   inputTokens?: number;
   outputTokens?: number;
   error?: string;
+  // tool_start fields
+  toolName?: string;
+  purpose?: string;
+  sql?: string;
+  // tool_result fields
+  success?: boolean;
+  rowCount?: number;
+  durationMs?: number;
+  preview?: Record<string, unknown>[];
+}
+
+interface SendMessageOptions {
+  voiceInput?: boolean;
+  kickoff?: boolean;
 }
 
 interface UseChatStreamReturn {
@@ -17,7 +45,9 @@ interface UseChatStreamReturn {
   isStreaming: boolean;
   streamingContent: string;
   pendingUpdate: Record<string, unknown> | null;
-  sendMessage: (content: string, voiceInput?: boolean) => Promise<void>;
+  activeToolCall: ToolExecution | null;
+  toolHistory: ToolExecution[];
+  sendMessage: (content: string, options?: SendMessageOptions) => Promise<void>;
   setMessages: (messages: ChatMessage[]) => void;
 }
 
@@ -28,25 +58,35 @@ export function useChatStream(sessionId: string | null): UseChatStreamReturn {
   const [streamingContent, setStreamingContent] = useState("");
   const [pendingUpdate, setPendingUpdate] =
     useState<Record<string, unknown> | null>(null);
+  const [activeToolCall, setActiveToolCall] = useState<ToolExecution | null>(null);
+  const [toolHistory, setToolHistory] = useState<ToolExecution[]>([]);
   const abortRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
-    async (content: string, voiceInput?: boolean) => {
+    async (content: string, options?: SendMessageOptions) => {
       if (!sessionId || isStreaming) return;
 
-      // Add user message to local state
+      const { voiceInput, kickoff } = options || {};
+
+      // Add user message to local state (kickoff messages are hidden in the UI)
+      const metadata: ChatMessage["metadata"] = {};
+      if (voiceInput) metadata.voiceInput = true;
+      if (kickoff) metadata.kickoff = true;
+
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
         sessionId,
         role: "user",
         content,
-        metadata: voiceInput ? { voiceInput: true } : null,
+        metadata: Object.keys(metadata).length > 0 ? metadata : null,
         createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, userMessage]);
       setIsStreaming(true);
       setStreamingContent("");
       setPendingUpdate(null);
+      setActiveToolCall(null);
+      setToolHistory([]);
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -57,7 +97,7 @@ export function useChatStream(sessionId: string | null): UseChatStreamReturn {
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ content, voiceInput }),
+            body: JSON.stringify({ content, voiceInput, kickoff }),
             signal: controller.signal,
           }
         );
@@ -99,6 +139,36 @@ export function useChatStream(sessionId: string | null): UseChatStreamReturn {
                 setPendingUpdate(event.content as Record<string, unknown>);
               }
 
+              if (event.type === "tool_start") {
+                const toolExec: ToolExecution = {
+                  toolName: event.toolName || "query_bigquery",
+                  purpose: event.purpose || "",
+                  sql: event.sql,
+                  status: "running",
+                };
+                setActiveToolCall(toolExec);
+              }
+
+              if (event.type === "tool_result") {
+                const completed: ToolExecution = {
+                  toolName: event.toolName || "query_bigquery",
+                  purpose: event.purpose || "",
+                  sql: event.sql,
+                  status: event.success ? "complete" : "error",
+                  result: {
+                    success: event.success ?? false,
+                    rowCount: event.rowCount,
+                    error: event.error,
+                    durationMs: event.durationMs,
+                    preview: event.preview,
+                  },
+                };
+                setActiveToolCall(completed);
+                setToolHistory((prev) => [...prev, completed]);
+                // Clear active indicator after a short delay
+                setTimeout(() => setActiveToolCall(null), 500);
+              }
+
               if (event.type === "done") {
                 // Add completed assistant message
                 const assistantMessage: ChatMessage = {
@@ -138,6 +208,7 @@ export function useChatStream(sessionId: string | null): UseChatStreamReturn {
         }
       } finally {
         setIsStreaming(false);
+        setActiveToolCall(null);
         abortRef.current = null;
       }
     },
@@ -149,6 +220,8 @@ export function useChatStream(sessionId: string | null): UseChatStreamReturn {
     isStreaming,
     streamingContent,
     pendingUpdate,
+    activeToolCall,
+    toolHistory,
     sendMessage,
     setMessages,
   };

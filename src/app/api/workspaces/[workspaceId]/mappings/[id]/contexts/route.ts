@@ -9,23 +9,23 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const mcs = await db
+  const mcs = db
     .select()
     .from(mappingContext)
-    .where(eq(mappingContext.fieldMappingId, id));
+    .where(eq(mappingContext.fieldMappingId, id))
+    .all();
 
-  const withDetail = [];
-  for (const mc of mcs) {
+  const withDetail = mcs.map((mc) => {
     const ctxDoc = mc.contextId
-      ? (await db.select().from(context).where(eq(context.id, mc.contextId)))[0]
+      ? db.select().from(context).where(eq(context.id, mc.contextId)).get()
       : null;
-    withDetail.push({
+    return {
       ...mc,
       contextName: ctxDoc?.name ?? null,
       contextCategory: ctxDoc?.category ?? null,
       contextPreview: ctxDoc?.content?.slice(0, 120) ?? null,
-    });
-  }
+    };
+  });
 
   return NextResponse.json(withDetail);
 });
@@ -42,7 +42,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
 
   const input = parsed.data;
 
-  const [created] = await db
+  const [created] = db
     .insert(mappingContext)
     .values({
       fieldMappingId: id,
@@ -51,11 +51,12 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
       excerpt: input.excerpt,
       relevance: input.relevance,
     })
-    .returning();
+    .returning()
+    .all();
 
   // Return with context name
   const ctxDoc = input.contextId
-    ? (await db.select().from(context).where(eq(context.id, input.contextId)))[0]
+    ? db.select().from(context).where(eq(context.id, input.contextId)).get()
     : null;
 
   return NextResponse.json(

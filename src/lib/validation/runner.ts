@@ -1,4 +1,4 @@
-import type { BigQueryConfig, BigQueryCredentials } from "@/types/workspace";
+import type { BigQueryConfig } from "@/types/workspace";
 import { runBqValidation } from "./bq-runner";
 
 export interface ValidationInput {
@@ -39,7 +39,6 @@ export interface ValidationOutput {
 export async function runValidation(
   input: ValidationInput,
   bqConfig?: BigQueryConfig | null,
-  credentials?: BigQueryCredentials | null
 ): Promise<{ status: "passed" | "failed" | "error"; output: ValidationOutput | null; errorMessage?: string; durationMs: number }> {
   if (!bqConfig) {
     return {
@@ -52,7 +51,7 @@ export async function runValidation(
 
   const start = Date.now();
   try {
-    const output = await runBqValidation(input, bqConfig, credentials || undefined);
+    const output = await runBqValidation(input, bqConfig);
     const durationMs = Date.now() - start;
     return {
       status: output.passed ? "passed" : "failed",

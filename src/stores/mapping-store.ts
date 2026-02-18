@@ -1,9 +1,14 @@
 import { create } from "zustand";
 import type { MappingStatus, EntityStatus, Milestone } from "@/lib/constants";
 
+type ActiveView = "fields" | "pipeline";
+
 interface MappingState {
   selectedFieldId: string | null;
   setSelectedFieldId: (id: string | null) => void;
+
+  activeView: ActiveView;
+  setActiveView: (view: ActiveView) => void;
 
   filterStatus: MappingStatus | "all";
   setFilterStatus: (status: MappingStatus | "all") => void;
@@ -27,6 +32,9 @@ interface MappingState {
 export const useMappingStore = create<MappingState>((set) => ({
   selectedFieldId: null,
   setSelectedFieldId: (id) => set({ selectedFieldId: id }),
+
+  activeView: "fields",
+  setActiveView: (view) => set({ activeView: view }),
 
   filterStatus: "all",
   setFilterStatus: (status) => set({ filterStatus: status }),

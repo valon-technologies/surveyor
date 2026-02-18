@@ -28,7 +28,7 @@ export class ClaudeProvider implements LLMProvider {
       max_tokens: request.maxTokens || 4096,
       temperature: request.temperature ?? 0,
       system: request.systemMessage,
-      messages,
+      messages: messages as Anthropic.MessageParam[],
     });
 
     const content = response.content
@@ -50,20 +50,94 @@ export class ClaudeProvider implements LLMProvider {
     const messages = request.messages ?? [
       { role: "user" as const, content: request.userMessage! },
     ];
+
+    // Build Anthropic tools if provided
+    const tools: Anthropic.Tool[] | undefined = request.tools?.map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
+    }));
+
     const stream = this.client.messages.stream({
       model: request.model || DEFAULT_MODEL,
       max_tokens: request.maxTokens || 4096,
       temperature: request.temperature ?? 0,
       system: request.systemMessage,
-      messages,
+      messages: messages as Anthropic.MessageParam[],
+      ...(tools && tools.length > 0 ? { tools } : {}),
     });
 
+    // Track active tool_use blocks: index → { id, name, jsonBuf }
+    const activeToolBlocks = new Map<
+      number,
+      { id: string; name: string; jsonBuf: string }
+    >();
+
     for await (const event of stream) {
+      // Text content
       if (
         event.type === "content_block_delta" &&
         event.delta.type === "text_delta"
       ) {
         yield { type: "text", content: event.delta.text };
+      }
+
+      // Tool use: block start
+      if (
+        event.type === "content_block_start" &&
+        event.content_block.type === "tool_use"
+      ) {
+        activeToolBlocks.set(event.index, {
+          id: event.content_block.id,
+          name: event.content_block.name,
+          jsonBuf: "",
+        });
+      }
+
+      // Tool use: accumulate JSON input
+      if (
+        event.type === "content_block_delta" &&
+        event.delta.type === "input_json_delta"
+      ) {
+        const block = activeToolBlocks.get(event.index);
+        if (block) {
+          block.jsonBuf += event.delta.partial_json;
+        }
+      }
+
+      // Tool use: block complete
+      if (event.type === "content_block_stop") {
+        const block = activeToolBlocks.get(event.index);
+        if (block) {
+          let input: Record<string, unknown> = {};
+          try {
+            input = JSON.parse(block.jsonBuf || "{}");
+          } catch {
+            // Malformed JSON — pass empty input
+          }
+          yield {
+            type: "tool_use",
+            toolCall: { id: block.id, name: block.name, input },
+          };
+          activeToolBlocks.delete(event.index);
+        }
+      }
+
+      // Message delta with stop reason
+      if (event.type === "message_delta") {
+        const delta = event as unknown as {
+          type: "message_delta";
+          delta: { stop_reason?: string };
+          usage?: { output_tokens?: number };
+        };
+        const stopReason = delta.delta.stop_reason as
+          | "end_turn"
+          | "tool_use"
+          | "max_tokens"
+          | undefined;
+        if (stopReason) {
+          yield { type: "stop", stopReason };
+        }
       }
     }
 

@@ -5,28 +5,11 @@ import remarkGfm from "remark-gfm";
 import { Badge } from "@/components/ui/badge";
 import { TagBadge } from "@/components/shared/tag-badge";
 import { SKILL_CONTEXT_ROLE_LABELS, type SkillContextRole } from "@/lib/constants";
-import type { SkillWithContexts, SkillContextWithDetail } from "@/types/skill";
+import type { SkillWithContexts } from "@/types/skill";
+import { groupByRole, formatTokens } from "./skill-utils";
 
 interface SkillDetailViewProps {
   skill: SkillWithContexts;
-}
-
-function groupByRole(contexts: SkillContextWithDetail[]) {
-  const groups: Record<SkillContextRole, SkillContextWithDetail[]> = {
-    primary: [],
-    reference: [],
-    supplementary: [],
-  };
-  for (const sc of contexts) {
-    groups[sc.role]?.push(sc);
-  }
-  return groups;
-}
-
-function formatTokens(count: number | null): string {
-  if (!count) return "?";
-  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
-  return String(count);
 }
 
 export function SkillDetailView({ skill }: SkillDetailViewProps) {
@@ -67,8 +50,8 @@ export function SkillDetailView({ skill }: SkillDetailViewProps) {
                 Entity patterns
               </span>
               <div className="flex flex-wrap gap-1">
-                {app.entityPatterns.map((p) => (
-                  <Badge key={p} variant="secondary" className="text-xs font-mono">
+                {app.entityPatterns.map((p, i) => (
+                  <Badge key={`${p}-${i}`} variant="secondary" className="text-xs font-mono">
                     {p}
                   </Badge>
                 ))}
@@ -81,8 +64,8 @@ export function SkillDetailView({ skill }: SkillDetailViewProps) {
                 Field patterns
               </span>
               <div className="flex flex-wrap gap-1">
-                {app.fieldPatterns.map((p) => (
-                  <Badge key={p} variant="secondary" className="text-xs font-mono">
+                {app.fieldPatterns.map((p, i) => (
+                  <Badge key={`${p}-${i}`} variant="secondary" className="text-xs font-mono">
                     {p}
                   </Badge>
                 ))}

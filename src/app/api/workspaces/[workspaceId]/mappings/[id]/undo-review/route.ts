@@ -10,12 +10,13 @@ export const POST = withAuth(
     const params = await ctx.params;
     const id = params.id;
 
-    const mapping = (await db
+    const mapping = db
       .select()
       .from(fieldMapping)
       .where(
         and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId))
-      ))[0];
+      )
+      .get();
 
     if (!mapping) {
       return NextResponse.json(
@@ -26,16 +27,17 @@ export const POST = withAuth(
 
     const now = new Date().toISOString();
 
-    await db.update(fieldMapping)
+    db.update(fieldMapping)
       .set({
-        status: "pending",
-        reviewStatus: null,
+        status: "unreviewed",
         puntNote: null,
+        excludeReason: null,
         updatedAt: now,
       })
-      .where(eq(fieldMapping.id, id));
+      .where(eq(fieldMapping.id, id))
+      .run();
 
-    await logActivity({
+    logActivity({
       workspaceId,
       fieldMappingId: id,
       entityId: null,
@@ -45,10 +47,11 @@ export const POST = withAuth(
       detail: { reviewAction: "undone" },
     });
 
-    const updated = (await db
+    const updated = db
       .select()
       .from(fieldMapping)
-      .where(eq(fieldMapping.id, id)))[0];
+      .where(eq(fieldMapping.id, id))
+      .get();
 
     return NextResponse.json(updated);
   },

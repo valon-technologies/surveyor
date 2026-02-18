@@ -1,38 +1,38 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { fieldMapping, field, entity, validation, workspace, userBigqueryToken } from "@/lib/db/schema";
+import { fieldMapping, field, entity, validation, workspace } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { logActivity } from "@/lib/activity/log-activity";
 import { runValidation, type ValidationInput } from "@/lib/validation/runner";
-import { decrypt } from "@/lib/auth/encryption";
-import type { BigQueryConfig, BigQueryCredentials } from "@/types/workspace";
+import type { BigQueryConfig } from "@/types/workspace";
 
-// POST — run validation
+// POST — run validation (uses Gestalt for BigQuery auth)
 export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const mapping = (await db
+  const mapping = db
     .select()
     .from(fieldMapping)
-    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId))))[0];
+    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
+    .get();
 
   if (!mapping) {
     return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
   }
 
-  const targetField = (await db.select().from(field).where(eq(field.id, mapping.targetFieldId)))[0];
+  const targetField = db.select().from(field).where(eq(field.id, mapping.targetFieldId)).get();
   const targetEntity = targetField
-    ? (await db.select().from(entity).where(eq(entity.id, targetField.entityId)))[0]
+    ? db.select().from(entity).where(eq(entity.id, targetField.entityId)).get()
     : null;
 
   let sourceField = null;
   let sourceEntity = null;
   if (mapping.sourceFieldId) {
-    sourceField = (await db.select().from(field).where(eq(field.id, mapping.sourceFieldId)))[0];
+    sourceField = db.select().from(field).where(eq(field.id, mapping.sourceFieldId)).get();
     if (sourceField) {
-      sourceEntity = (await db.select().from(entity).where(eq(entity.id, sourceField.entityId)))[0];
+      sourceEntity = db.select().from(entity).where(eq(entity.id, sourceField.entityId)).get();
     }
   }
 
@@ -52,57 +52,18 @@ export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
   };
 
   // Load workspace BQ config
-  const ws = (await db
+  const ws = db
     .select({ settings: workspace.settings })
     .from(workspace)
-    .where(eq(workspace.id, workspaceId)))[0];
+    .where(eq(workspace.id, workspaceId))
+    .get();
 
   const bqConfig = (ws?.settings as Record<string, unknown> | null)?.bigquery as BigQueryConfig | undefined;
 
-  // Load user's BQ OAuth credentials
-  let credentials: BigQueryCredentials | null = null;
-  const bqToken = (await db
-    .select()
-    .from(userBigqueryToken)
-    .where(eq(userBigqueryToken.userId, userId)))[0];
-
-  if (bqToken) {
-    credentials = {
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      refreshToken: decrypt(bqToken.encryptedRefreshToken, bqToken.iv, bqToken.authTag),
-    };
-  } else if (bqConfig && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    // BQ is configured but user hasn't connected their Google account and no ADC
-    const notConnectedResult = {
-      status: "error" as const,
-      output: null,
-      errorMessage: "BigQuery not connected. Go to Settings > BigQuery and click \"Connect BigQuery\" to authenticate.",
-      durationMs: 0,
-    };
-
-    const [stored] = await db
-      .insert(validation)
-      .values({
-        workspaceId,
-        fieldMappingId: id,
-        entityId: targetField?.entityId || null,
-        status: notConnectedResult.status,
-        input: input as unknown as Record<string, unknown>,
-        output: null,
-        errorMessage: notConnectedResult.errorMessage,
-        durationMs: 0,
-        ranBy: userId,
-      })
-      .returning();
-
-    return NextResponse.json(stored);
-  }
-
-  const result = await runValidation(input, bqConfig, credentials);
+  const result = await runValidation(input, bqConfig);
 
   // Store result
-  const [stored] = await db
+  const [stored] = db
     .insert(validation)
     .values({
       workspaceId,
@@ -115,9 +76,10 @@ export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
       durationMs: result.durationMs,
       ranBy: userId,
     })
-    .returning();
+    .returning()
+    .all();
 
-  await logActivity({
+  logActivity({
     workspaceId,
     fieldMappingId: id,
     entityId: targetField?.entityId || null,
@@ -139,12 +101,13 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const latest = (await db
+  const latest = db
     .select()
     .from(validation)
     .where(and(eq(validation.fieldMappingId, id), eq(validation.workspaceId, workspaceId)))
     .orderBy(desc(validation.createdAt))
-    .limit(1))[0];
+    .limit(1)
+    .get();
 
   if (!latest) {
     return NextResponse.json(null);

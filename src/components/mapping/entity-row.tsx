@@ -10,11 +10,11 @@ import {
 import type { Entity } from "@/types/entity";
 
 const STATUS_ORDER: MappingStatus[] = [
-  "fully_closed",
+  "accepted",
   "excluded",
-  "pending",
-  "open_comment_sm",
-  "open_comment_vt",
+  "unreviewed",
+  "punted",
+  "needs_discussion",
   "unmapped",
 ];
 
@@ -27,7 +27,7 @@ export function EntityRow({
     <tr className="border-t hover:bg-muted/30 transition-colors">
       <td className="px-4 py-3">
         <Link
-          href={`/mapping/${entity.id}`}
+          href={`/mapping?entityId=${entity.id}`}
           className="font-medium text-sm hover:underline"
         >
           {entity.displayName || entity.name}

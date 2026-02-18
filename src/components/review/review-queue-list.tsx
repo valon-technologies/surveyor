@@ -1,19 +1,29 @@
 "use client";
 
+import { useMemo } from "react";
 import { useReviewQueue } from "@/queries/review-queries";
 import { useReviewStore } from "@/stores/review-store";
-import { ReviewCard } from "./review-card";
+import { EntityGroup } from "./entity-group";
 import type { ReviewCardData } from "@/types/review";
 
 interface ReviewQueueListProps {
   onPunt: (card: ReviewCardData) => void;
+  onExclude: (card: ReviewCardData) => void;
+  onAcceptWithRipple?: (card: ReviewCardData) => void;
 }
 
-export function ReviewQueueList({ onPunt }: ReviewQueueListProps) {
+interface EntityGroupData {
+  entityId: string;
+  entityName: string;
+  cards: ReviewCardData[];
+  unreviewedCount: number;
+}
+
+export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: ReviewQueueListProps) {
   const {
     confidenceFilter,
     entityFilter,
-    reviewStatusFilter,
+    statusFilter,
     sortBy,
     sortOrder,
   } = useReviewStore();
@@ -21,10 +31,46 @@ export function ReviewQueueList({ onPunt }: ReviewQueueListProps) {
   const { data: cards, isLoading } = useReviewQueue({
     confidence: confidenceFilter,
     entityId: entityFilter,
-    reviewStatus: reviewStatusFilter,
+    status: statusFilter,
     sortBy,
     sortOrder,
   });
+
+  // Group cards by entity
+  const entityGroups = useMemo<EntityGroupData[]>(() => {
+    if (!cards?.length) return [];
+
+    const groupMap = new Map<string, EntityGroupData>();
+
+    for (const card of cards) {
+      let group = groupMap.get(card.entityId);
+      if (!group) {
+        group = {
+          entityId: card.entityId,
+          entityName: card.entityName,
+          cards: [],
+          unreviewedCount: 0,
+        };
+        groupMap.set(card.entityId, group);
+      }
+      group.cards.push(card);
+      if (card.status === "unreviewed") {
+        group.unreviewedCount++;
+      }
+    }
+
+    const groups = Array.from(groupMap.values());
+
+    // Sort: entities with unreviewed fields first (desc count), then alphabetical
+    groups.sort((a, b) => {
+      if (a.unreviewedCount !== b.unreviewedCount) {
+        return b.unreviewedCount - a.unreviewedCount;
+      }
+      return a.entityName.localeCompare(b.entityName);
+    });
+
+    return groups;
+  }, [cards]);
 
   if (isLoading) {
     return (
@@ -47,14 +93,15 @@ export function ReviewQueueList({ onPunt }: ReviewQueueListProps) {
     );
   }
 
-  const unreviewedCount = cards.filter((c) => !c.reviewStatus).length;
-  const acceptedCount = cards.filter((c) => c.reviewStatus === "accepted").length;
-  const puntedCount = cards.filter((c) => c.reviewStatus === "punted").length;
+  const unreviewedCount = cards.filter((c) => c.status === "unreviewed").length;
+  const acceptedCount = cards.filter((c) => c.status === "accepted").length;
+  const excludedCount = cards.filter((c) => c.status === "excluded").length;
+  const puntedCount = cards.filter((c) => c.status === "punted").length;
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-        <span>{cards.length} total</span>
+      <div className="flex items-center gap-4 text-xs text-muted-foreground mb-1">
+        <span>{cards.length} total across {entityGroups.length} entities</span>
         {unreviewedCount > 0 && (
           <span className="text-blue-600">{unreviewedCount} to review</span>
         )}
@@ -64,10 +111,21 @@ export function ReviewQueueList({ onPunt }: ReviewQueueListProps) {
         {puntedCount > 0 && (
           <span className="text-amber-600">{puntedCount} punted</span>
         )}
+        {excludedCount > 0 && (
+          <span className="text-stone-400">{excludedCount} excluded</span>
+        )}
       </div>
 
-      {cards.map((card) => (
-        <ReviewCard key={card.id} card={card} onPunt={onPunt} />
+      {entityGroups.map((group) => (
+        <EntityGroup
+          key={group.entityId}
+          entityId={group.entityId}
+          entityName={group.entityName}
+          cards={group.cards}
+          onPunt={onPunt}
+          onExclude={onExclude}
+          onAcceptWithRipple={onAcceptWithRipple}
+        />
       ))}
     </div>
   );

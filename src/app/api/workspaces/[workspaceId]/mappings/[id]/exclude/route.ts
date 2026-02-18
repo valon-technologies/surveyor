@@ -4,18 +4,30 @@ import { db } from "@/lib/db";
 import { fieldMapping } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { logActivity } from "@/lib/activity/log-activity";
+import { excludeMappingSchema } from "@/lib/validators/review";
 
 export const POST = withAuth(
   async (req, ctx, { userId, workspaceId }) => {
     const params = await ctx.params;
     const id = params.id;
 
-    const mapping = (await db
+    // Parse body (backward compat for empty body)
+    let reason = "";
+    try {
+      const body = await req.json();
+      const parsed = excludeMappingSchema.parse(body);
+      reason = parsed.reason;
+    } catch {
+      // Empty body or invalid JSON — proceed with no reason
+    }
+
+    const mapping = db
       .select()
       .from(fieldMapping)
       .where(
         and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId))
-      ))[0];
+      )
+      .get();
 
     if (!mapping) {
       return NextResponse.json(
@@ -26,28 +38,30 @@ export const POST = withAuth(
 
     const now = new Date().toISOString();
 
-    await db.update(fieldMapping)
+    db.update(fieldMapping)
       .set({
-        reviewStatus: "accepted",
         status: "excluded",
+        excludeReason: reason || null,
         updatedAt: now,
       })
-      .where(eq(fieldMapping.id, id));
+      .where(eq(fieldMapping.id, id))
+      .run();
 
-    await logActivity({
+    logActivity({
       workspaceId,
       fieldMappingId: id,
       entityId: null,
       actorId: userId,
       actorName: "user",
       action: "status_change",
-      detail: { reviewAction: "excluded" },
+      detail: { reviewAction: "excluded", reason: reason || undefined },
     });
 
-    const updated = (await db
+    const updated = db
       .select()
       .from(fieldMapping)
-      .where(eq(fieldMapping.id, id)))[0];
+      .where(eq(fieldMapping.id, id))
+      .get();
 
     return NextResponse.json(updated);
   },

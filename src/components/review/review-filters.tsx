@@ -2,11 +2,11 @@
 
 import { Select } from "@/components/ui/select";
 import { useReviewStore } from "@/stores/review-store";
-import { useEntities } from "@/queries/entity-queries";
+import { useReviewQueue } from "@/queries/review-queries";
 import {
-  CONFIDENCE_LEVELS,
-  REVIEW_STATUSES,
-  REVIEW_STATUS_LABELS,
+  MAPPING_STATUS_LABELS,
+  type ConfidenceLevel,
+  type MappingStatus,
 } from "@/lib/constants";
 
 export function ReviewFilters() {
@@ -15,37 +15,58 @@ export function ReviewFilters() {
     setConfidenceFilter,
     entityFilter,
     setEntityFilter,
-    reviewStatusFilter,
-    setReviewStatusFilter,
+    statusFilter,
+    setStatusFilter,
     sortBy,
     setSortBy,
     sortOrder,
     setSortOrder,
   } = useReviewStore();
 
-  const { data: entities } = useEntities({ side: "target" });
+  // Fetch unfiltered queue to derive available facet values
+  const { data: allCards } = useReviewQueue();
+
+  // Derive distinct values from actual data
+  const confidenceValues = new Set<ConfidenceLevel>();
+  const statusValues = new Set<MappingStatus>();
+  const entityMap = new Map<string, string>(); // id → display name
+
+  for (const card of allCards || []) {
+    if (card.confidence) confidenceValues.add(card.confidence);
+    if (card.status) statusValues.add(card.status);
+    if (card.entityId && !entityMap.has(card.entityId)) {
+      entityMap.set(card.entityId, card.entityName);
+    }
+  }
 
   const confidenceOptions = [
     { value: "all", label: "All Confidence" },
-    ...CONFIDENCE_LEVELS.map((c) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) })),
+    ...Array.from(confidenceValues)
+      .sort((a, b) => {
+        const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
+        return (order[a] ?? 3) - (order[b] ?? 3);
+      })
+      .map((c) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) })),
   ];
 
-  const statusOptions = [
+  const statusOptions: { value: string; label: string }[] = [
     { value: "all", label: "All Statuses" },
-    ...REVIEW_STATUSES.map((s) => ({ value: s, label: REVIEW_STATUS_LABELS[s] })),
   ];
+  for (const s of Array.from(statusValues)) {
+    if (MAPPING_STATUS_LABELS[s]) {
+      statusOptions.push({ value: s, label: MAPPING_STATUS_LABELS[s] });
+    }
+  }
 
   const entityOptions = [
     { value: "all", label: "All Entities" },
-    ...(entities || []).map((e) => ({
-      value: e.id,
-      label: e.displayName || e.name,
-    })),
+    ...Array.from(entityMap.entries())
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([id, name]) => ({ value: id, label: name })),
   ];
 
   const sortOptions = [
     { value: "confidence", label: "Confidence" },
-    { value: "entityName", label: "Entity" },
     { value: "targetFieldName", label: "Field Name" },
     { value: "createdAt", label: "Created" },
   ];
@@ -65,8 +86,8 @@ export function ReviewFilters() {
       />
       <Select
         options={statusOptions}
-        value={reviewStatusFilter}
-        onChange={(e) => setReviewStatusFilter(e.target.value as typeof reviewStatusFilter)}
+        value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
         className="w-40"
       />
       <Select

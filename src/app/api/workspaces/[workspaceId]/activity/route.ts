@@ -13,12 +13,13 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
   if (fieldMappingId) conditions.push(eq(activity.fieldMappingId, fieldMappingId));
   if (entityId) conditions.push(eq(activity.entityId, entityId));
 
-  const items = await db
+  const items = db
     .select()
     .from(activity)
     .where(and(...conditions))
     .orderBy(desc(activity.createdAt))
-    .limit(100);
+    .limit(100)
+    .all();
 
   return NextResponse.json(items);
 });

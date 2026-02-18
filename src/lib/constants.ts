@@ -1,38 +1,38 @@
 // ─── Mapping Statuses ─────────────────────────────────────────
 export const MAPPING_STATUSES = [
   "unmapped",
-  "pending",
-  "open_comment_sm",
-  "open_comment_vt",
-  "fully_closed",
+  "unreviewed",
+  "accepted",
+  "punted",
+  "needs_discussion",
   "excluded",
 ] as const;
 export type MappingStatus = (typeof MAPPING_STATUSES)[number];
 
 export const MAPPING_STATUS_COLORS: Record<MappingStatus, string> = {
   unmapped: "#6b7280",
-  pending: "#3b82f6",
-  open_comment_sm: "#f59e0b",
-  open_comment_vt: "#8b5cf6",
-  fully_closed: "#22c55e",
+  unreviewed: "#3b82f6",
+  accepted: "#22c55e",
+  punted: "#f59e0b",
+  needs_discussion: "#8b5cf6",
   excluded: "#a8a29e",
 };
 
 export const MAPPING_STATUS_LABELS: Record<MappingStatus, string> = {
   unmapped: "Unmapped",
-  pending: "Pending",
-  open_comment_sm: "Open Comment (SM)",
-  open_comment_vt: "Open Comment (VT)",
-  fully_closed: "Fully Closed",
+  unreviewed: "Unreviewed",
+  accepted: "Accepted",
+  punted: "Punted",
+  needs_discussion: "Needs Discussion",
   excluded: "Excluded",
 };
 
 export const MAPPING_STATUS_DESCRIPTIONS: Record<MappingStatus, string> = {
   unmapped: "No mapping has been defined for this field",
-  pending: "Mapping saved, awaiting review or comment",
-  open_comment_sm: "Open comment from ServiceMac team requiring response",
-  open_comment_vt: "Open comment from Valon Tech team requiring response",
-  fully_closed: "Mapping reviewed, validated, and closed",
+  unreviewed: "Mapping saved, awaiting human review",
+  accepted: "Mapping reviewed and accepted",
+  punted: "Delegated for further investigation",
+  needs_discussion: "Requires additional discussion before acceptance",
   excluded: "Business decided this field does not need mapping",
 };
 
@@ -178,6 +178,80 @@ export const CONTEXT_SUBCATEGORY_LABELS: Record<ContextSubcategory, string> = {
   working_doc: "Working Doc",
 };
 
+// ─── Context Tags ────────────────────────────────────────────
+export const CONTEXT_TAG_GROUPS = {
+  domain: [
+    "loans",
+    "borrowers",
+    "payments",
+    "escrow",
+    "insurance",
+    "foreclosure",
+    "loss_mitigation",
+    "servicing",
+    "investors",
+  ] as const,
+  data_type: [
+    "lookup_values",
+    "code_mappings",
+    "field_definitions",
+    "business_rules",
+    "enum_values",
+    "status_codes",
+    "validation_rules",
+  ] as const,
+  source_system: [
+    "servicemac",
+    "valon",
+    "vendor",
+    "fha",
+    "va",
+    "fannie_mae",
+    "freddie_mac",
+    "ginnie_mae",
+  ] as const,
+} as const;
+
+export const CONTEXT_TAG_GROUP_LABELS: Record<keyof typeof CONTEXT_TAG_GROUPS, string> = {
+  domain: "Domain",
+  data_type: "Data Type",
+  source_system: "Source System",
+};
+
+export const CONTEXT_TAGS = [
+  ...CONTEXT_TAG_GROUPS.domain,
+  ...CONTEXT_TAG_GROUPS.data_type,
+  ...CONTEXT_TAG_GROUPS.source_system,
+] as const;
+export type ContextTag = (typeof CONTEXT_TAGS)[number];
+
+export const CONTEXT_TAG_LABELS: Record<ContextTag, string> = {
+  loans: "Loans",
+  borrowers: "Borrowers",
+  payments: "Payments",
+  escrow: "Escrow",
+  insurance: "Insurance",
+  foreclosure: "Foreclosure",
+  loss_mitigation: "Loss Mitigation",
+  servicing: "Servicing",
+  investors: "Investors",
+  lookup_values: "Lookup Values",
+  code_mappings: "Code Mappings",
+  field_definitions: "Field Definitions",
+  business_rules: "Business Rules",
+  enum_values: "Enum Values",
+  status_codes: "Status Codes",
+  validation_rules: "Validation Rules",
+  servicemac: "ServiceMac",
+  valon: "Valon",
+  vendor: "Vendor",
+  fha: "FHA",
+  va: "VA",
+  fannie_mae: "Fannie Mae",
+  freddie_mac: "Freddie Mac",
+  ginnie_mae: "Ginnie Mae",
+};
+
 // ─── Skill Context Roles ──────────────────────────────────────
 export const SKILL_CONTEXT_ROLES = ["primary", "reference", "supplementary"] as const;
 export type SkillContextRole = (typeof SKILL_CONTEXT_ROLES)[number];
@@ -196,6 +270,35 @@ export const CONFIDENCE_COLORS: Record<ConfidenceLevel, string> = {
   high: "#22c55e",
   medium: "#f59e0b",
   low: "#ef4444",
+};
+
+// ─── Uncertainty Types ──────────────────────────────────────
+export const UNCERTAINTY_TYPES = [
+  "no_source_match",
+  "multiple_candidates",
+  "unclear_transform",
+  "incomplete_enum",
+  "domain_ambiguity",
+  "missing_context",
+] as const;
+export type UncertaintyType = (typeof UNCERTAINTY_TYPES)[number];
+
+export const UNCERTAINTY_TYPE_LABELS: Record<UncertaintyType, string> = {
+  no_source_match: "No Source Match",
+  multiple_candidates: "Multiple Candidates",
+  unclear_transform: "Unclear Transform",
+  incomplete_enum: "Incomplete Enum",
+  domain_ambiguity: "Domain Ambiguity",
+  missing_context: "Missing Context",
+};
+
+export const UNCERTAINTY_TYPE_DESCRIPTIONS: Record<UncertaintyType, string> = {
+  no_source_match: "No source field could be confidently matched to this target field",
+  multiple_candidates: "Multiple source fields are plausible matches — human must pick",
+  unclear_transform: "Source exists but the correct transformation logic is uncertain",
+  incomplete_enum: "Enum mapping is missing values or source codes are not fully documented",
+  domain_ambiguity: "Business meaning of the field is ambiguous or context-dependent",
+  missing_context: "Additional documentation or SME input is needed to resolve this mapping",
 };
 
 // ─── Context Types (mapping_context.contextType) ─────────────
@@ -234,15 +337,27 @@ export const GENERATION_TYPES = [
 export type GenerationType = (typeof GENERATION_TYPES)[number];
 
 // ─── Question Statuses ────────────────────────────────────────
-export const QUESTION_STATUSES = ["open", "answered", "dismissed"] as const;
+export const QUESTION_STATUSES = ["open", "resolved", "dismissed"] as const;
 export type QuestionStatus = (typeof QUESTION_STATUSES)[number];
+
+export const QUESTION_STATUS_LABELS: Record<QuestionStatus, string> = {
+  open: "Open",
+  resolved: "Resolved",
+  dismissed: "Dismissed",
+};
+
+export const QUESTION_STATUS_COLORS: Record<QuestionStatus, string> = {
+  open: "#3b82f6",
+  resolved: "#22c55e",
+  dismissed: "#6b7280",
+};
 
 // ─── Schema Sides ─────────────────────────────────────────────
 export const SCHEMA_SIDES = ["source", "target"] as const;
 export type SchemaSide = (typeof SCHEMA_SIDES)[number];
 
 // ─── Schema Formats ───────────────────────────────────────────
-export const SCHEMA_FORMATS = ["csv", "json", "sql_ddl"] as const;
+export const SCHEMA_FORMATS = ["csv", "json", "sql_ddl", "pdf"] as const;
 export type SchemaFormat = (typeof SCHEMA_FORMATS)[number];
 
 // ─── Workspace Teams ─────────────────────────────────────────
@@ -274,6 +389,7 @@ export const ACTIVITY_ACTIONS = [
   "validation_ran",
   "case_closed",
   "case_reopened",
+  "ripple_propagated",
 ] as const;
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];
 
@@ -302,22 +418,6 @@ export type LLMModelId = (typeof LLM_MODELS)[LLMProvider][number]["id"];
 export const DEFAULT_MODELS: Record<LLMProvider, { singleField: string; batch: string }> = {
   claude: { singleField: "claude-haiku-4-5-20251001", batch: "claude-sonnet-4-5-20250929" },
   openai: { singleField: "gpt-4o-mini", batch: "gpt-4o" },
-};
-
-// ─── Review Statuses ──────────────────────────────────────────
-export const REVIEW_STATUSES = ["accepted", "punted", "needs_discussion"] as const;
-export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
-
-export const REVIEW_STATUS_LABELS: Record<ReviewStatus, string> = {
-  accepted: "Accepted",
-  punted: "Punted",
-  needs_discussion: "Needs Discussion",
-};
-
-export const REVIEW_STATUS_COLORS: Record<ReviewStatus, string> = {
-  accepted: "#22c55e",
-  punted: "#f59e0b",
-  needs_discussion: "#3b82f6",
 };
 
 // ─── Batch Run Statuses ──────────────────────────────────────

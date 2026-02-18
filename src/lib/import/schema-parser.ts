@@ -34,6 +34,14 @@ export interface ParseOptions {
 }
 
 export function parseCSVSchema(rawContent: string, fallbackEntityName: string, options?: ParseOptions): ParsedEntity[] {
+  // First parse: preserve original header casing (needed for column-list fallback)
+  const rawResult = Papa.parse<Record<string, string>>(rawContent.trim(), {
+    header: true,
+    skipEmptyLines: true,
+  });
+  const originalHeaders = (rawResult.meta.fields || []).map((h) => h.trim());
+
+  // Second parse: lowercased headers for structured column matching
   const result = Papa.parse<Record<string, string>>(rawContent.trim(), {
     header: true,
     skipEmptyLines: true,
@@ -66,10 +74,20 @@ export function parseCSVSchema(rawContent: string, fallbackEntityName: string, o
   const displayCol = findCol(["display_name", "display", "label"]);
   const milestoneCol = findCol(["milestone", "phase", "delivery"]);
 
+  // Fallback: if no field/column header detected, treat each CSV header as a field name.
+  // This handles "column-list" CSVs where headers ARE the field names (e.g. "InvestorId,CategoryCode,...")
   if (!fieldCol) {
-    throw new Error(
-      `Cannot find a field/column name header. Found headers: ${headers.join(", ")}`
-    );
+    const fields: ParsedField[] = originalHeaders
+      .filter((h) => h.length > 0)
+      .map((h) => ({ name: h }));
+
+    if (fields.length === 0) {
+      throw new Error(
+        `Cannot find a field/column name header. Found headers: ${headers.join(", ")}`
+      );
+    }
+
+    return [{ name: fallbackEntityName, fields }];
   }
 
   // Group by entity

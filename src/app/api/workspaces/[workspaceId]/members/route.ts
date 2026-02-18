@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 
 // GET — list members of this workspace
 export const GET = withAuth(async (_req, _ctx, { workspaceId }) => {
-  const members = await db
+  const members = db
     .select({
       id: userWorkspace.id,
       userId: user.id,
@@ -19,7 +19,8 @@ export const GET = withAuth(async (_req, _ctx, { workspaceId }) => {
     })
     .from(userWorkspace)
     .innerJoin(user, eq(userWorkspace.userId, user.id))
-    .where(eq(userWorkspace.workspaceId, workspaceId));
+    .where(eq(userWorkspace.workspaceId, workspaceId))
+    .all();
 
   return NextResponse.json(members);
 });

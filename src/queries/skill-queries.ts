@@ -9,6 +9,7 @@ import type {
   SkillUpdateInput,
   SkillContextInput,
   SkillContextWithDetail,
+  AssemblySimulationResult,
 } from "@/types/skill";
 
 export function useSkills() {
@@ -107,6 +108,23 @@ export function useRemoveSkillContext() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["skills"] });
     },
+  });
+}
+
+export function useAssemblySimulation(
+  entityName?: string,
+  tokenBudget: number = 160_000
+) {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "skills");
+  return useQuery({
+    queryKey: ["skills", workspaceId, "simulate", entityName, tokenBudget],
+    queryFn: () =>
+      api.get<AssemblySimulationResult>(`${basePath}/simulate`, {
+        entityName,
+        tokenBudget,
+      }),
+    enabled: !!entityName?.trim(),
   });
 }
 

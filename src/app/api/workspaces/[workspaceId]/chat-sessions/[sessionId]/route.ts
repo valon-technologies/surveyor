@@ -8,7 +8,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const params = await ctx.params;
   const sessionId = params.sessionId;
 
-  const session = (await db
+  const session = db
     .select()
     .from(chatSession)
     .where(
@@ -16,7 +16,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
         eq(chatSession.id, sessionId),
         eq(chatSession.workspaceId, workspaceId)
       )
-    ))[0];
+    ).get();
 
   if (!session) {
     return NextResponse.json(
@@ -25,11 +25,12 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     );
   }
 
-  const messages = await db
+  const messages = db
     .select()
     .from(chatMessage)
     .where(eq(chatMessage.sessionId, sessionId))
-    .orderBy(chatMessage.createdAt);
+    .orderBy(chatMessage.createdAt)
+    .all();
 
   return NextResponse.json({ ...session, messages });
 });

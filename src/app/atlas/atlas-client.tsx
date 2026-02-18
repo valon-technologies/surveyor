@@ -62,11 +62,11 @@ export function AtlasClient() {
         )}
         {selectedEntityId && (
           <Link
-            href={`/mapping/${selectedEntityId}${selectedFieldId ? `?fieldId=${selectedFieldId}` : ""}`}
+            href={`/mapping?entityId=${selectedEntityId}`}
             className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             <ExternalLink className="h-3.5 w-3.5" />
-            Open in Mapping Editor
+            Open in Mapping Review
           </Link>
         )}
       </div>

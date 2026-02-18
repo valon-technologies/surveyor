@@ -56,9 +56,10 @@ export function ValidationTab({ mappingId }: ValidationTabProps) {
     latestValidation?.status === "error" &&
     latestValidation?.errorMessage?.includes("BigQuery not configured");
 
-  const isBqNotConnected =
+  const isBqNoCredentials =
     latestValidation?.status === "error" &&
-    latestValidation?.errorMessage?.includes("BigQuery not connected");
+    (latestValidation?.errorMessage?.includes("default credentials") ||
+     latestValidation?.errorMessage?.includes("GOOGLE_APPLICATION_CREDENTIALS"));
 
   return (
     <div className="p-4 space-y-4">
@@ -102,21 +103,21 @@ export function ValidationTab({ mappingId }: ValidationTabProps) {
         </div>
       )}
 
-      {/* BQ not connected state */}
-      {isBqNotConnected && (
+      {/* BQ no credentials state */}
+      {isBqNoCredentials && (
         <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-3 text-xs text-amber-700 dark:text-amber-300 space-y-2">
           <div className="flex items-center gap-1.5">
             <Settings className="h-3.5 w-3.5" />
-            <span className="font-medium">BigQuery not connected</span>
+            <span className="font-medium">No BigQuery credentials</span>
           </div>
           <p>
-            Connect your Google account to enable BigQuery validation.
+            Run <code className="font-mono text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 rounded">gcloud auth application-default login</code> to authenticate.
           </p>
           <Link
             href="/settings/bigquery"
             className="inline-flex items-center text-xs font-medium text-amber-800 dark:text-amber-200 underline underline-offset-2"
           >
-            Connect BigQuery
+            Setup Guide
           </Link>
         </div>
       )}
@@ -129,7 +130,7 @@ export function ValidationTab({ mappingId }: ValidationTabProps) {
       )}
 
       {/* Results */}
-      {latestValidation && !isBqNotConfigured && !isBqNotConnected && (
+      {latestValidation && !isBqNotConfigured && !isBqNoCredentials && (
         <div className="space-y-3">
           {/* Overall status banner */}
           <div

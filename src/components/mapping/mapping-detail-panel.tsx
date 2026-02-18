@@ -507,7 +507,7 @@ export function MappingDetailPanel({
           </div>
 
           {/* Close Case / Re-Open Case */}
-          {existing?.id && status !== "fully_closed" && (
+          {existing?.id && status !== "accepted" && (
             <Button
               variant="outline"
               onClick={() => closeCase.mutate(existing.id)}
@@ -515,10 +515,10 @@ export function MappingDetailPanel({
               className="w-full border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950/30"
             >
               <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
-              {closeCase.isPending ? "Closing..." : "Close Case"}
+              {closeCase.isPending ? "Accepting..." : "Accept Mapping"}
             </Button>
           )}
-          {existing?.id && status === "fully_closed" && (
+          {existing?.id && status === "accepted" && (
             <Button
               variant="outline"
               onClick={() => reopenCase.mutate(existing.id)}

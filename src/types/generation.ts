@@ -1,4 +1,4 @@
-import type { GenerationType, MappingStatus, MappingType, ConfidenceLevel } from "@/lib/constants";
+import type { GenerationType, MappingStatus, MappingType, ConfidenceLevel, UncertaintyType } from "@/lib/constants";
 
 export interface Generation {
   id: string;
@@ -19,6 +19,8 @@ export interface Generation {
   outputTokens: number | null;
   durationMs: number | null;
   error: string | null;
+  validationScore: number | null;
+  validationIssues: Record<string, unknown>[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,13 +41,23 @@ export interface ParsedFieldMapping {
   confidence: ConfidenceLevel | null;
   notes: string | null;
   reviewComment: string | null;
+  uncertaintyType: UncertaintyType | null;
   resolveWarnings: string[];
+}
+
+export interface ParsedQuestion {
+  targetFieldName: string | null;
+  targetFieldId: string | null;
+  questionText: string;
+  questionType: UncertaintyType;
+  priority: "urgent" | "high" | "normal" | "low";
 }
 
 export interface ParseResult {
   fieldMappings: ParsedFieldMapping[];
   parseErrors: string[];
   unmappedFields: string[];
+  questions: ParsedQuestion[];
 }
 
 export interface GenerationRunResult {
