@@ -476,11 +476,11 @@ export const FIELD_DOMAIN_LABELS: Record<FieldDomain, string> = {
 };
 
 export const FIELD_DOMAIN_DESCRIPTIONS: Record<FieldDomain, string> = {
-  escrow:                   "Escrow account management, tax/insurance disbursements, impound analysis",
-  payments:                 "Payment processing, payment history, transaction ledger (payment side), remittance",
-  servicing_infrastructure: "Core loan administration, loan setup, system plumbing, investor reporting, boarding",
-  delinquency_recovery:     "Collections, charge-offs, foreclosure, REO, bankruptcy, default servicing",
-  delinquency_retention:    "Loss mitigation, loan modifications, forbearance, repayment plans, workout",
+  escrow:                   "Escrow account management, tax/insurance disbursements, impound analysis, T&I custodial",
+  payments:                 "Payment processing, payment history, transaction ledger (payment side), PI remittance, PI custodial",
+  servicing_infrastructure: "Core loan administration, loan setup, ARM/rate data, investor master, pool/MBS registration, boarding",
+  delinquency_recovery:     "Collections, charge-offs, foreclosure, REO, bankruptcy, default servicing, agency delinquency reporting",
+  delinquency_retention:    "Loss mitigation, loan modifications, forbearance, repayment plans, workout, agency workout reporting",
   customer_experience:      "Borrower communications, self-service portal, correspondence, statements",
 };
 
@@ -513,6 +513,8 @@ export const ENTITY_DOMAIN_MAP: Record<string, FieldDomain[]> = {
   insurance_disbursement:         ["escrow"],
 
   // Payments
+  // Investor reporting sub-area: PI pass-through remittance and PI custodial
+  // are downstream of payment collection → owned by Payments, not a separate IR bucket
   payment:                        ["payments"],
   payment_history:                ["payments"],
   payment_transaction:            ["payments"],
@@ -520,22 +522,31 @@ export const ENTITY_DOMAIN_MAP: Record<string, FieldDomain[]> = {
   payment_reversal:               ["payments"],
   suspense:                       ["payments"],
   unapplied_funds:                ["payments"],
+  remittance:                     ["payments"],   // PI pass-through to investors
+  pi_custodial:                   ["payments"],   // Principal & interest custodial account
+
+  // Escrow
+  // Investor reporting sub-area: T&I custodial is escrow's remittance analog
+  ti_custodial:                   ["escrow"],     // Tax & insurance custodial account
 
   // Servicing Infrastructure
+  // Investor reporting sub-area: pool/investor master records and MBS registration
+  // live here — they are reference data, not transactional reporting
   loan:                           ["servicing_infrastructure"],
   loan_master:                    ["servicing_infrastructure"],
   loan_detail:                    ["servicing_infrastructure"],
   interest_rate:                  ["servicing_infrastructure"],
   arm_index:                      ["servicing_infrastructure"],
-  investor:                       ["servicing_infrastructure"],
-  investor_reporting:             ["servicing_infrastructure"],
-  pool:                           ["servicing_infrastructure"],
-  remittance:                     ["servicing_infrastructure"],
+  investor:                       ["servicing_infrastructure"],   // investor master record
+  pool:                           ["servicing_infrastructure"],   // MBS pool / GNMA/FNMA pool setup
+  pool_certification:             ["servicing_infrastructure"],   // agency cert/recert
   insurance:                      ["servicing_infrastructure"],
   hazard_insurance:               ["servicing_infrastructure"],
   pmi:                            ["servicing_infrastructure"],
 
   // Delinquency Recovery
+  // Investor reporting sub-area: delinquency & loss reporting to agencies (GNMA/FNMA)
+  // is owned by the recovery team that generates the underlying data
   foreclosure:                    ["delinquency_recovery"],
   default:                        ["delinquency_recovery"],
   bankruptcy:                     ["delinquency_recovery"],
@@ -544,8 +555,11 @@ export const ENTITY_DOMAIN_MAP: Record<string, FieldDomain[]> = {
   collections:                    ["delinquency_recovery"],
   collection_activity:            ["delinquency_recovery"],
   delinquency:                    ["delinquency_recovery"],
+  agency_delinquency_report:      ["delinquency_recovery"],  // e.g. GNMA default reporting
 
   // Delinquency Retention
+  // Investor reporting sub-area: forbearance/workout reporting to agencies
+  // (e.g. CARES Act reporting, FNMA hardship reporting) → owned by retention
   loss_mitigation:                ["delinquency_retention"],
   loan_modification:              ["delinquency_retention"],
   forbearance:                    ["delinquency_retention"],
@@ -553,6 +567,7 @@ export const ENTITY_DOMAIN_MAP: Record<string, FieldDomain[]> = {
   workout:                        ["delinquency_retention"],
   trial_plan:                     ["delinquency_retention"],
   deferral:                       ["delinquency_retention"],
+  agency_workout_report:          ["delinquency_retention"],  // e.g. FNMA workout reporting
 
   // Customer Experience
   borrower:                       ["customer_experience"],
@@ -569,6 +584,15 @@ export const ENTITY_DOMAIN_MAP: Record<string, FieldDomain[]> = {
   ledger:                         ["payments", "escrow"],
   transaction:                    ["payments", "escrow"],
   transaction_history:            ["payments", "escrow"],
+
+  // investor_reporting is a cross-cutting table if it exists as a single entity.
+  // Fields should be overridden at the field level:
+  //   PI remittance fields           → payments
+  //   T&I custodial/escrow fields    → escrow
+  //   Pool/certification fields      → servicing_infrastructure
+  //   Delinquency reporting fields   → delinquency_recovery
+  //   Workout reporting fields       → delinquency_retention
+  investor_reporting:             ["payments", "escrow", "servicing_infrastructure", "delinquency_recovery", "delinquency_retention"],
 
   // The core loan record has servicing infrastructure as primary but
   // the customer-facing fields (contact info, preferences) belong to
