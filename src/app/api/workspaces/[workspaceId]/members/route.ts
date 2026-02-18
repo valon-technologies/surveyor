@@ -15,6 +15,7 @@ export const GET = withAuth(async (_req, _ctx, { workspaceId }) => {
       image: user.image,
       role: userWorkspace.role,
       team: userWorkspace.team,
+      domains: user.domains,
       joinedAt: userWorkspace.createdAt,
     })
     .from(userWorkspace)

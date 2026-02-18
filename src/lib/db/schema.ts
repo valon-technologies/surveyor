@@ -13,6 +13,9 @@ export const user = sqliteTable("user", {
   emailVerified: text("email_verified"),
   image: text("image"),
   passwordHash: text("password_hash"),
+  // Domain preferences for auto-distribute: subset of FIELD_DOMAINS the
+  // user wants fields assigned from.  null = no preference (receives any).
+  domains: text("domains", { mode: "json" }).$type<string[]>(),
   createdAt: text("created_at").notNull().default(nowDefault),
   updatedAt: text("updated_at").notNull().default(nowDefault),
 });
@@ -197,6 +200,10 @@ export const entity = sqliteTable(
     // Target-only fields
     status: text("status").notNull().default("not_started"), // not_started | in_progress | review | blocked | complete
     sortOrder: integer("sort_order").notNull().default(0),
+    // Primary domain(s) this entity belongs to.  Single-domain entities have
+    // one entry; multi-domain entities (e.g. ledger) have two and rely on
+    // per-field domainTag overrides to resolve the final assignment bucket.
+    domainTags: text("domain_tags", { mode: "json" }).$type<string[]>(),
     metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
@@ -223,6 +230,11 @@ export const field = sqliteTable(
     isKey: integer("is_key", { mode: "boolean" }).notNull().default(false),
     description: text("description"),
     milestone: text("milestone"), // M1 | M2 | M3 | M4
+    // Per-field domain override used for multi-domain entities (e.g. a ledger
+    // field may be "payments" or "escrow" depending on its transaction_type).
+    // When set, this takes precedence over the parent entity's domainTags
+    // during auto-distribution.  null = inherit from entity.
+    domainTag: text("domain_tag"),
     sampleValues: text("sample_values", { mode: "json" }).$type<string[]>(),
     enumValues: text("enum_values", { mode: "json" }).$type<string[]>(),
     sortOrder: integer("sort_order").notNull().default(0),

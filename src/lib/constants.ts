@@ -452,3 +452,130 @@ export type ChatMessageRole = (typeof CHAT_MESSAGE_ROLES)[number];
 
 // ─── Default workspace ───────────────────────────────────────
 export const DEFAULT_WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
+
+// ─── Field Domains (auto-distribute tags) ────────────────────
+// These represent the functional ownership buckets used to match
+// workspace members to fields during auto-distribution.
+export const FIELD_DOMAINS = [
+  "escrow",
+  "payments",
+  "servicing_infrastructure",
+  "delinquency_recovery",
+  "delinquency_retention",
+  "customer_experience",
+] as const;
+export type FieldDomain = (typeof FIELD_DOMAINS)[number];
+
+export const FIELD_DOMAIN_LABELS: Record<FieldDomain, string> = {
+  escrow:                    "Escrow",
+  payments:                  "Payments",
+  servicing_infrastructure:  "Servicing Infrastructure",
+  delinquency_recovery:      "Delinquency Recovery",
+  delinquency_retention:     "Delinquency Retention",
+  customer_experience:       "Customer Experience",
+};
+
+export const FIELD_DOMAIN_DESCRIPTIONS: Record<FieldDomain, string> = {
+  escrow:                   "Escrow account management, tax/insurance disbursements, impound analysis",
+  payments:                 "Payment processing, payment history, transaction ledger (payment side), remittance",
+  servicing_infrastructure: "Core loan administration, loan setup, system plumbing, investor reporting, boarding",
+  delinquency_recovery:     "Collections, charge-offs, foreclosure, REO, bankruptcy, default servicing",
+  delinquency_retention:    "Loss mitigation, loan modifications, forbearance, repayment plans, workout",
+  customer_experience:      "Borrower communications, self-service portal, correspondence, statements",
+};
+
+export const FIELD_DOMAIN_COLORS: Record<FieldDomain, string> = {
+  escrow:                   "#0ea5e9",  // sky-500
+  payments:                 "#10b981",  // emerald-500
+  servicing_infrastructure: "#6366f1",  // indigo-500
+  delinquency_recovery:     "#ef4444",  // red-500
+  delinquency_retention:    "#f59e0b",  // amber-500
+  customer_experience:      "#8b5cf6",  // violet-500
+};
+
+// ─── Entity → Domain mapping ──────────────────────────────────
+// Canonical mapping of known target entity names (lowercased) to
+// their primary domain(s).  Entities with multiple domains signal
+// that individual fields within that entity will need per-field
+// domain overrides (e.g. ledger has both payment and escrow rows).
+//
+// This table is the authoritative seed for the auto-distribute
+// algorithm and can be extended as the schema evolves.
+export const ENTITY_DOMAIN_MAP: Record<string, FieldDomain[]> = {
+  // ── Single-domain entities ──────────────────────────────────
+  // Escrow
+  escrow:                         ["escrow"],
+  escrow_account:                 ["escrow"],
+  escrow_disbursement:            ["escrow"],
+  escrow_analysis:                ["escrow"],
+  escrow_shortage:                ["escrow"],
+  tax_disbursement:               ["escrow"],
+  insurance_disbursement:         ["escrow"],
+
+  // Payments
+  payment:                        ["payments"],
+  payment_history:                ["payments"],
+  payment_transaction:            ["payments"],
+  scheduled_payment:              ["payments"],
+  payment_reversal:               ["payments"],
+  suspense:                       ["payments"],
+  unapplied_funds:                ["payments"],
+
+  // Servicing Infrastructure
+  loan:                           ["servicing_infrastructure"],
+  loan_master:                    ["servicing_infrastructure"],
+  loan_detail:                    ["servicing_infrastructure"],
+  interest_rate:                  ["servicing_infrastructure"],
+  arm_index:                      ["servicing_infrastructure"],
+  investor:                       ["servicing_infrastructure"],
+  investor_reporting:             ["servicing_infrastructure"],
+  pool:                           ["servicing_infrastructure"],
+  remittance:                     ["servicing_infrastructure"],
+  insurance:                      ["servicing_infrastructure"],
+  hazard_insurance:               ["servicing_infrastructure"],
+  pmi:                            ["servicing_infrastructure"],
+
+  // Delinquency Recovery
+  foreclosure:                    ["delinquency_recovery"],
+  default:                        ["delinquency_recovery"],
+  bankruptcy:                     ["delinquency_recovery"],
+  reo:                            ["delinquency_recovery"],
+  charge_off:                     ["delinquency_recovery"],
+  collections:                    ["delinquency_recovery"],
+  collection_activity:            ["delinquency_recovery"],
+  delinquency:                    ["delinquency_recovery"],
+
+  // Delinquency Retention
+  loss_mitigation:                ["delinquency_retention"],
+  loan_modification:              ["delinquency_retention"],
+  forbearance:                    ["delinquency_retention"],
+  repayment_plan:                 ["delinquency_retention"],
+  workout:                        ["delinquency_retention"],
+  trial_plan:                     ["delinquency_retention"],
+  deferral:                       ["delinquency_retention"],
+
+  // Customer Experience
+  borrower:                       ["customer_experience"],
+  borrower_contact:               ["customer_experience"],
+  correspondence:                 ["customer_experience"],
+  statement:                      ["customer_experience"],
+  portal_activity:                ["customer_experience"],
+  communication_preference:       ["customer_experience"],
+
+  // ── Multi-domain entities (fields require per-field overrides) ─
+  // ledger rows are typed by transaction_type:
+  //   payment-side rows  → payments
+  //   escrow-side rows   → escrow
+  ledger:                         ["payments", "escrow"],
+  transaction:                    ["payments", "escrow"],
+  transaction_history:            ["payments", "escrow"],
+
+  // The core loan record has servicing infrastructure as primary but
+  // the customer-facing fields (contact info, preferences) belong to
+  // customer_experience
+  loan_borrower:                  ["servicing_infrastructure", "customer_experience"],
+
+  // Collections can feed both recovery (charge-off path) and
+  // retention (cure/catch-up path)
+  delinquency_detail:             ["delinquency_recovery", "delinquency_retention"],
+};
