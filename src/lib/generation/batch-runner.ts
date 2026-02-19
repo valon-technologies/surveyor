@@ -286,6 +286,7 @@ async function generateFlatEntity(
     parsed,
     batch,
     workspaceId,
+    userId,
     prepared.generationId,
     batchRunId,
   );
@@ -296,6 +297,7 @@ async function generateFlatEntity(
       gen.validationIssues as unknown as ValidationIssue[] | null,
       batch,
       workspaceId,
+      userId,
       mappingLookup,
       fieldsWithExplicitQuestion,
       resolvedFieldIds,
@@ -582,6 +584,7 @@ function saveMappingsAndQuestions(
   parsed: ParseResult,
   batch: EntityBatch,
   workspaceId: string,
+  userId: string,
   generationId: string,
   batchRunId: string,
 ): {
@@ -660,6 +663,7 @@ function saveMappingsAndQuestions(
         confidence: fm.confidence,
         notes: fm.notes,
         createdBy: "llm",
+        assigneeId: userId,
         generationId,
         batchRunId,
         version: 1,
@@ -721,6 +725,7 @@ function saveMappingsAndQuestions(
           priority: pq.priority,
           targetForTeam: "SM",
           fieldMappingId: lookup?.mappingId ?? null,
+          createdByUserId: userId,
         }).run();
         questionsCreated++;
       } catch (qErr) {
@@ -759,6 +764,7 @@ function saveMappingsAndQuestions(
           priority,
           targetForTeam: "SM",
           fieldMappingId: info.mappingId,
+          createdByUserId: userId,
         }).run();
         questionsCreated++;
       } catch {
@@ -777,6 +783,7 @@ function createValidationQuestions(
   validationIssues: ValidationIssue[] | null,
   batch: EntityBatch,
   workspaceId: string,
+  userId: string,
   mappingLookup: Map<string, { mappingId: string; targetFieldId: string; confidence: string | null; reviewComment: string | null; uncertaintyType: string | null }>,
   fieldsWithExplicitQuestion: Set<string>,
   resolvedFieldIds: Set<string>,
@@ -807,6 +814,7 @@ function createValidationQuestions(
         priority: "high",
         targetForTeam: "SM",
         fieldMappingId: lookup?.mappingId ?? null,
+        createdByUserId: userId,
       }).run();
       questionsCreated++;
     } catch {

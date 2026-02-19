@@ -21,19 +21,9 @@ import {
   AlertTriangle,
   Table,
 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useWorkspace } from "@/lib/hooks/use-workspace";
 
 export function DataPreview({ entityId }: { entityId: string }) {
-  const { data, isLoading, error, isError } = useEntitySampleData(entityId);
-  const queryClient = useQueryClient();
-  const { workspaceId } = useWorkspace();
-
-  const retry = () => {
-    queryClient.invalidateQueries({
-      queryKey: ["sample-data", workspaceId, entityId],
-    });
-  };
+  const { data, isLoading, error, isError, refetch } = useEntitySampleData(entityId);
 
   if (isLoading) {
     return (
@@ -46,16 +36,16 @@ export function DataPreview({ entityId }: { entityId: string }) {
 
   if (isError) {
     const msg = error instanceof Error ? error.message : String(error);
-    return <ErrorState message={msg} onRetry={retry} />;
+    return <ErrorState message={msg} onRetry={() => refetch()} />;
   }
 
   if (!data) return null;
 
   if (data.structureType === "flat") {
-    return <FlatPreview data={data} onRetry={retry} />;
+    return <FlatPreview data={data} onRetry={() => refetch()} />;
   }
 
-  return <AssemblyPreview data={data} onRetry={retry} />;
+  return <AssemblyPreview data={data} onRetry={() => refetch()} />;
 }
 
 function FlatPreview({
@@ -156,7 +146,7 @@ function ComponentPanel({
 }) {
   const [sqlExpanded, setSqlExpanded] = useState(false);
   const columns = comp.result.rows.length > 0
-    ? Object.keys(comp.result.rows[0])
+    ? [...new Set(comp.result.rows.flatMap((r) => Object.keys(r)))]
     : [];
 
   return (

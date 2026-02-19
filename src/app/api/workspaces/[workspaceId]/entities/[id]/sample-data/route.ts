@@ -54,7 +54,18 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     sourceDataset: bqConfig.sourceDataset,
   };
 
-  // 2. Load the entity's latest pipeline (auto-synthesize if missing)
+  // 2. Load the entity (used for name + existence check)
+  const targetEntity = db
+    .select()
+    .from(entityTable)
+    .where(eq(entityTable.id, entityId))
+    .get();
+
+  if (!targetEntity) {
+    return NextResponse.json({ error: "Entity not found" }, { status: 404 });
+  }
+
+  // 3. Load the entity's latest pipeline (auto-synthesize if missing)
   let pipeline = db
     .select()
     .from(entityPipeline)
@@ -68,36 +79,19 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     .get();
 
   if (!pipeline) {
-    const targetEntity = db
-      .select()
-      .from(entityTable)
-      .where(eq(entityTable.id, entityId))
-      .get();
-
-    if (!targetEntity) {
-      return NextResponse.json({ error: "Entity not found" }, { status: 404 });
-    }
-
-    const fieldIds = db
-      .select({ id: field.id })
-      .from(field)
-      .where(eq(field.entityId, entityId))
-      .all()
-      .map((f) => f.id);
-
-    const hasMappings =
-      fieldIds.length > 0 &&
-      db
-        .select({ id: fieldMapping.id, targetFieldId: fieldMapping.targetFieldId })
-        .from(fieldMapping)
-        .where(
-          and(
-            eq(fieldMapping.workspaceId, workspaceId),
-            eq(fieldMapping.isLatest, true)
-          )
+    const hasMappings = !!db
+      .select({ id: fieldMapping.id })
+      .from(fieldMapping)
+      .innerJoin(field, eq(fieldMapping.targetFieldId, field.id))
+      .where(
+        and(
+          eq(field.entityId, entityId),
+          eq(fieldMapping.workspaceId, workspaceId),
+          eq(fieldMapping.isLatest, true)
         )
-        .all()
-        .some((m) => fieldIds.includes(m.targetFieldId));
+      )
+      .limit(1)
+      .get();
 
     if (hasMappings) {
       try {
@@ -159,12 +153,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   // 4. Filter out null/unmapped columns for display
   const mappedColumns = columns.filter((c) => c.transform !== "null");
   const columnNames = mappedColumns.map((c) => c.target_column);
-
-  const entityName = db
-    .select({ name: entityTable.name, displayName: entityTable.displayName })
-    .from(entityTable)
-    .where(eq(entityTable.id, entityId))
-    .get();
+  const displayName = targetEntity.displayName || targetEntity.name;
 
   try {
     if (pipelineWithCols.structureType === "assembly" && pipelineWithCols.concat) {
@@ -266,7 +255,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
 
       return NextResponse.json({
         structureType: "assembly" as const,
-        entityName: entityName?.displayName || entityName?.name || pipeline.tableName,
+        entityName: displayName,
         columns: columnNames,
         components,
       });
@@ -278,7 +267,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
 
       return NextResponse.json({
         structureType: "flat" as const,
-        entityName: entityName?.displayName || entityName?.name || pipeline.tableName,
+        entityName: displayName,
         sql,
         result,
         columns: columnNames.filter((c) => !nullifiedColumns.includes(c)),

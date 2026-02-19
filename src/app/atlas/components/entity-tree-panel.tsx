@@ -17,15 +17,14 @@ interface EntityGroup {
   isAssembly: boolean;
 }
 
-export function EntityTreePanel() {
+interface EntityTreePanelProps {
+  selectedEntityId: string | null;
+  onSelect: (id: string) => void;
+}
+
+export function EntityTreePanel({ selectedEntityId, onSelect }: EntityTreePanelProps) {
   const { data: entities, isLoading } = useEntities({ side: "target" });
-  const {
-    selectedEntityId,
-    selectEntity,
-    searchQuery,
-    setSearchQuery,
-    toggleLeftPanel,
-  } = useAtlasStore();
+  const { searchQuery, setSearchQuery, toggleLeftPanel } = useAtlasStore();
 
   // Build hierarchical groups, then filter by search
   const groups = useMemo<EntityGroup[]>(() => {
@@ -105,7 +104,7 @@ export function EntityTreePanel() {
             return (
               <div key={group.entity.id}>
                 <button
-                  onClick={() => selectEntity(group.entity.id)}
+                  onClick={() => onSelect(group.entity.id)}
                   className={cn(
                     "flex items-center gap-2 w-full px-3 py-2 text-xs rounded-md transition-colors text-left",
                     isSelected
@@ -129,7 +128,7 @@ export function EntityTreePanel() {
                   return (
                     <button
                       key={child.id}
-                      onClick={() => selectEntity(child.id)}
+                      onClick={() => onSelect(child.id)}
                       className={cn(
                         "flex items-center gap-1.5 w-full pl-8 pr-3 py-1.5 text-xs rounded-md transition-colors text-left",
                         childSelected

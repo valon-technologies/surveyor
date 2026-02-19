@@ -974,6 +974,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
         targetFieldId: targetField.id,
         status: "unmapped",
         createdBy: "llm",
+        assigneeId: userId,
         batchRunId,
         version: 1,
         isLatest: true,
@@ -1227,6 +1228,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
         confidence: enriched.confidence as string || null,
         notes: enriched.notes as string || null,
         createdBy: "llm",
+        assigneeId: userId,
         batchRunId,
         updatedAt: msgNow,
       })

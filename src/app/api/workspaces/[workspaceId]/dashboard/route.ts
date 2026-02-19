@@ -10,7 +10,7 @@ import {
   chatSession,
   evaluation,
 } from "@/lib/db/schema";
-import { eq, and, sql, count, notInArray } from "drizzle-orm";
+import { eq, and, sql, count, notInArray, inArray } from "drizzle-orm";
 import { MILESTONES } from "@/lib/constants";
 import type {
   LeaderboardEntry,
@@ -199,7 +199,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       }
     }
 
-    const mappedCount = statusCounts["accepted"] || 0;
+    const mappedCount = (statusCounts["accepted"] || 0) + (statusCounts["excluded"] || 0);
 
     const openQs = db
       .select({ cnt: count() })
@@ -261,7 +261,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       total += r.cnt;
     }
 
-    const mapped = statusBreakdown["accepted"] || 0;
+    const mapped = (statusBreakdown["accepted"] || 0) + (statusBreakdown["excluded"] || 0);
 
     return {
       milestone: m,
@@ -331,7 +331,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
     .where(
       and(
         eq(fieldMapping.workspaceId, workspaceId),
-        eq(fieldMapping.status, "accepted"),
+        inArray(fieldMapping.status, ["accepted", "excluded"]),
         eq(fieldMapping.isLatest, true),
         sql`${fieldMapping.assigneeId} IS NOT NULL`
       )

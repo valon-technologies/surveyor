@@ -138,6 +138,8 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
           mappingType: "not_applicable",
           reasoning: `SM answer: ${answerText}`,
           notes: `Auto-excluded from resolved question (${updated.id})`,
+          assigneeId: userId,
+          editedBy: authorName,
           updatedAt: now,
         })
         .where(eq(fieldMapping.id, updated.fieldMappingId))

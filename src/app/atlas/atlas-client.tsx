@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAtlasStore } from "@/stores/atlas-store";
 import { useEntity } from "@/queries/entity-queries";
@@ -10,23 +10,20 @@ import { DataPreview } from "./components/data-preview";
 import { AtlasEmptySelection } from "./components/atlas-empty";
 import { Button } from "@/components/ui/button";
 import { Globe, PanelLeftOpen, ChevronRight, ExternalLink } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export function AtlasClient() {
   const searchParams = useSearchParams();
-  const {
-    leftPanelCollapsed,
-    toggleLeftPanel,
-    selectedEntityId,
-    selectEntity,
-  } = useAtlasStore();
+  const router = useRouter();
+  const { leftPanelCollapsed, toggleLeftPanel } = useAtlasStore();
 
-  useEffect(() => {
-    const entityId = searchParams.get("entityId");
-    if (entityId) {
-      selectEntity(entityId);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const entityId = searchParams.get("entityId");
+
+  const selectEntity = useCallback(
+    (id: string) => {
+      router.replace(`/atlas?entityId=${id}`, { scroll: false });
+    },
+    [router]
+  );
 
   return (
     <div className="h-full flex flex-col">
@@ -34,11 +31,11 @@ export function AtlasClient() {
       <div className="border-b px-4 py-2 flex items-center gap-3 shrink-0">
         <Globe className="h-4 w-4 text-primary" />
         <span className="font-semibold text-sm">Atlas</span>
-        <Breadcrumb entityId={selectedEntityId} />
+        <Breadcrumb entityId={entityId} />
         <div className="flex-1" />
-        {selectedEntityId && (
+        {entityId && (
           <Link
-            href={`/mapping?entityId=${selectedEntityId}`}
+            href={`/mapping?entityId=${entityId}`}
             className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             <ExternalLink className="h-3.5 w-3.5" />
@@ -52,7 +49,10 @@ export function AtlasClient() {
         {/* Left panel */}
         {!leftPanelCollapsed ? (
           <div className="w-80 border-r bg-background shrink-0 overflow-hidden flex flex-col">
-            <EntityTreePanel />
+            <EntityTreePanel
+              selectedEntityId={entityId}
+              onSelect={selectEntity}
+            />
           </div>
         ) : (
           <div className="border-r shrink-0">
@@ -69,8 +69,8 @@ export function AtlasClient() {
         )}
 
         {/* Data preview area */}
-        {selectedEntityId ? (
-          <DataPreview entityId={selectedEntityId} />
+        {entityId ? (
+          <DataPreview entityId={entityId} />
         ) : (
           <AtlasEmptySelection />
         )}

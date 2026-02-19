@@ -9,6 +9,13 @@ import type {
  * Defensively extract a string from a value that may be an object
  * (e.g. when LLM-generated YAML stores join.right as {alias:"fi", pipe_file:{table:"X"}}).
  */
+/** Escape a value for use inside a SQL single-quoted string literal.
+ *  Uses backslash escaping (\') rather than doubling ('') to avoid
+ *  BigQuery interpreting ''' as a triple-quoted string delimiter. */
+function sqlQuote(val: string): string {
+  return `'${val.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+}
+
 function asString(val: unknown, fallback = ""): string {
   if (typeof val === "string") return val;
   if (val && typeof val === "object") {
@@ -150,7 +157,7 @@ function renderColumn(col: PipelineColumn, _ctxAlias?: string): string {
   if (col.transform === "hash_id" && col.hash_columns?.length) {
     const parts = col.hash_columns.map((c) => {
       // Bare names (no dot) are entity-name literals for collision avoidance — quote them
-      if (!c.includes(".")) return `'${c}'`;
+      if (!c.includes(".")) return sqlQuote(c);
       return `CAST(${c} AS STRING)`;
     });
     return `TO_HEX(MD5(CONCAT(${parts.join(", '|', ")}))) AS ${target}`;
@@ -159,7 +166,7 @@ function renderColumn(col: PipelineColumn, _ctxAlias?: string): string {
   // Literal
   if (col.source && typeof col.source === "object" && !Array.isArray(col.source) && "literal" in col.source) {
     const val = (col.source as Record<string, unknown>).literal;
-    if (typeof val === "string") return `'${val}' AS ${target}`;
+    if (typeof val === "string") return `${sqlQuote(val)} AS ${target}`;
     if (typeof val === "boolean") return `${String(val).toUpperCase()} AS ${target}`;
     return `${val} AS ${target}`;
   }
@@ -191,9 +198,10 @@ function renderJoin(join: PipelineJoin, sources: PipelineSource[]): string {
 
   const onClauses = (Array.isArray(join.on) ? join.on : []).map((clause) => {
     const normalized = typeof clause === "string" ? clause.replace(/==/g, "=") : String(clause);
-    // CAST both sides of equality joins to STRING to prevent INT64 vs STRING mismatches
+    // CAST both sides of equality joins to STRING to prevent INT64 vs STRING mismatches.
+    // Handles: alias.col = alias.col, alias.col = 123, alias.col = 'literal'
     return normalized.replace(
-      /(\w+(?:\.\w+)+)\s*=\s*(\w+(?:\.\w+)+)/g,
+      /(\w+(?:\.\w+)+|\d+|'[^']*')\s*=\s*(\w+(?:\.\w+)+|\d+|'[^']*')/g,
       "CAST($1 AS STRING) = CAST($2 AS STRING)"
     );
   });
@@ -253,7 +261,7 @@ function filterLiteral(val: unknown): string {
   if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
   const s = String(val);
   if (/^-?\d+(\.\d+)?$/.test(s)) return s;
-  return `'${s}'`;
+  return sqlQuote(s);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,16 +353,16 @@ function renderMethod(call: PeeledCall): string | null {
     }
     case "eq": {
       const val = args.replace(/^["']|["']$/g, "");
-      return `${inner} = '${val}'`;
+      return `CAST(${inner} AS STRING) = ${sqlQuote(val)}`;
     }
     case "isin": {
       const listMatch = args.match(/^\[([\s\S]*)\]$/);
       if (listMatch) {
         const vals = splitTopLevel(listMatch[1]).map((v) => {
           const t = v.trim().replace(/^["']|["']$/g, "");
-          return `'${t}'`;
+          return sqlQuote(t);
         });
-        return `${inner} IN (${vals.join(", ")})`;
+        return `CAST(${inner} AS STRING) IN (${vals.join(", ")})`;
       }
       return null;
     }
@@ -375,13 +383,13 @@ function renderMethod(call: PeeledCall): string | null {
         const b = parts[1].trim().replace(/^["']|["']$/g, "");
         // Check for regex=True
         const hasRegex = parts.some((p) => /regex\s*=\s*True/.test(p));
-        if (hasRegex) return `REGEXP_REPLACE(${strInner}, r'${a}', '${b}')`;
-        return `REPLACE(${strInner}, '${a}', '${b}')`;
+        if (hasRegex) return `REGEXP_REPLACE(${strInner}, r${sqlQuote(a)}, ${sqlQuote(b)})`;
+        return `REPLACE(${strInner}, ${sqlQuote(a)}, ${sqlQuote(b)})`;
       }
       return null;
     }
     case "str.contains": {
-      const pattern = args.replace(/^["']|["']$/g, "");
+      const pattern = args.replace(/^["']|["']$/g, "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
       return `${strInner} LIKE '%${pattern}%'`;
     }
     case "str.len":
@@ -509,8 +517,11 @@ export function pandasToSql(expr: string): string {
     return `/* pandas: ${sql} */ NULL`;
   }
 
-  // 5. Bare reference or already-SQL — passthrough
-  return sql;
+  // 5. Normalize Python == to SQL = for bare comparisons
+  const normalized = sql.replace(/==/g, "=");
+
+  // 6. Bare reference or already-SQL — passthrough
+  return normalized;
 }
 
 // ---------------------------------------------------------------------------
@@ -546,12 +557,8 @@ function renderMap(subject: string, entriesStr: string): string {
   while ((match = entryRegex.exec(entriesStr)) !== null) {
     const key = match[1].trim();
     const val = convertValue(match[2].trim());
-    // Numeric keys don't get quoted
-    if (/^-?\d+(\.\d+)?$/.test(key)) {
-      lines.push(`  WHEN ${inner} = ${key} THEN ${val}`);
-    } else {
-      lines.push(`  WHEN ${inner} = '${key}' THEN ${val}`);
-    }
+    // Always compare as STRING to prevent INT64 vs STRING mismatches
+    lines.push(`  WHEN CAST(${inner} AS STRING) = ${sqlQuote(key)} THEN ${val}`);
   }
   lines.push("END");
   return lines.join("\n");
@@ -746,7 +753,7 @@ function convertValue(val: string): string {
   if (v === "False" || v === "false") return "FALSE";
   // Already quoted string
   if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
-    return `'${v.slice(1, -1)}'`;
+    return sqlQuote(v.slice(1, -1));
   }
   // Number
   if (/^-?\d+(\.\d+)?$/.test(v)) return v;

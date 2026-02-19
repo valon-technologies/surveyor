@@ -141,6 +141,11 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
   // Use client-provided status if explicitly set, otherwise auto-compute
   const finalStatus = updateData.status ?? computeStatusOnSave(existing.status);
 
+  // Auto-assign the acting user when status changes to a reviewed state
+  if (finalStatus !== existing.status && updateData.assigneeId === undefined) {
+    updateData.assigneeId = userId;
+  }
+
   // Generate change summary
   const changeSummary = generateChangeSummary(
     existing as unknown as Record<string, unknown>,

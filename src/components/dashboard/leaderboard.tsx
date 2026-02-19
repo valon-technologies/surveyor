@@ -8,7 +8,7 @@ export function Leaderboard({ data }: { data: LeaderboardData }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <LeaderboardCard
-        title="Most Mapped"
+        title="Most Reviewed"
         icon={CheckCircle}
         entries={data.mostMapped}
         emptyMessage="No accepted mappings yet"
