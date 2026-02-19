@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { question, questionReply, user } from "@/lib/db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { createQuestionReplySchema } from "@/lib/validators/question";
 
 export const GET = withAuth(async (req, ctx, { workspaceId }) => {
@@ -69,10 +69,10 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
     .returning()
     .all();
 
-  // Increment reply count
+  // Atomic increment — avoids stale read-modify-write under concurrency
   db.update(question)
     .set({
-      replyCount: q.replyCount + 1,
+      replyCount: sql`${question.replyCount} + 1`,
       updatedAt: new Date().toISOString(),
     })
     .where(eq(question.id, id))

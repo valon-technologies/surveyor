@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
-import { db } from "@/lib/db";
+import { db, withTransaction } from "@/lib/db";
 import { schemaAsset, entity, field } from "@/lib/db/schema";
 import { eq, and, count, isNull } from "drizzle-orm";
 import { createSchemaAssetSchema } from "@/lib/validators/schema";
@@ -98,20 +98,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
 
   const input = parsed.data;
 
-  // Create schema asset
-  const [asset] = db
-    .insert(schemaAsset)
-    .values({
-      workspaceId,
-      name: input.name,
-      side: input.side,
-      description: input.description,
-      sourceFile: input.sourceFile,
-      format: input.format,
-      rawContent: input.rawContent,
-    })
-    .returning()
-    .all();
+  let asset: typeof schemaAsset.$inferSelect;
 
   // Parse CSV into entities + fields
   if (input.format === "csv" || !input.format) {
@@ -119,18 +106,65 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
       const parsedEntities = parseCSVSchema(input.rawContent, input.name, {
         deduplicateFields: input.side === "target",
       });
-      insertEntities(parsedEntities, asset.id, workspaceId, input.side);
+
+      // Transaction: create asset + insert all entities/fields atomically
+      asset = withTransaction(() => {
+        const [a] = db
+          .insert(schemaAsset)
+          .values({
+            workspaceId,
+            name: input.name,
+            side: input.side,
+            description: input.description,
+            sourceFile: input.sourceFile,
+            format: input.format,
+            rawContent: input.rawContent,
+          })
+          .returning()
+          .all();
+
+        insertEntities(parsedEntities, a.id, workspaceId, input.side);
+        return a;
+      });
     } catch (err) {
-      // Still return the asset even if parsing fails — rawContent is saved
+      // Parsing failed — still save the asset with rawContent
+      const [fallbackAsset] = db
+        .insert(schemaAsset)
+        .values({
+          workspaceId,
+          name: input.name,
+          side: input.side,
+          description: input.description,
+          sourceFile: input.sourceFile,
+          format: input.format,
+          rawContent: input.rawContent,
+        })
+        .returning()
+        .all();
+
       return NextResponse.json(
-        { ...asset, parseError: (err as Error).message },
-        { status: 201 }
+        { ...fallbackAsset, parseError: (err as Error).message },
+        { status: 201 },
       );
     }
   }
 
-  // Parse PDF via Claude extraction
+  // Parse PDF via Claude extraction (async — can't be in sync transaction)
   else if (input.format === "pdf") {
+    [asset] = db
+      .insert(schemaAsset)
+      .values({
+        workspaceId,
+        name: input.name,
+        side: input.side,
+        description: input.description,
+        sourceFile: input.sourceFile,
+        format: input.format,
+        rawContent: input.rawContent,
+      })
+      .returning()
+      .all();
+
     try {
       const { provider } = resolveProvider(userId, "claude");
       const result = await parsePDFSchema(input.rawContent, input.name, provider);
@@ -156,9 +190,24 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
     } catch (err) {
       return NextResponse.json(
         { ...asset, parseError: (err as Error).message },
-        { status: 201 }
+        { status: 201 },
       );
     }
+  } else {
+    // Unknown format — just create the asset
+    [asset] = db
+      .insert(schemaAsset)
+      .values({
+        workspaceId,
+        name: input.name,
+        side: input.side,
+        description: input.description,
+        sourceFile: input.sourceFile,
+        format: input.format,
+        rawContent: input.rawContent,
+      })
+      .returning()
+      .all();
   }
 
   // Mark all scaffolds as stale since source/target schemas changed

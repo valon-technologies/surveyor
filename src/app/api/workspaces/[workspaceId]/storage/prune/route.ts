@@ -59,10 +59,8 @@ export const POST = withAuth(
       }
     }
 
-    // Reclaim disk space after pruning
-    if (deleted > 0) {
-      sqlite.pragma("vacuum");
-    }
+    // VACUUM requires an exclusive lock that blocks all concurrent reads/writes.
+    // Run manually during maintenance windows: sqlite3 surveyor.db "VACUUM;"
 
     return NextResponse.json({ deleted });
   },

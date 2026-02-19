@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { comment, commentThread } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { createCommentSchema } from "@/lib/validators/thread";
 import { logActivity } from "@/lib/activity/log-activity";
 
@@ -38,10 +38,10 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
     .returning()
     .all();
 
-  // Increment comment count
+  // Atomic increment — avoids stale read-modify-write under concurrency
   db.update(commentThread)
     .set({
-      commentCount: thread.commentCount + 1,
+      commentCount: sql`${commentThread.commentCount} + 1`,
       updatedAt: new Date().toISOString(),
     })
     .where(eq(commentThread.id, threadId))

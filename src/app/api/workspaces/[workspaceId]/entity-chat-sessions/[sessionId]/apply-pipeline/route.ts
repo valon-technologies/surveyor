@@ -3,6 +3,7 @@ import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { chatSession, entityPipeline } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { createPipelineVersion } from "@/lib/db/copy-on-write";
 import { z } from "zod/v4";
 
 const pipelineUpdateSchema = z.object({
@@ -220,36 +221,28 @@ export const POST = withAuth(
 
     const now = new Date().toISOString();
 
-    // Copy-on-write: mark current as not latest
-    db.update(entityPipeline)
-      .set({ isLatest: false, updatedAt: now })
-      .where(eq(entityPipeline.id, current.id))
-      .run();
-
-    // Insert new version
-    db.insert(entityPipeline)
-      .values({
-        workspaceId: current.workspaceId,
-        entityId: current.entityId,
-        version: current.version + 1,
-        parentId: current.id,
-        isLatest: true,
-        yamlSpec: current.yamlSpec, // will be rebuilt on next GET due to isStale
-        tableName: current.tableName,
-        primaryKey: current.primaryKey,
-        sources: newSources,
-        joins: newJoins,
-        concat: newConcat,
-        structureType: newStructureType,
-        isStale: true,
-        generationId: current.generationId,
-        batchRunId: current.batchRunId,
-        editedBy: "entity-chat",
-        changeSummary: update.reasoning,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    // Atomic copy-on-write: mark current not-latest + insert new version
+    createPipelineVersion(current.id, {
+      workspaceId: current.workspaceId,
+      entityId: current.entityId,
+      version: current.version + 1,
+      parentId: current.id,
+      isLatest: true,
+      yamlSpec: current.yamlSpec, // will be rebuilt on next GET due to isStale
+      tableName: current.tableName,
+      primaryKey: current.primaryKey,
+      sources: newSources,
+      joins: newJoins,
+      concat: newConcat,
+      structureType: newStructureType,
+      isStale: true,
+      generationId: current.generationId,
+      batchRunId: current.batchRunId,
+      editedBy: "entity-chat",
+      changeSummary: update.reasoning,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     return NextResponse.json({ success: true, changes });
   },

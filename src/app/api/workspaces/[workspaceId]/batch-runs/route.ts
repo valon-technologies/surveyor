@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { batchRun } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { createBatchRunSchema } from "@/lib/validators/batch-run";
 import { createBatchRun, executeBatchRun } from "@/lib/generation/batch-runner";
 import {
@@ -34,6 +34,25 @@ export const POST = withAuth(
     }
 
     const mode = parsed.data.mode || "single-shot";
+
+    // Guard: prevent concurrent batch runs (avoids duplicate LLM spend)
+    const activeBatch = db
+      .select({ id: batchRun.id })
+      .from(batchRun)
+      .where(
+        and(
+          eq(batchRun.workspaceId, workspaceId),
+          inArray(batchRun.status, ["pending", "running"]),
+        ),
+      )
+      .get();
+
+    if (activeBatch) {
+      return NextResponse.json(
+        { error: "A batch run is already in progress. Please wait for it to complete." },
+        { status: 409 },
+      );
+    }
 
     // Resolve includeStatuses: prefer explicit array, fall back from legacy boolean
     const includeStatuses = parsed.data.includeStatuses

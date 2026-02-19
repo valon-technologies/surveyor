@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { comment, commentThread } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { updateCommentSchema } from "@/lib/validators/thread";
 
 export const PATCH = withAuth(async (req, ctx, { workspaceId }) => {
@@ -41,22 +41,14 @@ export const DELETE = withAuth(async (_req, ctx, { workspaceId }) => {
     .where(and(eq(comment.id, commentId), eq(comment.threadId, threadId)))
     .run();
 
-  // Decrement comment count
-  const thread = db
-    .select()
-    .from(commentThread)
+  // Atomic decrement — avoids stale read-modify-write under concurrency
+  db.update(commentThread)
+    .set({
+      commentCount: sql`MAX(0, ${commentThread.commentCount} - 1)`,
+      updatedAt: new Date().toISOString(),
+    })
     .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId)))
-    .get();
-
-  if (thread) {
-    db.update(commentThread)
-      .set({
-        commentCount: Math.max(0, thread.commentCount - 1),
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(commentThread.id, threadId))
-      .run();
-  }
+    .run();
 
   return NextResponse.json({ success: true });
 }, { requiredRole: "editor" });

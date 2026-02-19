@@ -1,5 +1,6 @@
-import { db } from "@/lib/db";
+import { db, withTransaction } from "@/lib/db";
 import { entity, field, fieldMapping, generation, entityPipeline, skillContext as skillContextTable, context as contextTable, learning, workspace } from "@/lib/db/schema";
+import { createPipelineVersion } from "@/lib/db/copy-on-write";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { assembleContext, matchSkills } from "./context-assembler";
 import { buildPrompt, buildYamlPrompt } from "./prompt-builder";
@@ -78,7 +79,7 @@ export function startGeneration(
 ): { startResult: GenerationStartResult; prepared: PreparedGeneration } {
   const { workspaceId, userId, entityId, fieldIds, preferredProvider } = input;
 
-  // 1. Check for concurrent generation on this entity
+  // 1. Check for concurrent generation on this entity (inside transaction to close TOCTOU)
   const running = db
     .select()
     .from(generation)
@@ -376,28 +377,49 @@ WHEN TO USE TOOLS:
 - Summarize tool results concisely — don't repeat raw data in your output`;
   }
 
-  // 9. Create generation record
+  // 9. Atomic check + create generation record (closes TOCTOU race)
   const generationId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  db.insert(generation)
-    .values({
-      id: generationId,
-      workspaceId,
-      entityId,
-      generationType: input.generationType,
-      status: "running",
-      provider: providerName,
-      model: input.model || null,
-      promptSnapshot: {
-        systemMessage: finalSystemMessage,
-        userMessage,
-        skillsUsed: assembledCtx.skillsUsed.map((s) => s.name),
-      },
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  withTransaction(() => {
+    // Re-check inside transaction — the early check above is just for fast-fail
+    const concurrent = db
+      .select()
+      .from(generation)
+      .where(
+        and(
+          eq(generation.workspaceId, workspaceId),
+          eq(generation.entityId, entityId),
+          eq(generation.status, "running"),
+        ),
+      )
+      .get();
+
+    if (concurrent) {
+      throw new Error(
+        "A generation is already running for this entity. Please wait for it to complete.",
+      );
+    }
+
+    db.insert(generation)
+      .values({
+        id: generationId,
+        workspaceId,
+        entityId,
+        generationType: input.generationType,
+        status: "running",
+        provider: providerName,
+        model: input.model || null,
+        promptSnapshot: {
+          systemMessage: finalSystemMessage,
+          userMessage,
+          skillsUsed: assembledCtx.skillsUsed.map((s) => s.name),
+        },
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+  });
 
   return {
     startResult: {
@@ -472,14 +494,6 @@ export function persistEntityPipeline(opts: {
     )
     .get();
 
-  // Mark old version as not latest
-  if (existing) {
-    db.update(entityPipeline)
-      .set({ isLatest: false, updatedAt: now })
-      .where(eq(entityPipeline.id, existing.id))
-      .run();
-  }
-
   // Extract sources with resolved table names
   const sources = parsed.sources.map((s) => ({
     name: s.name,
@@ -511,27 +525,32 @@ export function persistEntityPipeline(opts: {
 
   const structureType = parsed.concat ? "assembly" : "flat";
 
-  db.insert(entityPipeline)
-    .values({
-      workspaceId,
-      entityId,
-      version: existing ? existing.version + 1 : 1,
-      parentId: existing?.id ?? null,
-      isLatest: true,
-      yamlSpec: yamlResult.yamlOutput,
-      tableName: parsed.table,
-      primaryKey: parsed.primary_key ?? null,
-      sources,
-      joins,
-      concat: parsed.concat as Record<string, unknown> | null ?? null,
-      structureType,
-      isStale: false,
-      generationId,
-      batchRunId: batchRunId ?? null,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  const pipelineValues = {
+    workspaceId,
+    entityId,
+    version: existing ? existing.version + 1 : 1,
+    parentId: existing?.id ?? null,
+    isLatest: true,
+    yamlSpec: yamlResult.yamlOutput,
+    tableName: parsed.table,
+    primaryKey: parsed.primary_key ?? null,
+    sources,
+    joins,
+    concat: parsed.concat as Record<string, unknown> | null ?? null,
+    structureType,
+    isStale: false,
+    generationId,
+    batchRunId: batchRunId ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  if (existing) {
+    // Atomic copy-on-write: mark old not-latest + insert new
+    createPipelineVersion(existing.id, pipelineValues);
+  } else {
+    db.insert(entityPipeline).values(pipelineValues).run();
+  }
 }
 
 const MAX_TOOL_ROUNDS = 5;

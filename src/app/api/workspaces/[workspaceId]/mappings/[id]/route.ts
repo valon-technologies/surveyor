@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
-import { db } from "@/lib/db";
+import { db, withTransaction } from "@/lib/db";
 import { fieldMapping, mappingContext, field, entity, context, userWorkspace, entityPipeline } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { updateMappingSchema } from "@/lib/validators/mapping";
@@ -126,82 +126,90 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const existing = db
-    .select()
-    .from(fieldMapping)
-    .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
-    .get();
+  const { editedBy, ...updateData } = parsed.data;
 
-  if (!existing) {
+  // Transaction: read existing + mark-old + insert-new (prevents duplicate isLatest)
+  const txResult = withTransaction(() => {
+    const existing = db
+      .select()
+      .from(fieldMapping)
+      .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
+      .get();
+
+    if (!existing) return null;
+
+    // Use client-provided status if explicitly set, otherwise auto-compute
+    const finalStatus = updateData.status ?? computeStatusOnSave(existing.status);
+
+    // Auto-assign the acting user when status changes to a reviewed state
+    if (finalStatus !== existing.status && updateData.assigneeId === undefined) {
+      updateData.assigneeId = userId;
+    }
+
+    // Generate change summary
+    const changeSummary = generateChangeSummary(
+      existing as unknown as Record<string, unknown>,
+      { ...updateData, status: finalStatus } as Record<string, unknown>
+    );
+
+    // Get target field for entity context
+    const targetField = db.select().from(field).where(eq(field.id, existing.targetFieldId)).get();
+
+    // Mark existing version as not latest
+    db.update(fieldMapping)
+      .set({ isLatest: false, updatedAt: new Date().toISOString() })
+      .where(eq(fieldMapping.id, id))
+      .run();
+
+    // Create new version (copy-on-write)
+    const [newVersion] = db
+      .insert(fieldMapping)
+      .values({
+        workspaceId: existing.workspaceId,
+        targetFieldId: existing.targetFieldId,
+        status: finalStatus,
+        mappingType: updateData.mappingType !== undefined ? updateData.mappingType : existing.mappingType,
+        assigneeId: updateData.assigneeId !== undefined ? updateData.assigneeId : existing.assigneeId,
+        sourceEntityId: updateData.sourceEntityId !== undefined ? updateData.sourceEntityId : existing.sourceEntityId,
+        sourceFieldId: updateData.sourceFieldId !== undefined ? updateData.sourceFieldId : existing.sourceFieldId,
+        transform: updateData.transform !== undefined ? updateData.transform : existing.transform,
+        defaultValue: updateData.defaultValue !== undefined ? updateData.defaultValue : existing.defaultValue,
+        enumMapping: updateData.enumMapping !== undefined ? updateData.enumMapping : existing.enumMapping,
+        reasoning: updateData.reasoning !== undefined ? updateData.reasoning : existing.reasoning,
+        confidence: updateData.confidence !== undefined ? updateData.confidence : existing.confidence,
+        notes: updateData.notes !== undefined ? updateData.notes : existing.notes,
+        createdBy: existing.createdBy,
+        generationId: existing.generationId,
+        version: existing.version + 1,
+        parentId: existing.id,
+        isLatest: true,
+        editedBy: editedBy || null,
+        changeSummary,
+      })
+      .returning()
+      .all();
+
+    // Mark entity pipeline as stale
+    if (targetField?.entityId) {
+      db.update(entityPipeline)
+        .set({ isStale: true, updatedAt: new Date().toISOString() })
+        .where(
+          and(
+            eq(entityPipeline.entityId, targetField.entityId),
+            eq(entityPipeline.isLatest, true)
+          )
+        )
+        .run();
+    }
+
+    return { newVersion, existing, targetField, finalStatus: finalStatus as string, changeSummary };
+  });
+
+  if (!txResult) {
     return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
   }
 
-  const { editedBy, ...updateData } = parsed.data;
-
-  // Use client-provided status if explicitly set, otherwise auto-compute
-  const finalStatus = updateData.status ?? computeStatusOnSave(existing.status);
-
-  // Auto-assign the acting user when status changes to a reviewed state
-  if (finalStatus !== existing.status && updateData.assigneeId === undefined) {
-    updateData.assigneeId = userId;
-  }
-
-  // Generate change summary
-  const changeSummary = generateChangeSummary(
-    existing as unknown as Record<string, unknown>,
-    { ...updateData, status: finalStatus } as Record<string, unknown>
-  );
-
-  // Get target field for entity context
-  const targetField = db.select().from(field).where(eq(field.id, existing.targetFieldId)).get();
-
-  // Mark existing version as not latest
-  db.update(fieldMapping)
-    .set({ isLatest: false, updatedAt: new Date().toISOString() })
-    .where(eq(fieldMapping.id, id))
-    .run();
-
-  // Create new version (copy-on-write)
-  const [newVersion] = db
-    .insert(fieldMapping)
-    .values({
-      workspaceId: existing.workspaceId,
-      targetFieldId: existing.targetFieldId,
-      status: finalStatus,
-      mappingType: updateData.mappingType !== undefined ? updateData.mappingType : existing.mappingType,
-      assigneeId: updateData.assigneeId !== undefined ? updateData.assigneeId : existing.assigneeId,
-      sourceEntityId: updateData.sourceEntityId !== undefined ? updateData.sourceEntityId : existing.sourceEntityId,
-      sourceFieldId: updateData.sourceFieldId !== undefined ? updateData.sourceFieldId : existing.sourceFieldId,
-      transform: updateData.transform !== undefined ? updateData.transform : existing.transform,
-      defaultValue: updateData.defaultValue !== undefined ? updateData.defaultValue : existing.defaultValue,
-      enumMapping: updateData.enumMapping !== undefined ? updateData.enumMapping : existing.enumMapping,
-      reasoning: updateData.reasoning !== undefined ? updateData.reasoning : existing.reasoning,
-      confidence: updateData.confidence !== undefined ? updateData.confidence : existing.confidence,
-      notes: updateData.notes !== undefined ? updateData.notes : existing.notes,
-      createdBy: existing.createdBy,
-      generationId: existing.generationId,
-      version: existing.version + 1,
-      parentId: existing.id,
-      isLatest: true,
-      editedBy: editedBy || null,
-      changeSummary,
-    })
-    .returning()
-    .all();
-
-  // Mark entity pipeline as stale
-  if (targetField?.entityId) {
-    db.update(entityPipeline)
-      .set({ isStale: true, updatedAt: new Date().toISOString() })
-      .where(
-        and(
-          eq(entityPipeline.entityId, targetField.entityId),
-          eq(entityPipeline.isLatest, true)
-        )
-      )
-      .run();
-  }
-
+  const { newVersion, existing, targetField, finalStatus, changeSummary } = txResult;
   const actorName = editedBy || "Unknown";
 
   // Log mapping_saved activity

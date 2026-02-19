@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { fieldMapping, field } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { logActivity } from "@/lib/activity/log-activity";
+import { createMappingVersion } from "@/lib/db/copy-on-write";
 
 export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
   const params = await ctx.params;
@@ -25,27 +26,16 @@ export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
 
   const targetField = db.select().from(field).where(eq(field.id, existing.targetFieldId)).get();
 
-  // Copy-on-write: mark old as not latest
-  db.update(fieldMapping)
-    .set({ isLatest: false, updatedAt: new Date().toISOString() })
-    .where(eq(fieldMapping.id, id))
-    .run();
-
-  const [newVersion] = db
-    .insert(fieldMapping)
-    .values({
-      ...existing,
-      id: crypto.randomUUID(),
-      status: "unreviewed",
-      version: existing.version + 1,
-      parentId: existing.id,
-      isLatest: true,
-      changeSummary: `status: accepted → unreviewed (case re-opened)`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    })
-    .returning()
-    .all();
+  const newVersion = createMappingVersion(existing.id, {
+    ...existing,
+    id: crypto.randomUUID(),
+    status: "unreviewed",
+    version: existing.version + 1,
+    parentId: existing.id,
+    changeSummary: `status: accepted → unreviewed (case re-opened)`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
 
   logActivity({
     workspaceId,

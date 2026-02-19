@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
-import { db } from "@/lib/db";
+import { db, withTransaction } from "@/lib/db";
 import {
   chatSession,
   chatMessage,
@@ -323,41 +323,42 @@ export const POST = withAuth(
       sourceSchemaStats,
     });
 
-    // Create session (entity-level: no fieldMappingId, no targetFieldId)
+    // Create session + initial system message atomically
     const sessionId = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    db.insert(chatSession)
-      .values({
-        id: sessionId,
-        workspaceId,
-        fieldMappingId: null,
-        targetFieldId: null,
-        entityId,
-        status: "active",
-        messageCount: 1,
-        lastMessageAt: now,
-        createdBy: userId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    const session = withTransaction(() => {
+      db.insert(chatSession)
+        .values({
+          id: sessionId,
+          workspaceId,
+          fieldMappingId: null,
+          targetFieldId: null,
+          entityId,
+          status: "active",
+          messageCount: 1,
+          lastMessageAt: now,
+          createdBy: userId,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
 
-    // Save system message with context
-    db.insert(chatMessage)
-      .values({
-        sessionId,
-        role: "system",
-        content: systemMessage + "\n\n" + contextMessage,
-        createdAt: now,
-      })
-      .run();
+      db.insert(chatMessage)
+        .values({
+          sessionId,
+          role: "system",
+          content: systemMessage + "\n\n" + contextMessage,
+          createdAt: now,
+        })
+        .run();
 
-    const session = db
-      .select()
-      .from(chatSession)
-      .where(eq(chatSession.id, sessionId))
-      .get();
+      return db
+        .select()
+        .from(chatSession)
+        .where(eq(chatSession.id, sessionId))
+        .get();
+    });
 
     return NextResponse.json(session);
   },

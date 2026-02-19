@@ -11,6 +11,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { z } from "zod/v4";
 import { extractMappingLearning } from "@/lib/generation/mapping-learning";
+import { createMappingVersion } from "@/lib/db/copy-on-write";
 import { MAPPING_TYPES, CONFIDENCE_LEVELS } from "@/lib/constants";
 
 const updateItemSchema = z.object({
@@ -170,57 +171,48 @@ export const POST = withAuth(
         }
       }
 
-      // Copy-on-write: mark existing as not latest, set accepted on apply
-      db.update(fieldMapping)
-        .set({ isLatest: false, updatedAt: new Date().toISOString() })
-        .where(eq(fieldMapping.id, existing.id))
-        .run();
-
-      const [newVersion] = db
-        .insert(fieldMapping)
-        .values({
-          workspaceId: existing.workspaceId,
-          targetFieldId: existing.targetFieldId,
-          status: "accepted",
-          mappingType:
-            update.mappingType !== undefined
-              ? update.mappingType
-              : existing.mappingType,
-          assigneeId: existing.assigneeId,
-          sourceEntityId: resolvedSourceEntityId,
-          sourceFieldId: resolvedSourceFieldId,
-          transform:
-            update.transform !== undefined
-              ? update.transform
-              : existing.transform,
-          defaultValue:
-            update.defaultValue !== undefined
-              ? update.defaultValue
-              : existing.defaultValue,
-          enumMapping:
-            update.enumMapping !== undefined
-              ? update.enumMapping
-              : existing.enumMapping,
-          reasoning:
-            update.reasoning !== undefined
-              ? update.reasoning
-              : existing.reasoning,
-          confidence:
-            update.confidence !== undefined
-              ? update.confidence
-              : existing.confidence,
-          notes:
-            update.notes !== undefined ? update.notes : existing.notes,
-          createdBy: existing.createdBy,
-          generationId: existing.generationId,
-          version: existing.version + 1,
-          parentId: existing.id,
-          isLatest: true,
-          editedBy: "entity-chat",
-          changeSummary: `Entity chat bulk update: ${update.reasoning || "no reasoning"}`,
-        })
-        .returning()
-        .all();
+      // Copy-on-write: atomically mark existing not-latest + insert new version
+      const newVersion = createMappingVersion(existing.id, {
+        workspaceId: existing.workspaceId,
+        targetFieldId: existing.targetFieldId,
+        status: "accepted",
+        mappingType:
+          update.mappingType !== undefined
+            ? update.mappingType
+            : existing.mappingType,
+        assigneeId: existing.assigneeId,
+        sourceEntityId: resolvedSourceEntityId,
+        sourceFieldId: resolvedSourceFieldId,
+        transform:
+          update.transform !== undefined
+            ? update.transform
+            : existing.transform,
+        defaultValue:
+          update.defaultValue !== undefined
+            ? update.defaultValue
+            : existing.defaultValue,
+        enumMapping:
+          update.enumMapping !== undefined
+            ? update.enumMapping
+            : existing.enumMapping,
+        reasoning:
+          update.reasoning !== undefined
+            ? update.reasoning
+            : existing.reasoning,
+        confidence:
+          update.confidence !== undefined
+            ? update.confidence
+            : existing.confidence,
+        notes:
+          update.notes !== undefined ? update.notes : existing.notes,
+        createdBy: existing.createdBy,
+        generationId: existing.generationId,
+        version: existing.version + 1,
+        parentId: existing.id,
+        isLatest: true,
+        editedBy: "entity-chat",
+        changeSummary: `Entity chat bulk update: ${update.reasoning || "no reasoning"}`,
+      });
 
       // Extract learning
       extractMappingLearning(

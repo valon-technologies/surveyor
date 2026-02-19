@@ -16,6 +16,7 @@ export function getSqliteDb(): Database.Database {
     _sqlite = new Database(getDbPath());
     _sqlite.pragma("journal_mode = WAL");
     _sqlite.pragma("foreign_keys = ON");
+    _sqlite.pragma("busy_timeout = 5000");
     _db = drizzle(_sqlite, { schema });
   }
   return _sqlite;
@@ -35,5 +36,10 @@ export const db = new Proxy({} as BetterSQLite3Database<typeof schema>, {
     return Reflect.get(getDb(), prop, receiver);
   },
 });
+
+/** Run a callback inside a SQLite IMMEDIATE transaction. */
+export function withTransaction<T>(fn: () => T): T {
+  return getSqliteDb().transaction(fn)();
+}
 
 export type DB = BetterSQLite3Database<typeof schema>;
