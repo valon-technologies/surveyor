@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { SkillList } from "@/components/skills/skill-list";
 import { AssemblySimulator } from "@/components/skills/assembly-simulator";
 import { SignalQueuePanel } from "@/components/forge/signal-queue-panel";
@@ -10,12 +11,23 @@ import { RefreshProposalCard } from "@/components/forge/refresh-proposal-card";
 import { Button } from "@/components/ui/button";
 import { useEntities } from "@/queries/entity-queries";
 import { useSkillRefreshes } from "@/queries/signal-queries";
-import { Plus, Hammer, X } from "lucide-react";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
+import { api, workspacePath } from "@/lib/api-client";
+import { Plus, Hammer, RefreshCw, X } from "lucide-react";
 
 export default function SkillsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { workspaceId } = useWorkspace();
   const [showEntityPicker, setShowEntityPicker] = useState(false);
   const [entitySearch, setEntitySearch] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenResult, setRegenResult] = useState<{
+    total: number;
+    created: number;
+    skipped: number;
+    contextLinks: number;
+  } | null>(null);
   const { data: entities } = useEntities({ side: "target" });
 
   const { data: pendingRefreshes } = useSkillRefreshes("proposed");
@@ -36,6 +48,34 @@ export default function SkillsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            disabled={regenerating}
+            onClick={async () => {
+              if (!window.confirm(
+                "This will rebuild all skills from current schema and context data. Continue?"
+              )) return;
+              setRegenerating(true);
+              setRegenResult(null);
+              try {
+                const result = await api.post<{
+                  total: number;
+                  created: number;
+                  skipped: number;
+                  contextLinks: number;
+                }>(workspacePath(workspaceId, "skills/regenerate"));
+                setRegenResult(result);
+                queryClient.invalidateQueries({ queryKey: ["skills"] });
+              } catch (err) {
+                window.alert(`Regeneration failed: ${(err as Error).message}`);
+              } finally {
+                setRegenerating(false);
+              }
+            }}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${regenerating ? "animate-spin" : ""}`} />
+            {regenerating ? "Regenerating..." : "Regenerate All"}
+          </Button>
           <Button
             variant="outline"
             onClick={() => setShowEntityPicker(!showEntityPicker)}
@@ -97,6 +137,27 @@ export default function SkillsPage() {
               </p>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Regeneration result banner */}
+      {regenResult && (
+        <div className="border rounded-lg p-3 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 flex items-center justify-between">
+          <span className="text-sm text-green-800 dark:text-green-200">
+            Regenerated {regenResult.created} skills with{" "}
+            {regenResult.contextLinks} context links
+            {regenResult.skipped > 0 && (
+              <> ({regenResult.skipped} skipped — no VDS context match)</>
+            )}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => setRegenResult(null)}
+          >
+            <X className="h-3 w-3" />
+          </Button>
         </div>
       )}
 

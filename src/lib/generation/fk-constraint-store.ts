@@ -95,4 +95,15 @@ export class FKConstraintStore {
   hasConstraintsFor(entityName: string): boolean {
     return (this.constraints.get(entityName)?.length ?? 0) > 0;
   }
+
+  /**
+   * Get all stored constraints across all entities.
+   */
+  getAllConstraints(): FKConstraint[] {
+    const result: FKConstraint[] = [];
+    for (const constraints of this.constraints.values()) {
+      result.push(...constraints);
+    }
+    return result;
+  }
 }

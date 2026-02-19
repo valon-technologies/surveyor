@@ -146,6 +146,13 @@ MAPPING CONVENTIONS:
   "hash_id" for PKs, "direct" for FK pass-throughs.
 - UNMAPPABLE FIELDS: If no source column semantically matches and no reasonable derivation exists, set status to "unmapped" — don't force a bad mapping.
 - DEPRECATED FIELDS: If a target field's description indicates it is deprecated, set status to "unmapped", transform to null, confidence to "high", and reasoning to "Field deprecated per VDS documentation". Do NOT generate a question about it.
+- REFERENCE ENTITY DETECTION: When target fields include an FK ending in _id or _sid that references another entity (e.g., mailing_address_sid → address, court_id → court), and you also see sibling target fields that describe attributes of that referenced entity (address line, city, state, zip; court district, court state), apply these rules WITHOUT asking questions:
+  (a) The FK field (e.g., mailing_address_sid) is ALWAYS a hash_id or identity pass-through — map it using the hash pattern from Cross-Entity FK Constraints if available, otherwise use hash_id with the appropriate address/entity key columns.
+  (b) The attribute fields (e.g., billing_address_line1, billing_city) belong to the REFERENCED entity and are mapped THERE, not here. In THIS entity, map them by joining through the FK to the reference entity's staging table. If the reference entity is not yet available as a staging dependency, set these fields to unmapped with reasoning "Mapped in {entity_type} entity — join through {fk_field} when staging dependency is available."
+  (c) Do NOT ask whether to create a separate entity — the answer is always YES. Address fields belong to the address entity. Court fields belong to the court entity. This is a settled architectural pattern.
+  (d) Do NOT ask about hash_columns for the FK — use the pattern from Cross-Entity FK Constraints, or if not available, use the standard hash_address_id / hash_id convention.
+  (e) Source fields like CoMrtgrMailingAddrLine1, BillingAddressLine1, etc. on LoanInfo are inputs to the address entity's hash_id — they are NOT mapped as direct columns in borrower or loan entities.
+  (f) NEVER fabricate attribute columns on the FK table. If LoanInfo has an address FK, the address attributes live on the Address staging table, not LoanInfo.
 
 SELF-REVIEW CHECKLIST (verify before outputting):
 1. Every source field referenced exists in "Available Source Schema" — no invented names
@@ -311,6 +318,7 @@ RULES:
 7. Your entire response must be parseable by a YAML parser — proper indentation, quoting where needed
 8. Use double quotes for strings containing special YAML characters
 9. NEVER use pd, np, or df as source alias prefixes. These are Python runtime globals (pandas, numpy, DataFrame) available ONLY inside expression: fields. Writing "source: pd.FieldName" is WRONG — pd is not a data source. If no source exists, use source: [] with transform: null.
+10. TABLE NAMES ARE NOT FIELDS: The "### TableName" headings in the Available Source Schema are table/source names, NOT columns on other tables. Writing "li.EventDates" is WRONG — EventDates is a table, not a field on LoanInfo. Each source's fields are listed indented below its heading. Only reference fields that are explicitly listed under a source heading.
 
 MAPPING CONVENTIONS:
 - PREFER IDENTITY: Check if the source column already contains data in the correct format before writing expressions. A direct identity mapping is always preferred over a complex transform.
@@ -334,6 +342,9 @@ MAPPING CONVENTIONS:
   a parent entity name, map as identity from the staging dependency. Set transform to
   hash_id for PKs, identity for FK pass-throughs.
 - UNMAPPABLE FIELDS: If no source exists, use source: [] and transform: null — don't force a mapping.
+- DATE FROM BOOLEAN: When the target expects a date/timestamp but the only relevant source is a boolean indicator (Y/N flag), do NOT fabricate a date expression. The boolean tells you IF something happened, not WHEN. Map as transform: null and generate a question asking where the date value should come from. Set confidence: low, not high.
+- REFERENCE ENTITY DETECTION: Sometimes target fields describe attributes of a DIFFERENT entity, not the primary source. Recognize CLUSTERS of target fields that belong to a separate domain object (e.g., billing_address_line1, billing_city, billing_state, billing_zip → all describe an address entity; court_district, court_state → attributes of a court entity). This does NOT apply to ID/key/number fields — those are FK pass-throughs (see ID FIELDS above). Only applies to descriptive attributes (name, state, date, type, etc.) that semantically belong to another entity.
+  WORKFLOW: (a) Recognize the cluster — "These N fields all describe a {entity_type}." (b) Find the FK column in the primary source that links to the reference entity (e.g., mailing_address_sid → address, BankruptcyCourtId → court). (c) Check Available Source Schema for the reference table. (d) If found: add the reference table as a source, join through the FK, and map attribute fields FROM the reference table. (e) If not found: map these fields as unmapped with transform: null and generate a question explaining the missing reference table ("CONTEXT GAP: Fields {field_list} describe a '{entity_type}' entity but no reference table is available in the source schema"). (f) NEVER fabricate attribute columns on the FK table — if LoanInfo has AddressId, it does NOT have AddressLine1; those live on the Address table.
 
 OPTIONAL QUESTIONS SECTION: After the columns section, you may include a questions section for uncertainties:
 

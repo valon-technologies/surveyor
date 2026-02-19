@@ -1,4 +1,3 @@
-import yaml from "js-yaml";
 import { db } from "@/lib/db";
 import {
   entity,
@@ -29,8 +28,7 @@ import {
 } from "@/lib/bigquery/tool-executor";
 import { runQuery } from "@/lib/bigquery/gestalt-client";
 import { buildKey, getCached, setCached } from "@/lib/bigquery/prefetch-cache";
-import { renderExecutableSql, parseBadColumnRefs, type BqSqlConfig } from "@/lib/pipeline/sql-renderer";
-import type { PipelineColumn, EntityPipelineWithColumns } from "@/types/pipeline";
+import { verifyAndCorrectPipeline } from "./pipeline-verifier";
 import {
   getSourceSchemaToolDefinition,
   executeSourceSchemaSearch,
@@ -49,157 +47,6 @@ import {
   type SiblingMappingsInput,
   type MappingExamplesInput,
 } from "@/lib/rag";
-
-// ─── Post-Entity SQL Validation ─────────────────────────────────
-
-/**
- * After pipeline synthesis, render the YAML to SQL, execute against BigQuery,
- * and record validation status on the entityPipeline record.
- */
-async function validatePipelineSql(
-  workspaceId: string,
-  entityId: string,
-  bqConfig: BigQueryConfig,
-): Promise<void> {
-  const pipeline = db
-    .select()
-    .from(entityPipeline)
-    .where(
-      and(eq(entityPipeline.entityId, entityId), eq(entityPipeline.isLatest, true))
-    )
-    .get();
-
-  if (!pipeline) return;
-
-  const now = new Date().toISOString();
-
-  try {
-    // Parse columns from YAML spec
-    const parsed = yaml.load(pipeline.yamlSpec) as Record<string, unknown>;
-    const columns = (parsed?.columns as PipelineColumn[]) ?? [];
-
-    if (columns.length === 0) {
-      db.update(entityPipeline)
-        .set({ sqlValidationStatus: "skipped", sqlValidationAt: now, updatedAt: now })
-        .where(eq(entityPipeline.id, pipeline.id))
-        .run();
-      return;
-    }
-
-    // Build enriched pipeline for SQL renderer
-    const enriched: EntityPipelineWithColumns = {
-      id: pipeline.id,
-      workspaceId: pipeline.workspaceId,
-      entityId: pipeline.entityId,
-      version: pipeline.version,
-      parentId: pipeline.parentId,
-      isLatest: pipeline.isLatest,
-      yamlSpec: pipeline.yamlSpec,
-      tableName: pipeline.tableName,
-      primaryKey: pipeline.primaryKey,
-      sources: pipeline.sources as EntityPipelineWithColumns["sources"],
-      joins: pipeline.joins as EntityPipelineWithColumns["joins"],
-      concat: pipeline.concat as EntityPipelineWithColumns["concat"],
-      structureType: pipeline.structureType as "flat" | "assembly",
-      isStale: pipeline.isStale,
-      sqlValidationStatus: pipeline.sqlValidationStatus ?? null,
-      sqlValidationError: pipeline.sqlValidationError ?? null,
-      sqlValidationAt: pipeline.sqlValidationAt ?? null,
-      generationId: pipeline.generationId,
-      batchRunId: pipeline.batchRunId,
-      editedBy: pipeline.editedBy,
-      changeSummary: pipeline.changeSummary,
-      createdAt: pipeline.createdAt,
-      updatedAt: pipeline.updatedAt,
-      columns,
-    };
-
-    const sqlConfig: BqSqlConfig = {
-      projectId: bqConfig.projectId,
-      sourceDataset: bqConfig.sourceDataset,
-    };
-
-    const sql = renderExecutableSql(enriched, sqlConfig, 5);
-
-    // Execute against BigQuery
-    const result = await runQuery(bqConfig.projectId, sql, 5);
-
-    // Success
-    db.update(entityPipeline)
-      .set({
-        sqlValidationStatus: "passed",
-        sqlValidationError: null,
-        sqlValidationAt: now,
-        updatedAt: now,
-      })
-      .where(eq(entityPipeline.id, pipeline.id))
-      .run();
-
-    console.log(`[bulk-chat] SQL validation passed for entity ${entityId}`);
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-
-    // Check for column-not-found errors
-    const badRefs = parseBadColumnRefs(errorMessage);
-    if (badRefs.length > 0) {
-      console.log(
-        `[bulk-chat] SQL validation found bad column refs for entity ${entityId}:`,
-        badRefs,
-      );
-
-      // Flag specific field mappings as needs_review
-      for (const ref of badRefs) {
-        const colName = ref.split(".").pop();
-        if (!colName) continue;
-
-        // Find the field mapping that references this column
-        const entityFields = db
-          .select({ id: field.id, name: field.name })
-          .from(field)
-          .where(eq(field.entityId, entityId))
-          .all();
-
-        for (const f of entityFields) {
-          const fm = db
-            .select()
-            .from(fieldMapping)
-            .where(
-              and(
-                eq(fieldMapping.targetFieldId, f.id),
-                eq(fieldMapping.workspaceId, workspaceId),
-                eq(fieldMapping.isLatest, true),
-              )
-            )
-            .get();
-
-          // Check if this mapping's transform/source references the bad column
-          if (fm && (fm.transform?.includes(colName) || fm.notes?.includes(colName))) {
-            db.update(fieldMapping)
-              .set({
-                status: "needs_discussion",
-                notes: `SQL validation error: column "${ref}" not found. ${fm.notes || ""}`.trim(),
-                updatedAt: now,
-              })
-              .where(eq(fieldMapping.id, fm.id))
-              .run();
-          }
-        }
-      }
-    }
-
-    db.update(entityPipeline)
-      .set({
-        sqlValidationStatus: "failed",
-        sqlValidationError: errorMessage.slice(0, 2000),
-        sqlValidationAt: now,
-        updatedAt: now,
-      })
-      .where(eq(entityPipeline.id, pipeline.id))
-      .run();
-
-    console.warn(`[bulk-chat] SQL validation failed for entity ${entityId}:`, errorMessage.slice(0, 200));
-  }
-}
 
 // ─── Constants ─────────────────────────────────────────────────
 
@@ -464,13 +311,26 @@ export async function executeBulkChatRun(
               batchRunId,
             });
 
-            // Post-entity SQL validation against BigQuery
+            // Post-entity SQL verification with auto-correction
             if (bqConfig) {
               try {
-                await validatePipelineSql(workspaceId, batch.entityId, bqConfig);
+                const verifyResult = await verifyAndCorrectPipeline({
+                  workspaceId,
+                  entityId: batch.entityId,
+                  entityName: batch.entityName,
+                  bqConfig: { projectId: bqConfig.projectId, sourceDataset: bqConfig.sourceDataset },
+                  batchRunId,
+                  userId,
+                });
+                if (verifyResult.status !== "passed" && verifyResult.status !== "skipped") {
+                  console.log(
+                    `[bulk-chat] SQL verification for "${batch.entityName}": ${verifyResult.status}`,
+                    verifyResult.correctedColumns || verifyResult.flaggedColumns || "",
+                  );
+                }
               } catch (valErr) {
                 console.warn(
-                  `[bulk-chat] SQL validation error for "${batch.entityName}":`,
+                  `[bulk-chat] SQL verification error for "${batch.entityName}":`,
                   valErr instanceof Error ? valErr.message : valErr
                 );
               }

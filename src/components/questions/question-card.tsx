@@ -344,6 +344,8 @@ export function QuestionCard({ question: q }: QuestionCardProps) {
 
             {/* Reply count + resolved info */}
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+              <span>{timeAgo(q.createdAt)}</span>
+              <span className="text-muted-foreground/40">·</span>
               <button
                 className="flex items-center gap-1 hover:text-foreground transition-colors"
                 onClick={() => setExpanded(!expanded)}

@@ -36,6 +36,7 @@ interface RunGenerationInput {
   model?: string;
   outputFormat?: "json" | "yaml";
   bqConfig?: BigQueryConfig;
+  fkConstraints?: import("./fk-constraint-store").FKConstraint[];
 }
 
 interface RunGenerationResult {
@@ -347,6 +348,7 @@ export function startGeneration(
     sourceSchema,
     workspaceRules: workspaceRules.length > 0 ? workspaceRules : undefined,
     workspaceId,
+    fkConstraints: input.fkConstraints,
   });
 
   // 8. Optionally attach tool instructions to the system message when BQ is available

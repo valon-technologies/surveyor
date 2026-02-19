@@ -714,8 +714,56 @@ export function nullifyBadColumns(
   return { pipeline: { ...pipeline, columns }, nullified };
 }
 
+// ---------------------------------------------------------------------------
+// BQ error diagnosis
+// ---------------------------------------------------------------------------
+
+export interface BqErrorDiagnosis {
+  type: "column_not_found" | "table_not_found" | "type_mismatch" | "syntax" | "unknown";
+  badRefs: string[];       // for column_not_found: ["li.EventDates"]
+  badTables: string[];     // for table_not_found: ["NonExistentTable"]
+  rawError: string;
+}
+
+/**
+ * Classify a BigQuery error message into an actionable diagnosis.
+ * Only `column_not_found` and `table_not_found` are correctable by LLM.
+ */
+export function diagnoseBqError(errorMessage: string): BqErrorDiagnosis {
+  const raw = errorMessage;
+
+  // Column not found: "Name X not found inside Y"
+  const badRefs = parseBadColumnRefs(raw);
+  if (badRefs.length > 0) {
+    return { type: "column_not_found", badRefs, badTables: [], rawError: raw };
+  }
+
+  // Table not found: "Not found: Table project.dataset.TableName"
+  const tableNotFound: string[] = [];
+  const tableRe = /Not found:\s*Table\s+[`]?([^`\s]+)[`]?/gi;
+  let tm;
+  while ((tm = tableRe.exec(raw)) !== null) {
+    tableNotFound.push(tm[1]);
+  }
+  if (tableNotFound.length > 0) {
+    return { type: "table_not_found", badRefs: [], badTables: tableNotFound, rawError: raw };
+  }
+
+  // Type mismatch: "No matching signature for ..." or "Cannot coerce"
+  if (/No matching signature|Cannot coerce|type mismatch/i.test(raw)) {
+    return { type: "type_mismatch", badRefs: [], badTables: [], rawError: raw };
+  }
+
+  // Syntax errors
+  if (/Syntax error|Unexpected keyword|Expected end of input/i.test(raw)) {
+    return { type: "syntax", badRefs: [], badTables: [], rawError: raw };
+  }
+
+  return { type: "unknown", badRefs: [], badTables: [], rawError: raw };
+}
+
 /** Collect all alias.column references from a pipeline column */
-function collectColumnRefs(col: PipelineColumn): string[] {
+export function collectColumnRefs(col: PipelineColumn): string[] {
   const refs: string[] = [];
   // Identity source
   if (typeof col.source === "string" && col.source.includes(".")) {

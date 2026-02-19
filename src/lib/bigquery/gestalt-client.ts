@@ -134,6 +134,36 @@ export async function testConnection(
   }
 }
 
+// ─── SQL Validation (dry run) ─────────────────────────────────
+
+export interface DryRunResult {
+  valid: boolean;
+  error?: string;
+  totalBytesProcessed?: number;
+}
+
+/**
+ * Validate SQL via BigQuery dry run — zero cost, no row scanning.
+ * Catches nonexistent tables, nonexistent fields, type mismatches,
+ * and syntax errors without executing the query.
+ */
+export async function dryRunQuery(
+  projectId: string,
+  sql: string,
+): Promise<DryRunResult> {
+  try {
+    const bq = new BigQuery({ projectId });
+    const [job] = await bq.createQueryJob({ query: sql, dryRun: true });
+    const totalBytesProcessed = Number(
+      job.metadata?.statistics?.totalBytesProcessed ?? 0,
+    );
+    return { valid: true, totalBytesProcessed };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { valid: false, error: message };
+  }
+}
+
 // ─── SQL Queries (via ADC / @google-cloud/bigquery) ──────────
 
 export interface QueryResult {

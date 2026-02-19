@@ -122,4 +122,13 @@ export const GOLD_FORMAT_PITFALLS = `
    entity name literal. Don't include timestamps unless they're part of the natural key.
    Don't include derived fields. The entity name literal (last element) MUST be a bare
    string without a dot (e.g., "BANK_ACCOUNT", not an alias.field reference).
+
+10. TABLE NAME AS FIELD: Source table names (e.g., "EventDates", "LoanInfo") are NOT fields on other
+    tables. If you write "li.EventDates", you are referencing a table name as if it were a column —
+    this is ALWAYS wrong. Only use field names explicitly listed under each "### TableName" heading.
+
+11. DATE FROM BOOLEAN: When the target expects a date/timestamp but the source only has a boolean
+    indicator (Y/N, 1/0), do NOT fabricate a date from an unrelated source. Map as transform: null
+    and generate a question asking where the date value should come from. A boolean flag does not
+    contain temporal information — inventing a date expression is always incorrect.
 `;

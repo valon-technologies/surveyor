@@ -33,6 +33,8 @@ interface SourceSchemaStats {
   tableCount: number;
   fieldCount: number;
   primarySource?: string;
+  /** All source table names — needed for pipeline-structure-update proposals */
+  tableNames?: string[];
 }
 
 export interface EntityChatPromptInput {
@@ -107,6 +109,8 @@ Available actions:
 - addSources / removeSources: Add new source tables or remove by alias
 - addJoins / removeJoins / updateJoins: Modify join graph
 - concat: Set union config or null to remove
+
+CRITICAL: When using addSources, you MUST provide real table names from the available source tables listed in the context. All three fields (name, alias, table) are required. Use \`search_source_schema\` to verify table names before proposing. Never leave name or table as null/undefined.
 
 IMPORTANT: After a structure change, field mappings may need updating to reference the new sources. Propose both a pipeline-structure-update AND entity-mapping-updates in the same message when appropriate.
 
@@ -349,6 +353,11 @@ Call multiple tools in a single turn when possible.`;
     parts.push(
       `${sourceSchemaStats.tableCount} source tables with ${sourceSchemaStats.fieldCount} total fields.${primaryNote} Use \`search_source_schema\` to find relevant fields.`
     );
+
+    // Include table names so the LLM can reference them in pipeline-structure-update proposals
+    if (sourceSchemaStats.tableNames?.length) {
+      parts.push(`\nAvailable source tables: ${sourceSchemaStats.tableNames.join(", ")}`);
+    }
   }
 
   return {

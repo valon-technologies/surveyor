@@ -160,7 +160,7 @@ export const POST = withAuth(
 
     // Source schema stats (RAG mode)
     let sourceSchemaStats:
-      | { tableCount: number; fieldCount: number; primarySource?: string }
+      | { tableCount: number; fieldCount: number; primarySource?: string; tableNames?: string[] }
       | undefined;
 
     if (ragEnabled) {
@@ -176,6 +176,7 @@ export const POST = withAuth(
       sourceSchemaStats = {
         tableCount: sourceEntities.length,
         fieldCount: totalFields,
+        tableNames: sourceEntities.map((se) => se.displayName || se.name),
       };
       // Derive primary source from field mappings
       const sourceCounts = new Map<string, number>();

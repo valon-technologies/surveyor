@@ -5,6 +5,7 @@ import { context } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createContextSchema } from "@/lib/validators/context";
 import { invalidateWorkspaceContextCache } from "@/lib/generation/context-cache";
+import { emitSignal } from "@/lib/generation/skill-signals";
 
 export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const searchParams = req.nextUrl.searchParams;
@@ -61,5 +62,18 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
     .all();
 
   invalidateWorkspaceContextCache(workspaceId);
+
+  try {
+    emitSignal({
+      workspaceId,
+      signalType: "context_added",
+      summary: `Context "${input.name}" created`,
+      sourceId: created.id,
+      sourceType: "context",
+    });
+  } catch {
+    // Non-critical — signal queue will catch up
+  }
+
   return NextResponse.json(created, { status: 201 });
 }, { requiredRole: "editor" });

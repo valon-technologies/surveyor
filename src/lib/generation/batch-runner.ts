@@ -19,6 +19,7 @@ import { buildDependencyGraph } from "./dependency-graph";
 import { selectStrategy } from "./strategy-selector";
 import { extractFKConstraints } from "./pattern-transfer";
 import { FKConstraintStore } from "./fk-constraint-store";
+import { verifyAndCorrectPipeline } from "./pipeline-verifier";
 
 interface BatchRunInput {
   workspaceId: string;
@@ -247,6 +248,7 @@ async function generateFlatEntity(
   preferredProvider?: "claude" | "openai",
   model?: string,
   bqConfig?: BigQueryConfig,
+  fkConstraints?: import("./fk-constraint-store").FKConstraint[],
 ): Promise<{ fieldsCompleted: number }> {
   const { prepared } = startGeneration({
     workspaceId,
@@ -257,6 +259,7 @@ async function generateFlatEntity(
     model,
     outputFormat,
     bqConfig,
+    fkConstraints,
   });
 
   // Link generation to batch run
@@ -318,6 +321,31 @@ async function generateFlatEntity(
           generationId: prepared.generationId,
           batchRunId,
         });
+
+        // Post-generation SQL verification with auto-correction
+        if (bqConfig) {
+          try {
+            const verifyResult = await verifyAndCorrectPipeline({
+              workspaceId,
+              entityId: batch.entityId,
+              entityName: batch.entityName,
+              bqConfig: { projectId: bqConfig.projectId, sourceDataset: bqConfig.sourceDataset },
+              generationId: prepared.generationId,
+              batchRunId,
+              userId,
+              preferredProvider,
+              model,
+            });
+            if (verifyResult.status !== "passed" && verifyResult.status !== "skipped") {
+              console.log(
+                `[batch] SQL verification for "${batch.entityName}": ${verifyResult.status}`,
+                verifyResult.correctedColumns || verifyResult.flaggedColumns || "",
+              );
+            }
+          } catch (verifyErr) {
+            console.warn(`[batch] SQL verification error for "${batch.entityName}":`, verifyErr);
+          }
+        }
       }
     } catch (pipelineErr) {
       console.warn(`[batch] Failed to persist pipeline for "${batch.entityName}":`, pipelineErr);
@@ -346,6 +374,7 @@ async function generateAssemblyEntity(
   preferredProvider?: "claude" | "openai",
   model?: string,
   bqConfig?: BigQueryConfig,
+  fkConstraints?: import("./fk-constraint-store").FKConstraint[],
 ): Promise<{ fieldsCompleted: number }> {
   let totalFields = 0;
 
@@ -445,6 +474,7 @@ async function generateAssemblyEntity(
         preferredProvider,
         model,
         bqConfig,
+        fkConstraints,
       );
       totalFields += result.fieldsCompleted;
     } catch (compErr) {
@@ -481,6 +511,31 @@ async function generateAssemblyEntity(
         batchRunId,
       });
       console.log(`[batch] Persisted assembly pipeline for "${batch.entityName}"`);
+
+      // Post-generation SQL verification for assembly pipeline
+      if (bqConfig) {
+        try {
+          const verifyResult = await verifyAndCorrectPipeline({
+            workspaceId,
+            entityId: batch.entityId,
+            entityName: batch.entityName,
+            bqConfig: { projectId: bqConfig.projectId, sourceDataset: bqConfig.sourceDataset },
+            generationId: batchRunId,
+            batchRunId,
+            userId,
+            preferredProvider,
+            model,
+          });
+          if (verifyResult.status !== "passed" && verifyResult.status !== "skipped") {
+            console.log(
+              `[batch] Assembly SQL verification for "${batch.entityName}": ${verifyResult.status}`,
+              verifyResult.correctedColumns || verifyResult.flaggedColumns || "",
+            );
+          }
+        } catch (verifyErr) {
+          console.warn(`[batch] Assembly SQL verification error for "${batch.entityName}":`, verifyErr);
+        }
+      }
     }
   } catch (assemblyErr) {
     console.warn(`[batch] Assembly pipeline generation failed for "${batch.entityName}":`, assemblyErr);
@@ -601,7 +656,10 @@ function saveMappingsAndQuestions(
     uncertaintyType: string | null;
   }>();
 
-  // Build set of field IDs that already have resolved answers — skip question creation for these.
+  // Build set of field IDs that already have resolved OR dismissed answers — skip question
+  // creation for these. Dismissed questions indicate a human already decided the question
+  // is not worth asking; resolved questions have an actual answer. Both should prevent
+  // the LLM from re-asking the same question on subsequent batch runs.
   // Also check sibling component entities (same parentEntityId) since assembly components
   // share the same field names and a resolution on one sibling applies to all.
   const siblingEntityIds = getSiblingEntityIds(workspaceId, batch.entityId);
@@ -613,9 +671,8 @@ function saveMappingsAndQuestions(
     .where(
       and(
         inArray(question.entityId, entityIdsToCheck),
-        eq(question.status, "resolved"),
+        inArray(question.status, ["resolved", "dismissed"]),
         sql`${question.fieldId} IS NOT NULL`,
-        sql`${question.answer} IS NOT NULL`,
       )
     )
     .all();
@@ -1017,6 +1074,7 @@ export async function executeBatchRun(
               );
 
               // Two-pass assembly generation
+              const accumulatedConstraints = fkStore.getAllConstraints();
               const result = await generateAssemblyEntity(
                 batch,
                 components,
@@ -1027,6 +1085,7 @@ export async function executeBatchRun(
                 preferredProvider,
                 model,
                 bqConfig,
+                accumulatedConstraints.length > 0 ? accumulatedConstraints : undefined,
               );
               completedFields += result.fieldsCompleted;
               completedEntities++;
@@ -1057,6 +1116,7 @@ export async function executeBatchRun(
         }
 
         // Flat entity generation (default path)
+        const accumulatedFKConstraints = fkStore.getAllConstraints();
         const result = await generateFlatEntity(
           batch,
           workspaceId,
@@ -1066,6 +1126,7 @@ export async function executeBatchRun(
           preferredProvider,
           model,
           bqConfig,
+          accumulatedFKConstraints.length > 0 ? accumulatedFKConstraints : undefined,
         );
         completedFields += result.fieldsCompleted;
         completedEntities++;

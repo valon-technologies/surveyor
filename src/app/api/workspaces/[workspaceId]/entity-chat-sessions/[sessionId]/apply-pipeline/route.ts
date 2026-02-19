@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { chatSession, entityPipeline } from "@/lib/db/schema";
+import { chatSession, entity, field, entityPipeline } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createPipelineVersion } from "@/lib/db/copy-on-write";
 import { z } from "zod/v4";
@@ -46,7 +46,7 @@ const pipelineUpdateSchema = z.object({
     concat: z
       .union([z.object({ sources: z.array(z.string()) }), z.null()])
       .optional(),
-    reasoning: z.string(),
+    reasoning: z.string().optional().default("Pipeline structure update"),
   }),
 });
 
@@ -83,8 +83,22 @@ export const POST = withAuth(
     }
 
     const body = await req.json();
+
+    // Normalize LLM output: the gold-format YAML uses `staging: { table }`,
+    // so the LLM sometimes mirrors that instead of the flat `{ table }` we expect.
+    if (body?.update?.addSources && Array.isArray(body.update.addSources)) {
+      for (const src of body.update.addSources) {
+        if (!src.table && src.staging?.table) {
+          src.table = src.staging.table;
+          delete src.staging;
+        }
+      }
+    }
+
     const parsed = pipelineUpdateSchema.safeParse(body);
     if (!parsed.success) {
+      console.error("[apply-pipeline] Zod validation failed:", JSON.stringify(parsed.error.issues, null, 2));
+      console.error("[apply-pipeline] Body received:", JSON.stringify(body, null, 2));
       return NextResponse.json(
         { error: parsed.error.message },
         { status: 400 }
@@ -129,12 +143,14 @@ export const POST = withAuth(
       newStructureType = update.structureType;
     }
 
-    // addSources
+    // addSources — track which ones are truly new for child entity creation
+    const addedSources: PipelineSource[] = [];
     if (update.addSources) {
       for (const src of update.addSources) {
         const exists = newSources.some((s) => s.alias === src.alias);
         if (!exists) {
           newSources.push(src);
+          addedSources.push(src);
           changes.push(`Add source: ${src.name} as ${src.alias}`);
         }
       }
@@ -244,7 +260,113 @@ export const POST = withAuth(
       updatedAt: now,
     });
 
-    return NextResponse.json({ success: true, changes });
+    // Auto-create child component entities for newly added assembly sources
+    const createdEntities: string[] = [];
+    if (
+      newStructureType === "assembly" &&
+      addedSources.length > 0
+    ) {
+      // Load parent entity for schemaAssetId and fields
+      const parentEntity = db
+        .select()
+        .from(entity)
+        .where(eq(entity.id, session.entityId))
+        .get();
+
+      if (parentEntity) {
+        const parentFields = db
+          .select()
+          .from(field)
+          .where(eq(field.entityId, session.entityId))
+          .all();
+
+        for (const src of addedSources) {
+          // Skip if child entity already exists
+          const existing = db
+            .select()
+            .from(entity)
+            .where(
+              and(
+                eq(entity.workspaceId, workspaceId),
+                eq(entity.name, src.name)
+              )
+            )
+            .get();
+
+          if (existing) continue;
+
+          const compEntityId = crypto.randomUUID();
+          const displayName = src.name
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+
+          // Create child entity
+          db.insert(entity)
+            .values({
+              id: compEntityId,
+              workspaceId,
+              schemaAssetId: parentEntity.schemaAssetId,
+              name: src.name,
+              displayName,
+              side: "target",
+              description: `Component of ${parentEntity.name}: ${src.name}`,
+              parentEntityId: session.entityId,
+              createdAt: now,
+              updatedAt: now,
+            })
+            .run();
+
+          // Clone fields from parent
+          for (const pf of parentFields) {
+            db.insert(field)
+              .values({
+                entityId: compEntityId,
+                name: pf.name,
+                dataType: pf.dataType,
+                isRequired: pf.isRequired,
+                isKey: pf.isKey,
+                description: pf.description,
+                enumValues: pf.enumValues,
+                sampleValues: pf.sampleValues,
+                sortOrder: pf.sortOrder,
+              })
+              .run();
+          }
+
+          // Create stub flat pipeline
+          db.insert(entityPipeline)
+            .values({
+              workspaceId,
+              entityId: compEntityId,
+              version: 1,
+              isLatest: true,
+              yamlSpec: "",
+              tableName: src.table,
+              sources: [{ name: src.name, alias: src.alias, table: src.table }],
+              joins: null,
+              concat: null,
+              structureType: "flat",
+              isStale: true,
+              editedBy: "entity-chat",
+              changeSummary: `Auto-created from assembly source "${src.name}"`,
+              createdAt: now,
+              updatedAt: now,
+            })
+            .run();
+
+          createdEntities.push(src.name);
+          changes.push(`Created child entity: ${src.name}`);
+        }
+
+        if (createdEntities.length > 0) {
+          console.log(
+            `[apply-pipeline] Created ${createdEntities.length} child entities: ${createdEntities.join(", ")}`
+          );
+        }
+      }
+    }
+
+    return NextResponse.json({ success: true, changes, createdEntities });
   },
   { requiredRole: "editor" }
 );
