@@ -208,14 +208,6 @@ export default function StoragePage() {
         onPrune={handlePrune}
       />
 
-      {/* VACUUM note */}
-      <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950 p-4">
-        <p className="text-sm text-amber-800 dark:text-amber-200">
-          <strong>Note:</strong> SQLite does not reclaim disk space until you run{" "}
-          <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded text-xs">VACUUM</code>.
-          After pruning, run <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded text-xs">sqlite3 surveyor.db &quot;VACUUM;&quot;</code> from the project root to shrink the database file.
-        </p>
-      </div>
     </div>
   );
 }

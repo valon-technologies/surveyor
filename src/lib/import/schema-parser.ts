@@ -72,7 +72,7 @@ export function parseCSVSchema(rawContent: string, fallbackEntityName: string, o
   const sampleCol = findCol(["sample", "sample_values", "examples", "example"]);
   const enumCol = findCol(["enum", "enum_values", "values", "allowed_values"]);
   const displayCol = findCol(["display_name", "display", "label"]);
-  const milestoneCol = findCol(["milestone", "phase", "delivery"]);
+  const milestoneCol = findCol(["milestone", "phase", "delivery", "sdt_field_type", "sdt"]);
 
   // Fallback: if no field/column header detected, treat each CSV header as a field name.
   // This handles "column-list" CSVs where headers ARE the field names (e.g. "InvestorId,CategoryCode,...")
@@ -150,8 +150,8 @@ function parseMilestone(val: string | undefined): string | undefined {
   // Extract M1/M2/M3/M4 from values like "M1 - SDT", "M2", etc.
   const match = trimmed.match(/^(M[1-4])\b/i);
   if (match) return match[1].toUpperCase();
-  // "Not required" variants → NR
-  if (/not\s+required/i.test(trimmed)) return "NR";
+  // "Not required" / "N/A" variants → NR
+  if (/not\s+required/i.test(trimmed) || /^n\/?a$/i.test(trimmed)) return "NR";
   return undefined;
 }
 

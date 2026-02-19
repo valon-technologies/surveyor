@@ -59,6 +59,11 @@ export const POST = withAuth(
       }
     }
 
+    // Reclaim disk space after pruning
+    if (deleted > 0) {
+      sqlite.pragma("vacuum");
+    }
+
     return NextResponse.json({ deleted });
   },
   { requiredRole: "owner" }
