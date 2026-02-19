@@ -6,10 +6,10 @@ import Link from "next/link";
 import { useAtlasStore } from "@/stores/atlas-store";
 import { useEntity } from "@/queries/entity-queries";
 import { EntityTreePanel } from "./components/entity-tree-panel";
-import { ReasoningInspector } from "./components/reasoning-inspector";
+import { DataPreview } from "./components/data-preview";
 import { AtlasEmptySelection } from "./components/atlas-empty";
 import { Button } from "@/components/ui/button";
-import { Globe, PanelLeftOpen, ChevronRight, ExternalLink, Waypoints } from "lucide-react";
+import { Globe, PanelLeftOpen, ChevronRight, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function AtlasClient() {
@@ -18,25 +18,13 @@ export function AtlasClient() {
     leftPanelCollapsed,
     toggleLeftPanel,
     selectedEntityId,
-    selectedFieldId,
-    selectedMappingId,
-    hydrateFromParams,
+    selectEntity,
   } = useAtlasStore();
 
   useEffect(() => {
     const entityId = searchParams.get("entityId");
-    const fieldId = searchParams.get("fieldId");
-    const mappingId = searchParams.get("mappingId");
-    const from = searchParams.get("from");
-    const fromEntity = searchParams.get("fromEntityId");
-    if (entityId || from) {
-      hydrateFromParams({
-        entityId: entityId || undefined,
-        fieldId: fieldId || undefined,
-        mappingId: mappingId || undefined,
-        from: from || undefined,
-        fromEntityId: fromEntity || undefined,
-      });
+    if (entityId) {
+      selectEntity(entityId);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -46,20 +34,8 @@ export function AtlasClient() {
       <div className="border-b px-4 py-2 flex items-center gap-3 shrink-0">
         <Globe className="h-4 w-4 text-primary" />
         <span className="font-semibold text-sm">Atlas</span>
-        <Breadcrumb
-          entityId={selectedEntityId}
-          fieldId={selectedFieldId}
-        />
+        <Breadcrumb entityId={selectedEntityId} />
         <div className="flex-1" />
-        {selectedMappingId && selectedEntityId && selectedFieldId && (
-          <Link
-            href={`/topology?entityId=${selectedEntityId}&fieldId=${selectedFieldId}&mappingId=${selectedMappingId}`}
-            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Waypoints className="h-3.5 w-3.5" />
-            View in Topology
-          </Link>
-        )}
         {selectedEntityId && (
           <Link
             href={`/mapping?entityId=${selectedEntityId}`}
@@ -92,9 +68,9 @@ export function AtlasClient() {
           </div>
         )}
 
-        {/* Inspector area */}
-        {selectedMappingId ? (
-          <ReasoningInspector mappingId={selectedMappingId} />
+        {/* Data preview area */}
+        {selectedEntityId ? (
+          <DataPreview entityId={selectedEntityId} />
         ) : (
           <AtlasEmptySelection />
         )}
@@ -103,33 +79,17 @@ export function AtlasClient() {
   );
 }
 
-function Breadcrumb({
-  entityId,
-  fieldId,
-}: {
-  entityId: string | null;
-  fieldId: string | null;
-}) {
+function Breadcrumb({ entityId }: { entityId: string | null }) {
   const { data: entity } = useEntity(entityId || undefined);
 
   if (!entityId || !entity) return null;
 
-  const field = fieldId
-    ? entity.fields.find((f) => f.id === fieldId)
-    : null;
-
   return (
     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <ChevronRight className="h-3 w-3" />
-      <span>{entity.displayName || entity.name}</span>
-      {field && (
-        <>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground font-medium">
-            {field.displayName || field.name}
-          </span>
-        </>
-      )}
+      <span className="text-foreground font-medium">
+        {entity.displayName || entity.name}
+      </span>
     </div>
   );
 }

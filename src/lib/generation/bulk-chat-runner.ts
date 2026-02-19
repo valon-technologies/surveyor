@@ -1,3 +1,4 @@
+import yaml from "js-yaml";
 import { db } from "@/lib/db";
 import {
   entity,
@@ -17,7 +18,7 @@ import type { MappingStatus } from "@/lib/constants";
 import { synthesizePipelineFromMappings } from "./pipeline-synthesizer";
 import { extractAndPersistContextGaps } from "./context-gap-extractor";
 import { assembleContext } from "./context-assembler";
-import { buildChatPrompt } from "./chat-prompt-builder";
+import { buildChatPrompt, injectBaselineData, type SourceDataPreview } from "./chat-prompt-builder";
 import { resolveProvider, getTokenBudget } from "./provider-resolver";
 import type { ToolDefinition, ToolCall } from "@/lib/llm/provider";
 import type { BigQueryConfig } from "@/types/workspace";
@@ -26,6 +27,10 @@ import {
   executeBigQueryTool,
   formatToolResultForLLM,
 } from "@/lib/bigquery/tool-executor";
+import { runQuery } from "@/lib/bigquery/gestalt-client";
+import { buildKey, getCached, setCached } from "@/lib/bigquery/prefetch-cache";
+import { renderExecutableSql, parseBadColumnRefs, type BqSqlConfig } from "@/lib/pipeline/sql-renderer";
+import type { PipelineColumn, EntityPipelineWithColumns } from "@/types/pipeline";
 import {
   getSourceSchemaToolDefinition,
   executeSourceSchemaSearch,
@@ -44,6 +49,157 @@ import {
   type SiblingMappingsInput,
   type MappingExamplesInput,
 } from "@/lib/rag";
+
+// ─── Post-Entity SQL Validation ─────────────────────────────────
+
+/**
+ * After pipeline synthesis, render the YAML to SQL, execute against BigQuery,
+ * and record validation status on the entityPipeline record.
+ */
+async function validatePipelineSql(
+  workspaceId: string,
+  entityId: string,
+  bqConfig: BigQueryConfig,
+): Promise<void> {
+  const pipeline = db
+    .select()
+    .from(entityPipeline)
+    .where(
+      and(eq(entityPipeline.entityId, entityId), eq(entityPipeline.isLatest, true))
+    )
+    .get();
+
+  if (!pipeline) return;
+
+  const now = new Date().toISOString();
+
+  try {
+    // Parse columns from YAML spec
+    const parsed = yaml.load(pipeline.yamlSpec) as Record<string, unknown>;
+    const columns = (parsed?.columns as PipelineColumn[]) ?? [];
+
+    if (columns.length === 0) {
+      db.update(entityPipeline)
+        .set({ sqlValidationStatus: "skipped", sqlValidationAt: now, updatedAt: now })
+        .where(eq(entityPipeline.id, pipeline.id))
+        .run();
+      return;
+    }
+
+    // Build enriched pipeline for SQL renderer
+    const enriched: EntityPipelineWithColumns = {
+      id: pipeline.id,
+      workspaceId: pipeline.workspaceId,
+      entityId: pipeline.entityId,
+      version: pipeline.version,
+      parentId: pipeline.parentId,
+      isLatest: pipeline.isLatest,
+      yamlSpec: pipeline.yamlSpec,
+      tableName: pipeline.tableName,
+      primaryKey: pipeline.primaryKey,
+      sources: pipeline.sources as EntityPipelineWithColumns["sources"],
+      joins: pipeline.joins as EntityPipelineWithColumns["joins"],
+      concat: pipeline.concat as EntityPipelineWithColumns["concat"],
+      structureType: pipeline.structureType as "flat" | "assembly",
+      isStale: pipeline.isStale,
+      sqlValidationStatus: pipeline.sqlValidationStatus ?? null,
+      sqlValidationError: pipeline.sqlValidationError ?? null,
+      sqlValidationAt: pipeline.sqlValidationAt ?? null,
+      generationId: pipeline.generationId,
+      batchRunId: pipeline.batchRunId,
+      editedBy: pipeline.editedBy,
+      changeSummary: pipeline.changeSummary,
+      createdAt: pipeline.createdAt,
+      updatedAt: pipeline.updatedAt,
+      columns,
+    };
+
+    const sqlConfig: BqSqlConfig = {
+      projectId: bqConfig.projectId,
+      sourceDataset: bqConfig.sourceDataset,
+    };
+
+    const sql = renderExecutableSql(enriched, sqlConfig, 5);
+
+    // Execute against BigQuery
+    const result = await runQuery(bqConfig.projectId, sql, 5);
+
+    // Success
+    db.update(entityPipeline)
+      .set({
+        sqlValidationStatus: "passed",
+        sqlValidationError: null,
+        sqlValidationAt: now,
+        updatedAt: now,
+      })
+      .where(eq(entityPipeline.id, pipeline.id))
+      .run();
+
+    console.log(`[bulk-chat] SQL validation passed for entity ${entityId}`);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+
+    // Check for column-not-found errors
+    const badRefs = parseBadColumnRefs(errorMessage);
+    if (badRefs.length > 0) {
+      console.log(
+        `[bulk-chat] SQL validation found bad column refs for entity ${entityId}:`,
+        badRefs,
+      );
+
+      // Flag specific field mappings as needs_review
+      for (const ref of badRefs) {
+        const colName = ref.split(".").pop();
+        if (!colName) continue;
+
+        // Find the field mapping that references this column
+        const entityFields = db
+          .select({ id: field.id, name: field.name })
+          .from(field)
+          .where(eq(field.entityId, entityId))
+          .all();
+
+        for (const f of entityFields) {
+          const fm = db
+            .select()
+            .from(fieldMapping)
+            .where(
+              and(
+                eq(fieldMapping.targetFieldId, f.id),
+                eq(fieldMapping.workspaceId, workspaceId),
+                eq(fieldMapping.isLatest, true),
+              )
+            )
+            .get();
+
+          // Check if this mapping's transform/source references the bad column
+          if (fm && (fm.transform?.includes(colName) || fm.notes?.includes(colName))) {
+            db.update(fieldMapping)
+              .set({
+                status: "needs_discussion",
+                notes: `SQL validation error: column "${ref}" not found. ${fm.notes || ""}`.trim(),
+                updatedAt: now,
+              })
+              .where(eq(fieldMapping.id, fm.id))
+              .run();
+          }
+        }
+      }
+    }
+
+    db.update(entityPipeline)
+      .set({
+        sqlValidationStatus: "failed",
+        sqlValidationError: errorMessage.slice(0, 2000),
+        sqlValidationAt: now,
+        updatedAt: now,
+      })
+      .where(eq(entityPipeline.id, pipeline.id))
+      .run();
+
+    console.warn(`[bulk-chat] SQL validation failed for entity ${entityId}:`, errorMessage.slice(0, 200));
+  }
+}
 
 // ─── Constants ─────────────────────────────────────────────────
 
@@ -217,6 +373,13 @@ export async function executeBulkChatRun(
       .run();
 
     for (const batch of entities) {
+      // Check for cancellation before each entity
+      const currentRun = db.select({ status: batchRun.status }).from(batchRun).where(eq(batchRun.id, batchRunId)).get();
+      if (currentRun?.status === "cancelled") {
+        console.log(`[bulk-chat] Run ${batchRunId} cancelled, stopping after ${completedEntities} entities`);
+        break;
+      }
+
       let entityFieldsCompleted = 0;
       let entityFieldsFailed = 0;
 
@@ -300,6 +463,18 @@ export async function executeBulkChatRun(
               entityName: batch.entityName,
               batchRunId,
             });
+
+            // Post-entity SQL validation against BigQuery
+            if (bqConfig) {
+              try {
+                await validatePipelineSql(workspaceId, batch.entityId, bqConfig);
+              } catch (valErr) {
+                console.warn(
+                  `[bulk-chat] SQL validation error for "${batch.entityName}":`,
+                  valErr instanceof Error ? valErr.message : valErr
+                );
+              }
+            }
           } catch (pipelineErr) {
             console.warn(
               `[bulk-chat] Pipeline synthesis failed for "${batch.entityName}":`,
@@ -331,10 +506,15 @@ export async function executeBulkChatRun(
       }
     }
 
-    // Mark as completed
+    // Mark as completed (preserve "cancelled" status if set)
+    const finalCheck = db.select({ status: batchRun.status }).from(batchRun).where(eq(batchRun.id, batchRunId)).get();
+    const finalStatus = finalCheck?.status === "cancelled"
+      ? "cancelled"
+      : failedEntities === entities.length ? "failed" : "completed";
+
     db.update(batchRun)
       .set({
-        status: failedEntities === entities.length ? "failed" : "completed",
+        status: finalStatus,
         completedEntities,
         failedEntities,
         completedFields,
@@ -517,6 +697,94 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
     }
   }
 
+  // ── Pre-flight BQ data enrichment ──────────────────────────────
+  // Run 1-2 targeted BQ queries per field to pre-load data awareness
+  let preflightBaseline: SourceDataPreview | null = null;
+  let baselineDataPreloaded = false;
+
+  if (bqConfig && primarySource) {
+    const { projectId, sourceDataset } = bqConfig;
+    const BQ_TIMEOUT = 3000; // 3-second timeout per query
+
+    // Derive candidate source column name from target field
+    // Try exact match, then camelCase variant
+    const candidateCol = targetField.name;
+    const camelCol = targetField.name
+      .split("_")
+      .map((w, i) => (i === 0 ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+      .join("");
+
+    try {
+      const promises: Promise<void>[] = [];
+      let nullRateResult: { rows?: Record<string, unknown>[] } | null = null;
+      let distinctResult: { rows?: Record<string, unknown>[] } | null = null;
+
+      // Check cache first
+      const nullKey = buildKey(projectId, sourceDataset, primarySource, "nullrate", camelCol);
+      const distinctKey = buildKey(projectId, sourceDataset, primarySource, "distinct", camelCol);
+      const cachedNull = getCached(nullKey);
+      const cachedDistinct = getCached(distinctKey);
+
+      // Query 1: Null rate + distinct count on the candidate column
+      if (!cachedNull) {
+        const nullSql = `SELECT COUNT(*) as total, COUNT(${camelCol}) as non_null, COUNT(DISTINCT ${camelCol}) as distinct_vals FROM \`${projectId}.${sourceDataset}.${primarySource}\` LIMIT 1`;
+        promises.push(
+          Promise.race([
+            runQuery(projectId, nullSql, 1)
+              .then((data) => {
+                nullRateResult = data as { rows?: Record<string, unknown>[] };
+                setCached(nullKey, data);
+              }),
+            new Promise<void>((_, reject) => setTimeout(() => reject(new Error("timeout")), BQ_TIMEOUT)),
+          ]).catch(() => { /* skip on failure */ })
+        );
+      } else {
+        nullRateResult = cachedNull.data as { rows?: Record<string, unknown>[] } | null;
+      }
+
+      // Query 2: For enum target fields, get distinct values with counts
+      const isEnumField = targetField.enumValues && targetField.enumValues.length > 0;
+      if (isEnumField) {
+        if (!cachedDistinct) {
+          const distinctSql = `SELECT ${camelCol}, COUNT(*) as cnt FROM \`${projectId}.${sourceDataset}.${primarySource}\` WHERE ${camelCol} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 25`;
+          promises.push(
+            Promise.race([
+              runQuery(projectId, distinctSql, 25)
+                .then((data) => {
+                  distinctResult = data as { rows?: Record<string, unknown>[] };
+                  setCached(distinctKey, data);
+                }),
+              new Promise<void>((_, reject) => setTimeout(() => reject(new Error("timeout")), BQ_TIMEOUT)),
+            ]).catch(() => { /* skip on failure */ })
+          );
+        } else {
+          distinctResult = cachedDistinct.data as { rows?: Record<string, unknown>[] } | null;
+        }
+      }
+
+      await Promise.allSettled(promises);
+
+      // Assemble pre-flight data
+      if (nullRateResult?.rows?.[0] || distinctResult?.rows) {
+        const row = nullRateResult?.rows?.[0];
+        preflightBaseline = {
+          tableName: primarySource,
+          rowCount: row ? Number(row.total ?? 0) : 0,
+          sampleRows: [], // Don't duplicate sample rows
+          fieldProfile: {
+            fieldName: camelCol,
+            totalRows: row ? Number(row.total ?? 0) : undefined,
+            nullCount: row ? Number(row.total ?? 0) - Number(row.non_null ?? 0) : undefined,
+            distinctValues: distinctResult?.rows?.map((r) => r[camelCol] ?? r.val) ?? undefined,
+          },
+        };
+        baselineDataPreloaded = true;
+      }
+    } catch {
+      // Pre-flight is best-effort — continue without it
+    }
+  }
+
   // Entity learnings
   const structuredLearnings = db
     .select({ content: learning.content, fieldName: learning.fieldName, scope: learning.scope })
@@ -551,6 +819,21 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
       });
     }
   }
+
+  // Load workspace-scoped rules for prompt injection
+  const workspaceRules = db
+    .select({ content: learning.content })
+    .from(learning)
+    .where(
+      and(
+        eq(learning.workspaceId, workspaceId),
+        eq(learning.scope, "workspace")
+      )
+    )
+    .orderBy(desc(learning.createdAt))
+    .limit(20)
+    .all()
+    .map((l) => l.content);
 
   // Entity pipeline structure
   let entityStructure:
@@ -653,6 +936,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
     bigqueryDataset: bqConfig
       ? `${bqConfig.projectId}.${bqConfig.sourceDataset}`
       : undefined,
+    baselineDataPreloaded,
     entityStructure,
     pipelineYamlSpec: pipeline?.yamlSpec ?? undefined,
     ragEnabled: true,
@@ -663,7 +947,15 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
     },
     unmatchedPipelineSources: unmatchedPipelineSources.length > 0 ? unmatchedPipelineSources : undefined,
     answeredQuestions: answeredQs.length > 0 ? answeredQs : undefined,
+    workspaceRules: workspaceRules.length > 0 ? workspaceRules : undefined,
+    workspaceId,
   });
+
+  // Inject pre-flight baseline data into context message if available
+  let finalContextMessage = contextMessage;
+  if (preflightBaseline && baselineDataPreloaded) {
+    finalContextMessage = injectBaselineData(contextMessage, preflightBaseline);
+  }
 
   // ── 3. Create chat session ───────────────────────────────────
 
@@ -708,7 +1000,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
     .run();
 
   // Save system message
-  const fullSystemMessage = systemMessage + "\n\n" + contextMessage;
+  const fullSystemMessage = systemMessage + "\n\n" + finalContextMessage;
   db.insert(chatMessage)
     .values({
       sessionId,

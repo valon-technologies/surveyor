@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useReviewQueue } from "@/queries/review-queries";
 import { useReviewStore } from "@/stores/review-store";
 import { EntityGroup } from "./entity-group";
-import type { ReviewCardData } from "@/types/review";
+import type { ReviewCardData, ChildEntityGroup } from "@/types/review";
 
 interface ReviewQueueListProps {
   onPunt: (card: ReviewCardData) => void;
@@ -16,6 +16,8 @@ interface EntityGroupData {
   entityId: string;
   entityName: string;
   cards: ReviewCardData[];
+  childGroups: ChildEntityGroup[];
+  totalCardCount: number;
   unreviewedCount: number;
 }
 
@@ -36,30 +38,70 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
     sortOrder,
   });
 
-  // Group cards by entity
+  // Group cards by entity with hierarchical parent/child folding
   const entityGroups = useMemo<EntityGroupData[]>(() => {
     if (!cards?.length) return [];
 
-    const groupMap = new Map<string, EntityGroupData>();
-
+    // Pass 1: bucket cards by their own entityId
+    const bucketMap = new Map<string, { entityName: string; cards: ReviewCardData[]; parentEntityId: string | null; parentEntityName: string | null }>();
     for (const card of cards) {
-      let group = groupMap.get(card.entityId);
-      if (!group) {
-        group = {
-          entityId: card.entityId,
-          entityName: card.entityName,
-          cards: [],
-          unreviewedCount: 0,
-        };
-        groupMap.set(card.entityId, group);
+      let bucket = bucketMap.get(card.entityId);
+      if (!bucket) {
+        bucket = { entityName: card.entityName, cards: [], parentEntityId: card.parentEntityId, parentEntityName: card.parentEntityName };
+        bucketMap.set(card.entityId, bucket);
       }
-      group.cards.push(card);
-      if (card.status === "unreviewed") {
-        group.unreviewedCount++;
+      bucket.cards.push(card);
+    }
+
+    // Pass 2: build parent groups, attaching child buckets
+    const parentMap = new Map<string, EntityGroupData>();
+
+    for (const [eid, bucket] of bucketMap) {
+      if (bucket.parentEntityId) {
+        // This is a child entity — attach to parent group
+        let parent = parentMap.get(bucket.parentEntityId);
+        if (!parent) {
+          // Synthetic parent (has no cards of its own yet)
+          parent = {
+            entityId: bucket.parentEntityId,
+            entityName: bucket.parentEntityName || bucket.parentEntityId,
+            cards: [],
+            childGroups: [],
+            totalCardCount: 0,
+            unreviewedCount: 0,
+          };
+          parentMap.set(bucket.parentEntityId, parent);
+        }
+        parent.childGroups.push({ entityId: eid, entityName: bucket.entityName, cards: bucket.cards });
+      } else {
+        // Top-level entity
+        let existing = parentMap.get(eid);
+        if (existing) {
+          // Already created as synthetic parent — fill in its own cards
+          existing.cards = bucket.cards;
+          existing.entityName = bucket.entityName;
+        } else {
+          parentMap.set(eid, {
+            entityId: eid,
+            entityName: bucket.entityName,
+            cards: bucket.cards,
+            childGroups: [],
+            totalCardCount: 0,
+            unreviewedCount: 0,
+          });
+        }
       }
     }
 
-    const groups = Array.from(groupMap.values());
+    // Compute totals
+    const groups = Array.from(parentMap.values());
+    for (const g of groups) {
+      const allCards = [...g.cards, ...g.childGroups.flatMap((cg) => cg.cards)];
+      g.totalCardCount = allCards.length;
+      g.unreviewedCount = allCards.filter((c) => c.status === "unreviewed").length;
+      // Sort child groups alphabetically
+      g.childGroups.sort((a, b) => a.entityName.localeCompare(b.entityName));
+    }
 
     // Sort: entities with unreviewed fields first (desc count), then alphabetical
     groups.sort((a, b) => {
@@ -122,6 +164,8 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
           entityId={group.entityId}
           entityName={group.entityName}
           cards={group.cards}
+          childGroups={group.childGroups}
+          totalCardCount={group.totalCardCount}
           onPunt={onPunt}
           onExclude={onExclude}
           onAcceptWithRipple={onAcceptWithRipple}

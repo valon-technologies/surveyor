@@ -274,6 +274,9 @@ export const POST = withAuth(
       async start(controller) {
         let fullContent = "";
         let mappingUpdate: Record<string, unknown> | null = null;
+        let entityMappingUpdates: Record<string, unknown>[] | null = null;
+        let pipelineStructureUpdate: Record<string, unknown> | null = null;
+        const isEntitySession = !session.fieldMappingId && !!session.entityId;
         let sourceDataLoaded = false;
         let cachedSourceEntities: { id: string; name: string }[] = [];
         let cachedSourceFields: { id: string; name: string; entityId: string }[] = [];
@@ -319,45 +322,106 @@ export const POST = withAuth(
                   )
                 );
 
-                // Check for mapping-update block as it streams
-                const updateMatch = fullContent.match(
-                  /```mapping-update\s*\n([\s\S]*?)\n\s*```/
-                );
-                if (updateMatch && !mappingUpdate) {
-                  try {
-                    const parsed = JSON.parse(updateMatch[1]) as Record<string, unknown>;
+                // Check for mapping-update or entity-mapping-updates block as it streams
+                if (isEntitySession) {
+                  // Entity-level: parse entity-mapping-updates (JSON array)
+                  const entityUpdateMatch = fullContent.match(
+                    /```entity-mapping-updates\s*\n([\s\S]*?)\n\s*```/
+                  );
+                  if (entityUpdateMatch && !entityMappingUpdates) {
+                    try {
+                      const parsed = JSON.parse(entityUpdateMatch[1]) as Record<string, unknown>[];
 
-                    // Lazy-load source data for name→ID resolution
-                    if (!sourceDataLoaded) {
-                      cachedSourceEntities = db
-                        .select({ id: entity.id, name: entity.name })
-                        .from(entity)
-                        .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-                        .all();
-                      const seIds = cachedSourceEntities.map((e) => e.id);
-                      cachedSourceFields = seIds.length > 0
-                        ? db
-                            .select({ id: field.id, name: field.name, entityId: field.entityId })
-                            .from(field)
-                            .all()
-                            .filter((f) => seIds.includes(f.entityId))
-                        : [];
-                      sourceDataLoaded = true;
+                      // Lazy-load source data for name→ID resolution
+                      if (!sourceDataLoaded) {
+                        cachedSourceEntities = db
+                          .select({ id: entity.id, name: entity.name })
+                          .from(entity)
+                          .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
+                          .all();
+                        const seIds = cachedSourceEntities.map((e) => e.id);
+                        cachedSourceFields = seIds.length > 0
+                          ? db
+                              .select({ id: field.id, name: field.name, entityId: field.entityId })
+                              .from(field)
+                              .all()
+                              .filter((f) => seIds.includes(f.entityId))
+                          : [];
+                        sourceDataLoaded = true;
+                      }
+
+                      entityMappingUpdates = parsed.map((u) =>
+                        resolveMappingUpdateIds(u, cachedSourceEntities, cachedSourceFields)
+                      );
+
+                      controller.enqueue(
+                        encoder.encode(
+                          `data: ${JSON.stringify({ type: "entity_mapping_updates", content: entityMappingUpdates })}\n\n`
+                        )
+                      );
+                    } catch {
+                      // JSON not complete yet, will retry on next chunk
                     }
+                  }
 
-                    mappingUpdate = resolveMappingUpdateIds(
-                      parsed,
-                      cachedSourceEntities,
-                      cachedSourceFields
-                    );
+                  // Parse pipeline-structure-update block (single JSON object)
+                  const pipelineUpdateMatch = fullContent.match(
+                    /```pipeline-structure-update\s*\n([\s\S]*?)\n\s*```/
+                  );
+                  if (pipelineUpdateMatch && !pipelineStructureUpdate) {
+                    try {
+                      pipelineStructureUpdate = JSON.parse(pipelineUpdateMatch[1]) as Record<string, unknown>;
 
-                    controller.enqueue(
-                      encoder.encode(
-                        `data: ${JSON.stringify({ type: "mapping_update", content: mappingUpdate })}\n\n`
-                      )
-                    );
-                  } catch {
-                    // JSON not complete yet, will retry on next chunk
+                      controller.enqueue(
+                        encoder.encode(
+                          `data: ${JSON.stringify({ type: "pipeline_structure_update", content: pipelineStructureUpdate })}\n\n`
+                        )
+                      );
+                    } catch {
+                      // JSON not complete yet, will retry on next chunk
+                    }
+                  }
+                } else {
+                  // Field-level: parse mapping-update (single object)
+                  const updateMatch = fullContent.match(
+                    /```mapping-update\s*\n([\s\S]*?)\n\s*```/
+                  );
+                  if (updateMatch && !mappingUpdate) {
+                    try {
+                      const parsed = JSON.parse(updateMatch[1]) as Record<string, unknown>;
+
+                      // Lazy-load source data for name→ID resolution
+                      if (!sourceDataLoaded) {
+                        cachedSourceEntities = db
+                          .select({ id: entity.id, name: entity.name })
+                          .from(entity)
+                          .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
+                          .all();
+                        const seIds = cachedSourceEntities.map((e) => e.id);
+                        cachedSourceFields = seIds.length > 0
+                          ? db
+                              .select({ id: field.id, name: field.name, entityId: field.entityId })
+                              .from(field)
+                              .all()
+                              .filter((f) => seIds.includes(f.entityId))
+                          : [];
+                        sourceDataLoaded = true;
+                      }
+
+                      mappingUpdate = resolveMappingUpdateIds(
+                        parsed,
+                        cachedSourceEntities,
+                        cachedSourceFields
+                      );
+
+                      controller.enqueue(
+                        encoder.encode(
+                          `data: ${JSON.stringify({ type: "mapping_update", content: mappingUpdate })}\n\n`
+                        )
+                      );
+                    } catch {
+                      // JSON not complete yet, will retry on next chunk
+                    }
                   }
                 }
               }
@@ -611,16 +675,19 @@ export const POST = withAuth(
 
           // Save assistant message
           const msgNow = new Date().toISOString();
+          const msgMetadata: Record<string, unknown> = {
+            provider: providerName,
+            mappingUpdate: mappingUpdate || undefined,
+            ...(entityMappingUpdates ? { entityMappingUpdates } : {}),
+            ...(pipelineStructureUpdate ? { pipelineStructureUpdate } : {}),
+            ...(allToolCalls.length > 0 ? { toolCalls: allToolCalls } : {}),
+          };
           db.insert(chatMessage)
             .values({
               sessionId,
               role: "assistant",
               content: fullContent,
-              metadata: {
-                provider: providerName,
-                mappingUpdate: mappingUpdate || undefined,
-                ...(allToolCalls.length > 0 ? { toolCalls: allToolCalls } : {}),
-              },
+              metadata: msgMetadata as typeof chatMessage.$inferInsert.metadata,
               createdAt: msgNow,
             }).run();
 

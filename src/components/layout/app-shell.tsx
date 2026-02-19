@@ -11,6 +11,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isFullScreen =
     (pathname.match(/^\/mapping\/[^/]+$/) && pathname !== "/mapping/questions") ||
     pathname.startsWith("/mapping/discuss/") ||
+    pathname.startsWith("/mapping/discuss-entity/") ||
     pathname.startsWith("/auth");
 
   if (isFullScreen) {

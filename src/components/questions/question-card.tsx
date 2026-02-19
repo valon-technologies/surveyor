@@ -50,10 +50,15 @@ function timeAgo(dateStr: string): string {
 }
 
 function ReplyBubble({ reply }: { reply: QuestionReply }) {
-  const initial = reply.authorName.charAt(0).toUpperCase();
+  const isAI = reply.authorRole === "llm";
+  const initial = isAI ? "AI" : reply.authorName.charAt(0).toUpperCase();
   return (
     <div className="flex gap-2.5 py-2">
-      <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium shrink-0">
+      <div
+        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium shrink-0 ${
+          isAI ? "bg-violet-100 text-violet-700" : "bg-muted"
+        }`}
+      >
         {initial}
       </div>
       <div className="flex-1 min-w-0">

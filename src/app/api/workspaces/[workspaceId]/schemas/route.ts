@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { schemaAsset, entity, field } from "@/lib/db/schema";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and, count, isNull } from "drizzle-orm";
 import { createSchemaAssetSchema } from "@/lib/validators/schema";
 import { parseCSVSchema, type ParsedEntity } from "@/lib/import/schema-parser";
 import { parsePDFSchema } from "@/lib/import/pdf-schema-parser";
 import { resolveProvider } from "@/lib/generation/provider-resolver";
+import { markScaffoldsStale } from "@/lib/generation/scaffolding";
+import { emitSignal } from "@/lib/generation/skill-signals";
 
 export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   // Exclude rawContent from list response (can be huge)
@@ -28,12 +30,12 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
     .orderBy(schemaAsset.createdAt)
     .all();
 
-  // Get entity counts per asset
+  // Get top-level entity counts per asset (exclude child/component entities)
   const result = assets.map((asset) => {
     const entityCount = db
       .select({ cnt: count() })
       .from(entity)
-      .where(eq(entity.schemaAssetId, asset.id))
+      .where(and(eq(entity.schemaAssetId, asset.id), isNull(entity.parentEntityId)))
       .get();
 
     return { ...asset, entityCount: entityCount?.cnt || 0 };
@@ -157,6 +159,20 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
         { status: 201 }
       );
     }
+  }
+
+  // Mark all scaffolds as stale since source/target schemas changed
+  try {
+    markScaffoldsStale(workspaceId);
+    emitSignal({
+      workspaceId,
+      signalType: "schema_change",
+      summary: `Schema "${input.name}" (${input.side}) imported/updated`,
+      sourceId: asset.id,
+      sourceType: "schema_asset",
+    });
+  } catch {
+    // Non-critical — scaffolds will be regenerated on next batch run
   }
 
   return NextResponse.json(asset, { status: 201 });

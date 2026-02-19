@@ -76,6 +76,12 @@ export function useResolveQuestion() {
       qc.invalidateQueries({ queryKey: ["questions"] });
       qc.invalidateQueries({ queryKey: ["questionReplies"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+
+      // AI evaluation runs async — re-check after delay in case it reopened
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ["questions"] });
+        qc.invalidateQueries({ queryKey: ["questionReplies"] });
+      }, 5000);
     },
   });
 }

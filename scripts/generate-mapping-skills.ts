@@ -178,20 +178,31 @@ const MORTGAGE_KEYWORD_MAP: Record<string, string[]> = {
   credit_score: [findCtx("Mortgage Servicing > Federal > FCRA > Furnishing Credit Information")].filter(Boolean) as string[],
 };
 
-// Domain overview context IDs — always included as reference for orientation
-const OVERVIEW_CTX = {
-  mortgageServicing: findCtx("Mortgage Servicing > Overview"),
-  serviceMac: findCtx("ServiceMac > Overview"),
-  vds: findCtx("VDS > Overview"),
+// SM table → enum context mapping
+// Maps ACDC table names to their Lookups tab extract type for enum resolution.
+// Some tables share enum contexts (e.g., BorrowerDemographics uses FairLending enums).
+const SM_ENUM_MAP: Record<string, string | null> = {
+  LoanInfo: findCtx("ServiceMac > Enums > LOANINFO ENUMS"),
+  StopsFlagsAndIndicators: findCtx("ServiceMac > Enums > STOPSFLAGSANDINDICATORS ENUMS"),
+  Investor: findCtx("ServiceMac > Enums > INVESTOR ENUMS"),
+  Arm: findCtx("ServiceMac > Enums > ARM ENUMS"),
+  Transaction: findCtx("ServiceMac > Enums > TRANSACTION ENUMS"),
+  HazardInsurance: findCtx("ServiceMac > Enums > HAZARDINSURANCE ENUMS"),
+  Tax: findCtx("ServiceMac > Enums > TAX ENUMS"),
+  DefaultWorkstations: findCtx("ServiceMac > Enums > DEFAULTWORKSTATIONS ENUMS"),
+  Heloc: findCtx("ServiceMac > Enums > HELOC ENUMS"),
+  HelocSegments: findCtx("ServiceMac > Enums > HELOCSEGMENTS ENUMS"),
+  Letter: findCtx("ServiceMac > Enums > LETTER ENUMS"),
+  Step: findCtx("ServiceMac > Enums > STEP ENUMS"),
+  LossMitigation: findCtx("ServiceMac > Enums > LOSSMITIGATION ENUMS"),
+  // BorrowerDemographics enums are under FairLending extract type in Lookups tab
+  BorrowerDemographics: findCtx("ServiceMac > Enums > FAIRLENDING ENUMS"),
+  FairLending: findCtx("ServiceMac > Enums > FAIRLENDING ENUMS"),
 };
 
-// Shared methodology context IDs
-const METHODOLOGY_CTX = {
-  criticalRules: findCtx("Mapping > Critical Rules and Workflow"),
-  patterns: findCtx("Mapping > Patterns"),
-  mappingDecisions: findCtx("ServiceMac > MAPPING DECISIONS"),
-  tableRelationships: findCtx("ServiceMac > TABLE RELATIONSHIPS"),
-};
+// NOTE: Domain overviews (OVERVIEW_CTX) and methodology contexts (METHODOLOGY_CTX)
+// are no longer linked per-skill. They are injected into the system message via
+// system-context.ts. MAPPING DECISIONS is now RAG-only.
 
 // Q&A context lookup
 function findQaContexts(entityName: string): string[] {
@@ -352,6 +363,18 @@ ${sourceTableList}
       }
     }
 
+    // 2b. SM enum contexts (reference) — authoritative code→value lookups from Lookups tab
+    const seenEnumCtxIds = new Set<string>();
+    for (const table of pairing.sm_tables) {
+      const enumCtxId = SM_ENUM_MAP[table];
+      if (enumCtxId && !seenEnumCtxIds.has(enumCtxId)) {
+        seenEnumCtxIds.add(enumCtxId);
+        insertSkillContext.run(crypto.randomUUID(), skillId, enumCtxId, "reference", ctxOrder++,
+          `ServiceMac ${table} enum values — authoritative code definitions from Lookups tab`);
+        linkCount++;
+      }
+    }
+
     // 3. SM domains (reference)
     for (const domain of pairing.sm_domains) {
       const ctxId = SM_DOMAIN_MAP[domain];
@@ -370,50 +393,12 @@ ${sourceTableList}
       linkCount++;
     }
 
-    // 5. Domain overviews (reference) — orientation before specifics
-    if (OVERVIEW_CTX.vds) {
-      insertSkillContext.run(crypto.randomUUID(), skillId, OVERVIEW_CTX.vds, "reference", ctxOrder++,
-        "VDS target schema overview — entity categories, relationships");
-      linkCount++;
-    }
-    if (OVERVIEW_CTX.serviceMac) {
-      insertSkillContext.run(crypto.randomUUID(), skillId, OVERVIEW_CTX.serviceMac, "reference", ctxOrder++,
-        "ServiceMac source system overview — tables, domains, data model");
-      linkCount++;
-    }
-    if (OVERVIEW_CTX.mortgageServicing) {
-      insertSkillContext.run(crypto.randomUUID(), skillId, OVERVIEW_CTX.mortgageServicing, "reference", ctxOrder++,
-        "Mortgage servicing domain overview — regulatory landscape, key concepts");
-      linkCount++;
-    }
+    // NOTE: Sections 5-8 (domain overviews, critical rules, mapping decisions,
+    // table relationships) are now injected into the system message via
+    // system-context.ts instead of per-skill duplication. MAPPING DECISIONS
+    // is now RAG-only (retrieved via get_reference_docs).
 
-    // 6. Mapping methodology (reference) — always link critical rules + patterns
-    if (METHODOLOGY_CTX.criticalRules) {
-      insertSkillContext.run(crypto.randomUUID(), skillId, METHODOLOGY_CTX.criticalRules, "reference", ctxOrder++,
-        "9 critical mapping rules and 8-step workflow");
-      linkCount++;
-    }
-    if (METHODOLOGY_CTX.patterns) {
-      insertSkillContext.run(crypto.randomUUID(), skillId, METHODOLOGY_CTX.patterns, "reference", ctxOrder++,
-        "11 mapping pattern templates with SQL examples");
-      linkCount++;
-    }
-
-    // 7. Mapping decisions (reference) — the 51KB decisions doc
-    if (METHODOLOGY_CTX.mappingDecisions) {
-      insertSkillContext.run(crypto.randomUUID(), skillId, METHODOLOGY_CTX.mappingDecisions, "reference", ctxOrder++,
-        "Prior mapping decisions, enum codes, extract feasibility");
-      linkCount++;
-    }
-
-    // 8. Table relationships (reference)
-    if (METHODOLOGY_CTX.tableRelationships) {
-      insertSkillContext.run(crypto.randomUUID(), skillId, METHODOLOGY_CTX.tableRelationships, "reference", ctxOrder++,
-        "ServiceMac table join keys and relationships");
-      linkCount++;
-    }
-
-    // 9. Mortgage domain contexts (supplementary) — based on keywords
+    // 5. Mortgage domain contexts (supplementary) — based on keywords
     const mortgageCtxIds = new Set<string>();
     for (const keyword of pairing.mortgage_keywords) {
       const ids = MORTGAGE_KEYWORD_MAP[keyword] ?? [];
@@ -426,7 +411,7 @@ ${sourceTableList}
       linkCount++;
     }
 
-    // 10. Q&A contexts (reference)
+    // 6. Q&A contexts (reference)
     const qaIds = findQaContexts(entityName);
     for (const qaId of qaIds) {
       const qaName = allContexts.find((c) => c.id === qaId)?.name ?? "";

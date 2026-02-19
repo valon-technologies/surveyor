@@ -28,6 +28,8 @@ export interface CompletionResponse {
   inputTokens: number;
   outputTokens: number;
   model: string;
+  stopReason?: "end_turn" | "tool_use" | "max_tokens";
+  toolCalls?: ToolCall[];
 }
 
 export interface StreamChunk {

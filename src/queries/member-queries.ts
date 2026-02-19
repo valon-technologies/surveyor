@@ -10,6 +10,7 @@ export interface WorkspaceMember {
   image: string | null;
   role: string;
   team: string | null;
+  domains: string[] | null;
   joinedAt: string;
 }
 

@@ -62,11 +62,15 @@ export function resolveProvider(
 }
 
 /**
- * Get the context window token budget for a provider.
- * Leaves room for output tokens and overhead.
+ * Get the context token budget for a provider.
+ * This is the budget for CONTEXT ONLY (reference docs, enum tables, etc.).
+ * The full prompt also includes the system message (~5K tokens for JSON,
+ * ~5K for YAML + gold examples/renderer refs in user message ~20-40K),
+ * source schema (~5-15K), and target fields (~2-5K).
+ *
+ * Claude 200K model: 200K limit - 8K output - 50K prompt overhead ≈ 140K for context
+ * OpenAI GPT-4o 128K: 128K limit - 8K output - 30K prompt overhead ≈ 90K for context
  */
 export function getTokenBudget(providerName: "claude" | "openai"): number {
-  // Claude: 200K context, budget ~160K for input (leaving 8K output + overhead)
-  // OpenAI GPT-4o: 128K context, budget ~100K for input
-  return providerName === "claude" ? 160_000 : 100_000;
+  return providerName === "claude" ? 120_000 : 90_000;
 }

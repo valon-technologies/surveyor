@@ -1,6 +1,19 @@
 import type { AssembledContext } from "./context-assembler";
 import { GOLD_FORMAT_EXAMPLES, GOLD_FORMAT_PITFALLS } from "./gold-format-reference";
 import { RENDERER_EXPRESSION_CONTEXT, RENDERER_FILTER_REFERENCE } from "./renderer-reference";
+import { DOMAIN_RULES, renderWorkspaceRulesSection } from "./chat-prompt-builder";
+import { getSystemContextBundle, renderSystemContextSection } from "./system-context";
+import { FKConstraintStore, type FKConstraint } from "./fk-constraint-store";
+
+/** Render FK constraints as a user message section */
+function renderFKConstraints(constraints: FKConstraint[]): string {
+  const store = new FKConstraintStore();
+  // Group by entity name for rendering
+  for (const c of constraints) {
+    store.addConstraints(c.entityName, [c]);
+  }
+  return store.renderPromptSection(constraints);
+}
 
 interface TargetField {
   name: string;
@@ -14,7 +27,29 @@ interface TargetField {
 
 interface SourceEntitySchema {
   entityName: string;
+  detailed?: boolean; // true = include field descriptions; false = name+type only
   fields: { name: string; dataType: string | null; description?: string | null }[];
+}
+
+/** Render source schema into prompt parts — all tables at equal level, descriptions included when available */
+function renderSourceSchema(sourceSchema: SourceEntitySchema[] | undefined): string[] {
+  if (!sourceSchema || sourceSchema.length === 0) return [];
+
+  const parts: string[] = [];
+  parts.push(`\n## Available Source Schema (ONLY use field names from this list)\n`);
+
+  for (const se of sourceSchema) {
+    const fieldList = se.fields
+      .map((f) => {
+        let line = `- ${f.name}${f.dataType ? ` (${f.dataType})` : ""}`;
+        if (f.description) line += ` — ${f.description}`;
+        return line;
+      })
+      .join("\n");
+    parts.push(`### ${se.entityName}\n${fieldList}\n`);
+  }
+
+  return parts;
 }
 
 interface PromptInput {
@@ -23,7 +58,10 @@ interface PromptInput {
   targetFields: TargetField[];
   assembledContext: AssembledContext;
   sourceSchema?: SourceEntitySchema[];
-  learnings?: string[];
+  workspaceRules?: string[];
+  workspaceId?: string;
+  scaffoldStrategy?: string;
+  fkConstraints?: FKConstraint[];
 }
 
 const SYSTEM_MESSAGE = `You are a data mapping API that outputs ONLY valid JSON. No prose, no markdown, no explanations — just a JSON object.
@@ -60,12 +98,14 @@ WHEN TO GENERATE QUESTIONS:
 - "medium" confidence mappings SHOULD have a question when the uncertainty is resolvable by a human (e.g., "Which of these two source columns is correct?")
 - Use null targetFieldName for cross-cutting issues (e.g., "Is there a separate source table for historical data?")
 - Do NOT generate questions for things clearly resolvable from the provided context
+- ENUM/LOOKUP RULE: Reference documents titled "Enums" (marked "AUTHORITATIVE SOURCE") contain definitive code-to-value lookup tables extracted from the source system. When an enum reference document lists codes for a source field, treat it as the complete, authoritative mapping. Use those codes directly in your enumMapping — do NOT generate incomplete_enum questions or ask about valid codes/meanings for fields covered by these documents. Only generate enum questions when NO lookup data exists for a field.
+- FILTER VALUE RULE: When writing source filters (e.g., BorrowerIndicator = '06'), ALWAYS look up the correct code from the enum reference. Do NOT guess numeric values — use the documented codes. Do NOT generate questions asking "should we validate this filter value?" when the enum reference already documents all valid values and their meanings. If the enum table shows which code means what, USE it — that IS the validation.
 
 UNCERTAINTY TYPES:
 - no_source_match: No source field could be confidently matched to this target
 - multiple_candidates: Multiple source fields are plausible — human must pick
 - unclear_transform: Source exists but the correct transformation logic is uncertain
-- incomplete_enum: Enum mapping is missing values or source codes are undocumented
+- incomplete_enum: Enum mapping is missing values or source codes are undocumented — ONLY use this when no enum reference document covers the field
 - domain_ambiguity: Business meaning of the field is ambiguous or context-dependent
 - missing_context: Additional documentation or SME input is needed
 
@@ -86,7 +126,11 @@ RULES:
 MAPPING CONVENTIONS:
 - PREFER IDENTITY: Many fields map directly from a source column with no transform. Before writing complex SQL, check if the source column already contains the correct data.
 - BOOLEAN FIELDS: Source systems store booleans as indicator codes ('Y'/'N', '1'/'0', status codes), NOT native booleans. Map using equality checks (e.g., source_field = 'Y') or IN clauses. NEVER use CAST(x AS BOOL).
-- ENUM FIELDS — COMPLETENESS REQUIRED: Source systems use short codes. Map with CASE WHEN. COUNT the target field's allowed enum values. Your CASE WHEN MUST produce ALL target values plus an ELSE NULL. If target has 5 enum values, you need 5 output branches. Before submitting, verify: (a) every target enum value appears in your CASE output, (b) every known source code is handled, (c) ELSE clause exists for unknown codes. If the source already contains the target values, use identity.
+- ENUM FIELDS: Source systems use short codes. Map with CASE WHEN using this 3-step process:
+  1. DIRECT MATCH: For each source code in the enum reference, find the target enum value that matches by name (e.g., source code CHI with definition "CHINESE" → target CHINESE). These are high confidence — no question needed.
+  2. INFERRED MATCH: When a source code's definition doesn't exactly match any target value, use domain reasoning to pick the best target value AND flag it. Set confidence to "medium" or "low" and note your assumption. Example: source REF/"DID NOT RESPOND" → target DECLINE_TO_STATE is a reasonable inference, but should be flagged for human review since it's an assumption.
+  3. NULL/MISSING DEFAULT: When the source field is NULL or empty, propose a domain-appropriate default but flag the assumption. This is a US mortgage servicing product — e.g., language might default to ENGLISH, but that's a business decision that should be confirmed.
+  CARDINALITY MISMATCH IS NORMAL: the target enum often has far more values than the source uses. This is expected — map every source code you can directly match (high confidence), infer the rest with lower confidence, and include an ELSE for unknown codes. Do NOT generate questions for direct semantic matches covered by the enum reference. DO flag inferred mappings that require domain assumptions. If the source already contains the target values, use identity.
 - NULL HANDLING: For OPTIONAL fields, let NULLs flow through — don't add COALESCE or defaults. For REQUIRED fields, use COALESCE with a domain-appropriate default. Don't invent null handling when it's not needed.
 - SOURCE NAMING: Source columns are CamelCase (e.g., LoanNumber, GseCode). Target fields are snake_case. Look for semantic matches, not exact name matches.
 - ID FIELDS: Primary keys use deterministic hashing via hash_id transform with hash_columns.
@@ -101,18 +145,20 @@ MAPPING CONVENTIONS:
   a parent entity name, map as identity from the staging dependency. Set mappingType to
   "hash_id" for PKs, "direct" for FK pass-throughs.
 - UNMAPPABLE FIELDS: If no source column semantically matches and no reasonable derivation exists, set status to "unmapped" — don't force a bad mapping.
+- DEPRECATED FIELDS: If a target field's description indicates it is deprecated, set status to "unmapped", transform to null, confidence to "high", and reasoning to "Field deprecated per VDS documentation". Do NOT generate a question about it.
 
 SELF-REVIEW CHECKLIST (verify before outputting):
 1. Every source field referenced exists in "Available Source Schema" — no invented names
-2. Every enum mapping covers ALL target enum values (count them)
+2. Every enum mapping handles ALL documented source codes from enum references
 3. No CAST(x AS BOOL) patterns — use equality checks instead
 4. Every target field has exactly one mapping entry (count: ${"`"}mappings.length === requested fields${"`"})
 5. Confidence is calibrated honestly — not everything should be "high"
 6. Every medium/low mapping has both uncertaintyType and reviewComment
-7. Questions generated for genuine uncertainties that a human can resolve`;
+7. Questions generated for genuine uncertainties that a human can resolve — NOT for values already documented in enum references
+8. All filter values use documented enum codes — cross-check every filter condition against enum references before asking about it`;
 
 export function buildPrompt(input: PromptInput): { systemMessage: string; userMessage: string } {
-  const { entityName, entityDescription, targetFields, assembledContext, sourceSchema } = input;
+  const { entityName, entityDescription, targetFields, assembledContext, sourceSchema, workspaceRules } = input;
 
   const parts: string[] = [];
 
@@ -137,20 +183,18 @@ export function buildPrompt(input: PromptInput): { systemMessage: string; userMe
     parts.push(line);
   }
 
-  // Source schema
-  if (sourceSchema && sourceSchema.length > 0) {
-    parts.push(`\n## Available Source Schema (ONLY use field names from this list)\n`);
-    for (const se of sourceSchema) {
-      const fieldList = se.fields
-        .map((f) => {
-          let line = `- ${f.name}${f.dataType ? ` (${f.dataType})` : ""}`;
-          if (f.description) line += ` — ${f.description}`;
-          return line;
-        })
-        .join("\n");
-      parts.push(`### ${se.entityName}\n${fieldList}\n`);
-    }
+  // Scaffold strategy (from Phase 2 scaffolding engine)
+  if (input.scaffoldStrategy) {
+    parts.push(`\n## Mapping Strategy\n${input.scaffoldStrategy}`);
   }
+
+  // FK constraints from parent entities (Phase 3)
+  if (input.fkConstraints?.length) {
+    parts.push(`\n${renderFKConstraints(input.fkConstraints)}`);
+  }
+
+  // Source schema (detailed for relevant tables, compact for the rest)
+  parts.push(...renderSourceSchema(sourceSchema));
 
   // Context sections
   if (assembledContext.primaryContexts.length > 0) {
@@ -174,20 +218,21 @@ export function buildPrompt(input: PromptInput): { systemMessage: string; userMe
     }
   }
 
-  // Inject learnings from prior training
-  if (input.learnings?.length) {
-    parts.push(`\n## Learnings from Prior Training\n`);
-    parts.push(`Apply these insights — they were learned from expert review of similar mappings:\n`);
-    for (const l of input.learnings) {
-      parts.push(`- ${l}`);
-    }
-  }
-
   // Reinforce JSON-only output at the end of the user message
   parts.push(`\n---\nRespond with ONLY the JSON object containing "mappings" (array of ${targetFields.length} field mappings) and "questions" (array of any uncertainties needing human input). No other text.`);
 
+  // Append domain rules + universal context to system message
+  let systemMessage = SYSTEM_MESSAGE + renderWorkspaceRulesSection(workspaceRules);
+
+  if (input.workspaceId) {
+    const bundle = getSystemContextBundle(input.workspaceId);
+    if (bundle.totalTokens > 0) {
+      systemMessage += renderSystemContextSection(bundle);
+    }
+  }
+
   return {
-    systemMessage: SYSTEM_MESSAGE,
+    systemMessage,
     userMessage: parts.join("\n"),
   };
 }
@@ -265,11 +310,16 @@ RULES:
 6. For unmapped fields, use transform: null with source: []
 7. Your entire response must be parseable by a YAML parser — proper indentation, quoting where needed
 8. Use double quotes for strings containing special YAML characters
+9. NEVER use pd, np, or df as source alias prefixes. These are Python runtime globals (pandas, numpy, DataFrame) available ONLY inside expression: fields. Writing "source: pd.FieldName" is WRONG — pd is not a data source. If no source exists, use source: [] with transform: null.
 
 MAPPING CONVENTIONS:
 - PREFER IDENTITY: Check if the source column already contains data in the correct format before writing expressions. A direct identity mapping is always preferred over a complex transform.
 - BOOLEAN FIELDS: Source systems store booleans as indicator codes ('Y'/'N', '1'/'0', status codes). Convert using .eq() or .isin() checks, NOT CAST. Example: fi.ArmIndicator.eq("Y"), fi.BalloonStatusCode.isin(["A","H"])
-- ENUM FIELDS — COMPLETENESS REQUIRED: Source systems use short codes. Map with np.select or .map(). COUNT the target field's allowed enum values. Your mapping MUST produce ALL target values plus a pd.NA default for unknown codes. If target has 5 enum values, you need 5 output branches. Before submitting, verify: (a) every target enum value appears in your mapping output, (b) every known source code is handled, (c) default exists for unknown codes. If the source already contains target values, use identity.
+- ENUM FIELDS: Source systems use short codes. Map with np.select or .map() using this 3-step process:
+  1. DIRECT MATCH: For each source code in the enum reference, find the target enum value that matches by name (e.g., source code CHI with definition "CHINESE" → target CHINESE). These are high confidence — no question needed.
+  2. INFERRED MATCH: When a source code's definition doesn't exactly match any target value, use domain reasoning to pick the best target value AND flag it. Note your assumption in the questions section. Example: source REF/"DID NOT RESPOND" → target DECLINE_TO_STATE is a reasonable inference, but should be flagged for human review since it's an assumption.
+  3. NULL/MISSING DEFAULT: When the source field is NULL or empty, propose a domain-appropriate default but flag the assumption. This is a US mortgage servicing product — e.g., language might default to ENGLISH, but that's a business decision that should be confirmed.
+  CARDINALITY MISMATCH IS NORMAL: the target enum often has far more values than the source uses. This is expected — map every source code you can directly match (high confidence), infer the rest with lower confidence, and include a default for unknown codes. Do NOT generate questions for direct semantic matches covered by the enum reference. DO flag inferred mappings that require domain assumptions. If the source already contains target values, use identity.
 - NULL HANDLING: For optional fields, let NULLs pass through. For required fields, use .fillna() with a domain-appropriate default. Don't add null handling when it's not needed.
 - SOURCE NAMING: Source columns are CamelCase. Target fields are snake_case. Match semantically, not by exact name.
 - ID FIELDS: Primary keys use deterministic hashing via hash_id transform with hash_columns.
@@ -298,17 +348,20 @@ WHEN TO GENERATE QUESTIONS:
 - Fields where you chose between multiple plausible sources SHOULD have a question
 - Use null target_column for cross-cutting issues
 - Do NOT generate questions for things clearly resolvable from the provided context
+- ENUM/LOOKUP RULE: Reference documents titled "Enums" (marked "AUTHORITATIVE SOURCE") contain definitive code-to-value lookup tables extracted from the source system. When an enum reference document lists codes for a source field, use those codes directly in your .map() expressions — do NOT generate incomplete_enum questions or ask about valid codes/meanings. Only generate enum questions when NO lookup data exists for a field.
+- FILTER VALUE RULE: When writing source filters (e.g., BorrowerIndicator = '06'), ALWAYS look up the correct code from the enum reference. Do NOT guess numeric values — use the documented codes. Do NOT generate questions asking "should we validate this filter value?" when the enum reference already documents all valid values and their meanings. If the enum table shows which code means what, USE it — that IS the validation.
 
 SELF-REVIEW CHECKLIST (verify before outputting):
 1. Every source field referenced exists in "Available Source Schema" — no invented names
-2. Every enum mapping covers ALL target enum values (count them)
+2. Every enum mapping handles ALL documented source codes from enum references
 3. No CAST(x AS BOOL) patterns — use equality checks instead
 4. Every target field has exactly one column entry (count check)
 5. Prefer identity transforms — don't over-engineer simple 1:1 matches
-6. Questions generated for genuine uncertainties that a human can resolve`;
+6. Questions generated for genuine uncertainties that a human can resolve — NOT for values already documented in enum references
+7. All filter values use documented enum codes — cross-check every filter condition against enum references before asking about it`;
 
 export function buildYamlPrompt(input: PromptInput): { systemMessage: string; userMessage: string } {
-  const { entityName, entityDescription, targetFields, assembledContext, sourceSchema } = input;
+  const { entityName, entityDescription, targetFields, assembledContext, sourceSchema, workspaceRules } = input;
 
   const parts: string[] = [];
 
@@ -333,20 +386,18 @@ export function buildYamlPrompt(input: PromptInput): { systemMessage: string; us
     parts.push(line);
   }
 
-  // Source schema
-  if (sourceSchema && sourceSchema.length > 0) {
-    parts.push(`\n## Available Source Schema (ONLY use field names from this list)\n`);
-    for (const se of sourceSchema) {
-      const fieldList = se.fields
-        .map((f) => {
-          let line = `- ${f.name}${f.dataType ? ` (${f.dataType})` : ""}`;
-          if (f.description) line += ` — ${f.description}`;
-          return line;
-        })
-        .join("\n");
-      parts.push(`### ${se.entityName}\n${fieldList}\n`);
-    }
+  // Scaffold strategy (from Phase 2 scaffolding engine)
+  if (input.scaffoldStrategy) {
+    parts.push(`\n## Mapping Strategy\n${input.scaffoldStrategy}`);
   }
+
+  // FK constraints from parent entities (Phase 3)
+  if (input.fkConstraints?.length) {
+    parts.push(`\n${renderFKConstraints(input.fkConstraints)}`);
+  }
+
+  // Source schema (detailed for relevant tables, compact for the rest)
+  parts.push(...renderSourceSchema(sourceSchema));
 
   // Context sections
   if (assembledContext.primaryContexts.length > 0) {
@@ -370,20 +421,21 @@ export function buildYamlPrompt(input: PromptInput): { systemMessage: string; us
     }
   }
 
-  // Inject learnings from prior training
-  if (input.learnings?.length) {
-    parts.push(`\n## Learnings from Prior Training\n`);
-    parts.push(`Apply these insights — they were learned from expert review of similar mappings:\n`);
-    for (const l of input.learnings) {
-      parts.push(`- ${l}`);
-    }
-  }
-
   // Reinforce YAML-only output
   parts.push(`\n---\nRespond with ONLY the YAML mapping document for the ${targetFields.length} fields above. Include a "questions:" section if there are uncertainties needing human input. No other text.`);
 
+  // Append domain rules + universal context to system message
+  let systemMessage = YAML_SYSTEM_MESSAGE + renderWorkspaceRulesSection(workspaceRules);
+
+  if (input.workspaceId) {
+    const bundle = getSystemContextBundle(input.workspaceId);
+    if (bundle.totalTokens > 0) {
+      systemMessage += renderSystemContextSection(bundle);
+    }
+  }
+
   return {
-    systemMessage: YAML_SYSTEM_MESSAGE,
+    systemMessage,
     userMessage: parts.join("\n"),
   };
 }

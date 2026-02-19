@@ -13,10 +13,12 @@ ALIAS DATAFRAMES:
   Each source alias (e.g., "li", "ed", "pf") is available as a pandas DataFrame with
   the original unsuffixed column names. Write: li.LoanNumber, ed.FpLastPaymentDueDate, etc.
 
-GLOBAL VARIABLES:
+GLOBAL VARIABLES (available ONLY inside expression: fields — these are NOT source aliases):
   - df: The full joined DataFrame (all sources merged)
-  - pd: pandas library
-  - np: numpy library
+  - pd: pandas library (use pd.NA, pd.to_numeric, etc. — NEVER use "pd" as a source alias prefix)
+  - np: numpy library (use np.where, np.select, etc. — NEVER use "np" as a source alias prefix)
+  IMPORTANT: pd, np, and df are Python runtime globals. They must ONLY appear inside expression:
+  fields. Never write "source: pd.FieldName" or "source: np.FieldName" — those are not data sources.
 
 AVAILABLE FUNCTIONS:
   - date_add(start, n, unit): Add time units to a date. unit = "day", "month", "year"

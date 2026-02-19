@@ -1,4 +1,4 @@
-import type { ChatSessionStatus, ChatMessageRole, BatchRunStatus } from "@/lib/constants";
+import type { ChatSessionStatus, ChatSessionType, ChatMessageRole, BatchRunStatus } from "@/lib/constants";
 
 export interface ChatSession {
   id: string;
@@ -6,6 +6,8 @@ export interface ChatSession {
   fieldMappingId: string | null;
   targetFieldId: string | null;
   entityId: string | null;
+  sessionType: ChatSessionType;
+  skillId: string | null;
   status: ChatSessionStatus;
   messageCount: number;
   lastMessageAt: string | null;
@@ -40,6 +42,21 @@ export interface ChatMessage {
 
 export interface ChatSessionWithMessages extends ChatSession {
   messages: ChatMessage[];
+}
+
+export interface EntityMappingUpdate {
+  targetFieldName: string;
+  mappingType?: string | null;
+  sourceEntityName?: string | null;
+  sourceFieldName?: string | null;
+  sourceEntityId?: string | null;
+  sourceFieldId?: string | null;
+  transform?: string | null;
+  defaultValue?: string | null;
+  enumMapping?: Record<string, string> | null;
+  reasoning?: string | null;
+  confidence?: string | null;
+  notes?: string | null;
 }
 
 export interface BatchRun {

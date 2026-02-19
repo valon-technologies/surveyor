@@ -10,6 +10,7 @@ const settingsTabs = [
   { href: "/settings/api-keys", label: "API Keys", exact: false },
   { href: "/settings/bigquery", label: "BigQuery", exact: false },
   { href: "/settings/members", label: "Members", exact: false },
+  { href: "/settings/storage", label: "Storage", exact: false },
 ];
 
 export default function SettingsLayout({
@@ -21,8 +22,9 @@ export default function SettingsLayout({
   const { role } = useWorkspace();
 
   const visibleTabs = settingsTabs.filter((tab) => {
-    // Members tab only visible to owners
+    // Members and Storage tabs only visible to owners
     if (tab.href === "/settings/members" && role !== "owner") return false;
+    if (tab.href === "/settings/storage" && role !== "owner") return false;
     return true;
   });
 

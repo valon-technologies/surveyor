@@ -34,7 +34,13 @@ export function ReviewFilters() {
   for (const card of allCards || []) {
     if (card.confidence) confidenceValues.add(card.confidence);
     if (card.status) statusValues.add(card.status);
-    if (card.entityId && !entityMap.has(card.entityId)) {
+    // Only show top-level entities (skip children)
+    if (card.parentEntityId) {
+      // Ensure parent appears in dropdown even if it has no cards of its own
+      if (!entityMap.has(card.parentEntityId) && card.parentEntityName) {
+        entityMap.set(card.parentEntityId, card.parentEntityName);
+      }
+    } else if (card.entityId && !entityMap.has(card.entityId)) {
       entityMap.set(card.entityId, card.entityName);
     }
   }

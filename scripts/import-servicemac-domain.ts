@@ -189,12 +189,35 @@ if (fs.existsSync(domainsDir)) {
 }
 
 // --- 4. Enums ---
+// Map ACDC extract types (used in Lookups tab) to table display names (used in Tables contexts).
+// When extract type differs from table name, this ensures the enum context can be matched
+// to the correct table context at assembly time via metadata.source_tables.
+const ENUM_TO_TABLE_NAMES: Record<string, string[]> = {
+  ARM: ["Arm"],
+  DEFAULTWORKSTATIONS: ["Default Workstations"],
+  FAIRLENDING: ["Borrower Demographics"],
+  HAZARDINSURANCE: ["Hazard Insurance"],
+  HELOC: ["HELOC"],
+  HELOCSEGMENTS: ["HELOC Segments"],
+  INVESTOR: ["Investor"],
+  LETTER: ["Letter"],
+  LOANINFO: ["Loan Info"],
+  LOSSMITIGATION: ["Loss Mitigation"],
+  STEP: ["Step"],
+  STOPSFLAGSANDINDICATORS: ["Stops Flags Indicators"],
+  TAX: ["Tax"],
+  TRANSACTION: ["Transaction"],
+};
+
 const enumsDir = path.join(SM_ROOT, "enums");
 if (fs.existsSync(enumsDir)) {
   const enumFiles = fs.readdirSync(enumsDir).filter((f) => f.endsWith(".md"));
   for (const file of enumFiles) {
     const content = stripFrontmatter(readMd(path.join(enumsDir, file)));
     const label = slugToLabel(file);
+    // Derive extract type key from filename: "FAIRLENDING-ENUMS.md" → "FAIRLENDING"
+    const extractKey = file.replace(/-ENUMS\.md$/i, "").toUpperCase();
+    const sourceTables = ENUM_TO_TABLE_NAMES[extractKey] || [];
     docs.push({
       id: deterministicId(`servicemac-domain/enums/${file}`),
       name: `ServiceMac > Enums > ${label}`,
@@ -203,6 +226,7 @@ if (fs.existsSync(enumsDir)) {
       content,
       tags: ["servicemac", "enum"],
       importSource: `servicemac-domain/enums/${file}`,
+      metadata: sourceTables.length > 0 ? { source_tables: sourceTables } : null,
     });
   }
 }
@@ -210,17 +234,18 @@ if (fs.existsSync(enumsDir)) {
 // --- Insert ---
 const now = new Date().toISOString();
 const stmt = db.prepare(`
-  INSERT OR IGNORE INTO context (id, workspace_id, name, category, subcategory, content, content_format, token_count, tags, is_active, sort_order, import_source, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, 'markdown', ?, ?, 1, 0, ?, ?, ?)
+  INSERT OR REPLACE INTO context (id, workspace_id, name, category, subcategory, content, content_format, token_count, tags, is_active, sort_order, import_source, metadata, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, 'markdown', ?, ?, 1, 0, ?, ?, ?, ?)
 `);
 
 const insertAll = db.transaction(() => {
   for (const doc of docs) {
     const tokenCount = Math.ceil(doc.content.length / 4);
+    const metadata = (doc as any).metadata ? JSON.stringify((doc as any).metadata) : null;
     stmt.run(
       doc.id, WORKSPACE_ID, doc.name, doc.category, doc.subcategory,
       doc.content, tokenCount, JSON.stringify(doc.tags),
-      doc.importSource, now, now
+      doc.importSource, metadata, now, now
     );
   }
 });

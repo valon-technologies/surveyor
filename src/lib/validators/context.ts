@@ -5,6 +5,7 @@ const ALL_SUBCATEGORIES = [
   "domain_knowledge", "business_rules", "glossary",
   "code_breaker", "lookup_table", "enum_map", "data_dictionary", "field_spec",
   "meeting_notes", "transcript", "extract", "working_doc",
+  "qa_knowledge",
 ] as const;
 
 export const createContextSchema = z.object({

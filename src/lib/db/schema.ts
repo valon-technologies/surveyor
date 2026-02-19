@@ -418,6 +418,7 @@ export const question = sqliteTable(
     resolvedAt: text("resolved_at"),
     replyCount: integer("reply_count").notNull().default(0),
     createdByUserId: text("created_by_user_id").references(() => user.id, { onDelete: "set null" }),
+    autoResolvedFrom: text("auto_resolved_from"), // question.id that triggered cascade resolution
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
   },
@@ -581,6 +582,8 @@ export const chatSession = sqliteTable(
     fieldMappingId: text("field_mapping_id").references(() => fieldMapping.id, { onDelete: "set null" }),
     targetFieldId: text("target_field_id").references(() => field.id, { onDelete: "set null" }),
     entityId: text("entity_id").references(() => entity.id, { onDelete: "set null" }),
+    sessionType: text("session_type").notNull().default("discuss"), // discuss | entity_discuss | forge
+    skillId: text("skill_id").references(() => skill.id, { onDelete: "set null" }),
     status: text("status").notNull().default("active"), // active | resolved | abandoned
     messageCount: integer("message_count").notNull().default(0),
     lastMessageAt: text("last_message_at"),
@@ -643,6 +646,43 @@ export const learning = sqliteTable(
   ]
 );
 
+export const evaluation = sqliteTable(
+  "evaluation",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    questionId: text("question_id")
+      .notNull()
+      .references(() => question.id, { onDelete: "cascade" }),
+    humanAnswer: text("human_answer").notNull(),
+    aiAnswer: text("ai_answer"),
+    tokenOverlap: integer("token_overlap"), // 0-100 Jaccard
+    judgeScore: integer("judge_score"), // 1-5
+    judgeReasoning: text("judge_reasoning"),
+    judgeModel: text("judge_model"),
+    contextUsed: text("context_used", { mode: "json" }).$type<{
+      skillsUsed: string[];
+      contextIds: string[];
+      totalTokens: number;
+    }>(),
+    aiProvider: text("ai_provider"),
+    aiModel: text("ai_model"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    generationDurationMs: integer("generation_duration_ms"),
+    status: text("status").notNull().default("pending"), // pending | completed | failed
+    error: text("error"),
+    createdAt: text("created_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("evaluation_workspace_idx").on(table.workspaceId),
+    index("evaluation_question_idx").on(table.questionId),
+    index("evaluation_status_idx").on(table.status),
+  ]
+);
+
 export const entityPipeline = sqliteTable(
   "entity_pipeline",
   {
@@ -674,6 +714,9 @@ export const entityPipeline = sqliteTable(
     concat: text("concat", { mode: "json" }).$type<Record<string, unknown> | null>(),
     structureType: text("structure_type").notNull().default("flat"), // flat | assembly
     isStale: integer("is_stale", { mode: "boolean" }).notNull().default(false),
+    sqlValidationStatus: text("sql_validation_status"), // "passed" | "failed" | "skipped"
+    sqlValidationError: text("sql_validation_error"),
+    sqlValidationAt: text("sql_validation_at"),
     generationId: text("generation_id"),
     batchRunId: text("batch_run_id"),
     editedBy: text("edited_by"),
@@ -735,6 +778,106 @@ export const validation = sqliteTable(
   ]
 );
 
+// ─── Entity Scaffold (Phase 2) ─────────────────────────────────
+
+export const entityScaffold = sqliteTable(
+  "entity_scaffold",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    entityId: text("entity_id")
+      .notNull()
+      .references(() => entity.id, { onDelete: "cascade" }),
+    topology: text("topology").notNull().default("single_source"), // single_source | multi_source_same_type | multi_source_different_type | assembly
+    sourceTables: text("source_tables", { mode: "json" }).$type<{
+      name: string;
+      relevanceScore: number;
+      matchedFields: number;
+      role: "primary" | "secondary" | "lookup" | "irrelevant";
+      discriminatorColumns?: { column: string; values: string[]; meaning: string }[];
+      fkRelationships?: { column: string; referencesEntity: string }[];
+    }[]>(),
+    assemblyComponents: text("assembly_components", { mode: "json" }).$type<Record<string, unknown>[]>(),
+    strategyNotes: text("strategy_notes"),
+    primarySources: text("primary_sources", { mode: "json" }).$type<string[]>(),
+    secondarySources: text("secondary_sources", { mode: "json" }).$type<string[]>(),
+    excludedSources: text("excluded_sources", { mode: "json" }).$type<string[]>(),
+    isStale: integer("is_stale", { mode: "boolean" }).notNull().default(false),
+    generationId: text("generation_id"),
+    batchRunId: text("batch_run_id"),
+    createdAt: text("created_at").notNull().default(nowDefault),
+    updatedAt: text("updated_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("entity_scaffold_entity_idx").on(table.entityId),
+    index("entity_scaffold_workspace_idx").on(table.workspaceId),
+  ]
+);
+
+// ─── Skill Signals & Refreshes (Phase 4) ──────────────────────
+
+export const skillSignal = sqliteTable(
+  "skill_signal",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    entityId: text("entity_id"),
+    skillId: text("skill_id"),
+    signalType: text("signal_type").notNull(), // question_resolved | chat_insight | mapping_correction | schema_change | context_added | context_gap
+    weight: integer("weight").notNull().default(1),
+    summary: text("summary").notNull(),
+    sourceId: text("source_id"),
+    sourceType: text("source_type"),
+    processed: integer("processed", { mode: "boolean" }).notNull().default(false),
+    processedAt: text("processed_at"),
+    createdAt: text("created_at").notNull().default(nowDefault),
+    updatedAt: text("updated_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("skill_signal_workspace_idx").on(table.workspaceId),
+    index("skill_signal_entity_idx").on(table.entityId),
+    index("skill_signal_skill_idx").on(table.skillId),
+    index("skill_signal_processed_idx").on(table.processed),
+  ]
+);
+
+export const skillRefresh = sqliteTable(
+  "skill_refresh",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    skillId: text("skill_id")
+      .notNull()
+      .references(() => skill.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("pending"), // pending | running | proposed | approved | rejected | auto_applied | failed
+    triggerScore: integer("trigger_score").notNull().default(0),
+    signalCount: integer("signal_count").notNull().default(0),
+    proposal: text("proposal", { mode: "json" }).$type<{
+      additions: { contextId: string; contextName: string; role: string }[];
+      removals: { contextId: string; contextName: string }[];
+      roleChanges: { contextId: string; contextName: string; fromRole: string; toRole: string }[];
+      instructionUpdate?: string;
+      riskScore: number;
+    }>(),
+    appliedChanges: text("applied_changes", { mode: "json" }).$type<Record<string, unknown>>(),
+    reviewedBy: text("reviewed_by"),
+    chatSessionId: text("chat_session_id"),
+    createdAt: text("created_at").notNull().default(nowDefault),
+    updatedAt: text("updated_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("skill_refresh_workspace_idx").on(table.workspaceId),
+    index("skill_refresh_skill_idx").on(table.skillId),
+    index("skill_refresh_status_idx").on(table.status),
+  ]
+);
+
 // ─── Relations ────────────────────────────────────────────────
 
 export const workspaceRelations = relations(workspace, ({ many }) => ({
@@ -750,6 +893,7 @@ export const workspaceRelations = relations(workspace, ({ many }) => ({
   batchRuns: many(batchRun),
   chatSessions: many(chatSession),
   learnings: many(learning),
+  evaluations: many(evaluation),
 }));
 
 export const schemaAssetRelations = relations(schemaAsset, ({ one, many }) => ({
@@ -895,6 +1039,7 @@ export const questionRelations = relations(question, ({ one, many }) => ({
     references: [user.id],
   }),
   replies: many(questionReply),
+  evaluations: many(evaluation),
 }));
 
 export const questionReplyRelations = relations(questionReply, ({ one }) => ({
@@ -966,6 +1111,10 @@ export const chatSessionRelations = relations(chatSession, ({ one, many }) => ({
     fields: [chatSession.entityId],
     references: [entity.id],
   }),
+  forgeSkill: one(skill, {
+    fields: [chatSession.skillId],
+    references: [skill.id],
+  }),
   messages: many(chatMessage),
 }));
 
@@ -984,6 +1133,17 @@ export const learningRelations = relations(learning, ({ one }) => ({
   entity: one(entity, {
     fields: [learning.entityId],
     references: [entity.id],
+  }),
+}));
+
+export const evaluationRelations = relations(evaluation, ({ one }) => ({
+  workspace: one(workspace, {
+    fields: [evaluation.workspaceId],
+    references: [workspace.id],
+  }),
+  question: one(question, {
+    fields: [evaluation.questionId],
+    references: [question.id],
   }),
 }));
 

@@ -84,6 +84,8 @@ export function useUpdateMapping() {
       qc.invalidateQueries({ queryKey: ["entities"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["activity"] });
+      qc.invalidateQueries({ queryKey: ["pipeline"] });
+      qc.invalidateQueries({ queryKey: ["sample-data"] });
     },
   });
 }

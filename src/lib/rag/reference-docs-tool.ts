@@ -1,7 +1,8 @@
 import type { ToolDefinition } from "@/lib/llm/provider";
 import { db } from "@/lib/db";
 import { context } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
+import { searchContextsFts } from "./fts5-search";
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -78,69 +79,41 @@ export function executeReferenceDocRetrieval(
 ): ReferenceDocsResult {
   const { query, category, subcategory, maxTokens: rawMaxTokens } = input;
   const tokenCap = Math.min(rawMaxTokens || 4000, 8000);
-  const queryLower = query.toLowerCase();
-  const queryTokens = queryLower.split(/\s+/).filter(Boolean);
 
-  // Load active contexts for workspace
+  // Count total active contexts for stats
   const allContexts = db
-    .select()
+    .select({ id: context.id })
     .from(context)
     .where(and(eq(context.workspaceId, workspaceId), eq(context.isActive, true)))
     .all();
 
-  // Apply optional filters
-  let filtered = allContexts;
-  if (category) {
-    filtered = filtered.filter((c) => c.category === category);
-  }
-  if (subcategory) {
-    filtered = filtered.filter((c) => c.subcategory === subcategory);
-  }
+  // Use FTS5 for ranked retrieval (falls back gracefully if table doesn't exist)
+  const ftsResults = searchContextsFts(workspaceId, query, 10);
 
-  // Score each context
-  const scored: ScoredDoc[] = [];
+  // Load full context records for FTS matches
+  let topDocs: ScoredDoc[] = [];
+  if (ftsResults.length > 0) {
+    const ftsIds = ftsResults.map((r) => r.contextId);
+    const ftsContexts = db
+      .select()
+      .from(context)
+      .where(inArray(context.id, ftsIds))
+      .all();
 
-  for (const ctx of filtered) {
-    const nameLower = ctx.name.toLowerCase();
-    const nameNormalized = nameLower.replace(/[_\s-]/g, "");
-    const queryNormalized = queryLower.replace(/[_\s-]/g, "");
-    const tags = (ctx.tags || []).map((t) => t.toLowerCase());
-    // Only check first 500 chars of content for scoring (avoid scanning huge docs)
-    const contentPrefix = (ctx.content || "").slice(0, 500).toLowerCase();
+    // Build a rank map for ordering
+    const rankMap = new Map(ftsResults.map((r) => [r.contextId, r.rank]));
 
-    let score = 0;
-
-    // Exact name match
-    if (nameNormalized === queryNormalized) {
-      score = 10;
+    // Apply optional category/subcategory filters
+    let filtered = ftsContexts;
+    if (category) {
+      filtered = filtered.filter((c) => c.category === category);
     }
-    // Name contains all query tokens
-    else if (queryTokens.every((t) => nameLower.includes(t))) {
-      score = 8;
-    }
-    // Tag match (all tokens)
-    else if (queryTokens.every((t) => tags.some((tag) => tag.includes(t)))) {
-      score = 7;
-    }
-    // Name contains any token
-    else if (queryTokens.some((t) => nameLower.includes(t))) {
-      score = 5;
-    }
-    // Tag match (any token)
-    else if (queryTokens.some((t) => tags.some((tag) => tag.includes(t)))) {
-      score = 4;
-    }
-    // Content prefix match (all tokens)
-    else if (queryTokens.every((t) => contentPrefix.includes(t))) {
-      score = 3;
-    }
-    // Content prefix match (any token)
-    else if (queryTokens.some((t) => contentPrefix.includes(t))) {
-      score = 2;
+    if (subcategory) {
+      filtered = filtered.filter((c) => c.subcategory === subcategory);
     }
 
-    if (score > 0) {
-      scored.push({
+    topDocs = filtered
+      .map((ctx) => ({
         id: ctx.id,
         name: ctx.name,
         category: ctx.category,
@@ -148,14 +121,11 @@ export function executeReferenceDocRetrieval(
         content: ctx.content || "",
         tokenCount: ctx.tokenCount,
         tags: ctx.tags,
-        score,
-      });
-    }
+        score: -(rankMap.get(ctx.id) ?? 0), // FTS5 rank is negative, lower = better
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
   }
-
-  // Sort by score desc, take top 3
-  scored.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
-  const topDocs = scored.slice(0, 3);
 
   // Truncate content to token cap (rough: 1 token ≈ 4 chars)
   const charCap = tokenCap * 4;

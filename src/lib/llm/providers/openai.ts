@@ -117,11 +117,32 @@ export class OpenAIProvider implements LLMProvider {
       ...(tools ? { tools } : {}),
     });
 
+    const choice = response.choices[0];
+    const finishReason = choice?.finish_reason;
+
+    // Map OpenAI finish reasons to our stopReason type
+    const stopReason = finishReason === "tool_calls"
+      ? "tool_use" as const
+      : finishReason === "length"
+        ? "max_tokens" as const
+        : "end_turn" as const;
+
+    // Extract tool calls if present
+    const toolCalls = choice?.message.tool_calls
+      ?.filter((tc): tc is OpenAI.ChatCompletionMessageToolCall & { type: "function" } => tc.type === "function")
+      .map((tc) => ({
+        id: tc.id,
+        name: tc.function.name,
+        input: JSON.parse(tc.function.arguments || "{}") as Record<string, unknown>,
+      }));
+
     return {
-      content: response.choices[0]?.message.content || "",
+      content: choice?.message.content || "",
       inputTokens: response.usage?.prompt_tokens || 0,
       outputTokens: response.usage?.completion_tokens || 0,
       model: response.model,
+      stopReason,
+      toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
     };
   }
 

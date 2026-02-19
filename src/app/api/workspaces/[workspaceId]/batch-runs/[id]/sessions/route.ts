@@ -8,6 +8,7 @@ import {
   fieldMapping,
   field,
   entity,
+  generation,
 } from "@/lib/db/schema";
 import { eq, and, ne, gte, inArray } from "drizzle-orm";
 
@@ -52,7 +53,12 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     .all();
 
   if (mappings.length === 0) {
-    return NextResponse.json({ sessions: [], batchRun: run });
+    return NextResponse.json({
+      sessions: [],
+      entityResults: [],
+      mode: "single-shot" as const,
+      batchRun: run,
+    });
   }
 
   const mappingIds = mappings.map((m) => m.id);
@@ -88,64 +94,181 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     .orderBy(chatSession.createdAt)
     .all();
 
-  // 4. Batch-fetch all messages for these sessions (excluding system role)
-  const sessionIds = sessions.map((s) => s.id);
-  const allMessages =
-    sessionIds.length > 0
-      ? db
-          .select()
-          .from(chatMessage)
-          .where(
-            and(
-              inArray(chatMessage.sessionId, sessionIds),
-              ne(chatMessage.role, "system")
+  // If we have chat sessions, return chat mode
+  if (sessions.length > 0) {
+    // 4. Batch-fetch all messages for these sessions (excluding system role)
+    const sessionIds = sessions.map((s) => s.id);
+    const allMessages =
+      sessionIds.length > 0
+        ? db
+            .select()
+            .from(chatMessage)
+            .where(
+              and(
+                inArray(chatMessage.sessionId, sessionIds),
+                ne(chatMessage.role, "system")
+              )
             )
-          )
-          .orderBy(chatMessage.createdAt)
-          .all()
-      : [];
+            .orderBy(chatMessage.createdAt)
+            .all()
+        : [];
 
-  // Group messages by session
-  const messagesBySession = new Map<string, typeof allMessages>();
-  for (const msg of allMessages) {
-    const list = messagesBySession.get(msg.sessionId) || [];
-    list.push(msg);
-    messagesBySession.set(msg.sessionId, list);
+    // Group messages by session
+    const messagesBySession = new Map<string, typeof allMessages>();
+    for (const msg of allMessages) {
+      const list = messagesBySession.get(msg.sessionId) || [];
+      list.push(msg);
+      messagesBySession.set(msg.sessionId, list);
+    }
+
+    // 5. Build response
+    const result = sessions.map((s) => {
+      const msgs = messagesBySession.get(s.id) || [];
+      const mapping = s.fieldMappingId
+        ? mappingById.get(s.fieldMappingId)
+        : null;
+
+      // Extract mapping result from last assistant message's metadata
+      const lastAssistant = [...msgs]
+        .reverse()
+        .find((m) => m.role === "assistant" && m.metadata?.mappingUpdate);
+
+      return {
+        id: s.id,
+        fieldMappingId: s.fieldMappingId,
+        fieldName: s.fieldName,
+        entityName: s.entityName,
+        status: s.status,
+        messageCount: s.messageCount,
+        createdAt: s.createdAt,
+        messages: msgs.filter(
+          (m) => !(m.metadata as Record<string, unknown> | null)?.kickoff
+        ),
+        mappingResult: lastAssistant?.metadata?.mappingUpdate || null,
+        mappingSummary: mapping
+          ? {
+              mappingType: mapping.mappingType,
+              confidence: mapping.confidence,
+              status: mapping.status,
+            }
+          : null,
+      };
+    });
+
+    return NextResponse.json({
+      sessions: result,
+      entityResults: [],
+      mode: "chat" as const,
+      batchRun: run,
+    });
   }
 
-  // 5. Build response
-  const result = sessions.map((s) => {
-    const msgs = messagesBySession.get(s.id) || [];
-    const mapping = s.fieldMappingId
-      ? mappingById.get(s.fieldMappingId)
-      : null;
+  // 6. Single-shot mode fallback: query generation records for this batch run
+  const generations = db
+    .select({
+      id: generation.id,
+      entityId: generation.entityId,
+      entityName: entity.name,
+      status: generation.status,
+      inputTokens: generation.inputTokens,
+      outputTokens: generation.outputTokens,
+      durationMs: generation.durationMs,
+      validationScore: generation.validationScore,
+      error: generation.error,
+    })
+    .from(generation)
+    .leftJoin(entity, eq(generation.entityId, entity.id))
+    .where(eq(generation.batchRunId, id))
+    .orderBy(generation.createdAt)
+    .all();
 
-    // Extract mapping result from last assistant message's metadata
-    const lastAssistant = [...msgs]
-      .reverse()
-      .find((m) => m.role === "assistant" && m.metadata?.mappingUpdate);
+  // 7. For each generation, gather field mappings with source info
+  const batchMappings = db
+    .select({
+      id: fieldMapping.id,
+      generationId: fieldMapping.generationId,
+      targetFieldName: field.name,
+      mappingType: fieldMapping.mappingType,
+      confidence: fieldMapping.confidence,
+      sourceFieldId: fieldMapping.sourceFieldId,
+      sourceEntityId: fieldMapping.sourceEntityId,
+      transform: fieldMapping.transform,
+      reasoning: fieldMapping.reasoning,
+    })
+    .from(fieldMapping)
+    .leftJoin(field, eq(fieldMapping.targetFieldId, field.id))
+    .where(
+      and(
+        eq(fieldMapping.batchRunId, id),
+        eq(fieldMapping.isLatest, true)
+      )
+    )
+    .orderBy(field.name)
+    .all();
 
+  // Batch-lookup source field and entity names
+  const sourceFieldIds = [...new Set(batchMappings.map((m) => m.sourceFieldId).filter(Boolean))] as string[];
+  const sourceEntityIds = [...new Set(batchMappings.map((m) => m.sourceEntityId).filter(Boolean))] as string[];
+
+  const sourceFieldNames = sourceFieldIds.length > 0
+    ? new Map(
+        db.select({ id: field.id, name: field.name })
+          .from(field)
+          .where(inArray(field.id, sourceFieldIds))
+          .all()
+          .map((f) => [f.id, f.name])
+      )
+    : new Map<string, string>();
+
+  const sourceEntityNames = sourceEntityIds.length > 0
+    ? new Map(
+        db.select({ id: entity.id, name: entity.name })
+          .from(entity)
+          .where(inArray(entity.id, sourceEntityIds))
+          .all()
+          .map((e) => [e.id, e.name])
+      )
+    : new Map<string, string>();
+
+  // Group mappings by generationId
+  const mappingsByGeneration = new Map<string, typeof batchMappings>();
+  for (const m of batchMappings) {
+    if (!m.generationId) continue;
+    const list = mappingsByGeneration.get(m.generationId) || [];
+    list.push(m);
+    mappingsByGeneration.set(m.generationId, list);
+  }
+
+  // 8. Assemble entity results
+  const entityResults = generations.map((gen) => {
+    const genMappings = mappingsByGeneration.get(gen.id) || [];
     return {
-      id: s.id,
-      fieldMappingId: s.fieldMappingId,
-      fieldName: s.fieldName,
-      entityName: s.entityName,
-      status: s.status,
-      messageCount: s.messageCount,
-      createdAt: s.createdAt,
-      messages: msgs.filter(
-        (m) => !(m.metadata as Record<string, unknown> | null)?.kickoff
-      ),
-      mappingResult: lastAssistant?.metadata?.mappingUpdate || null,
-      mappingSummary: mapping
-        ? {
-            mappingType: mapping.mappingType,
-            confidence: mapping.confidence,
-            status: mapping.status,
-          }
-        : null,
+      entityId: gen.entityId || "",
+      entityName: gen.entityName || "Unknown",
+      generationId: gen.id,
+      status: gen.status,
+      fieldCount: genMappings.length,
+      fieldMappings: genMappings.map((m) => ({
+        targetFieldName: m.targetFieldName || "Unknown",
+        mappingType: m.mappingType,
+        confidence: m.confidence,
+        sourceFieldName: m.sourceFieldId ? sourceFieldNames.get(m.sourceFieldId) || null : null,
+        sourceEntityName: m.sourceEntityId ? sourceEntityNames.get(m.sourceEntityId) || null : null,
+        transform: m.transform,
+        reasoning: m.reasoning,
+      })),
+      inputTokens: gen.inputTokens,
+      outputTokens: gen.outputTokens,
+      durationMs: gen.durationMs,
+      validationScore: gen.validationScore,
+      error: gen.error,
     };
   });
 
-  return NextResponse.json({ sessions: result, batchRun: run });
+  return NextResponse.json({
+    sessions: [],
+    entityResults,
+    mode: "single-shot" as const,
+    batchRun: run,
+  });
 });

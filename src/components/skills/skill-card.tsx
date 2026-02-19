@@ -5,10 +5,11 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { TagBadge } from "@/components/shared/tag-badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { useSkill } from "@/queries/skill-queries";
 import { groupByRole, formatTokens } from "./skill-utils";
 import { SKILL_CONTEXT_ROLE_LABELS, type SkillContextRole } from "@/lib/constants";
-import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Hammer } from "lucide-react";
 import type { SkillWithCount, SkillContextWithDetail } from "@/types/skill";
 
 const DEFAULT_BUDGET = 160_000;
@@ -203,6 +204,19 @@ export function SkillCard({ skill }: SkillCardProps) {
                   {budget.dropped.length} context{budget.dropped.length !== 1 ? "s" : ""} would be
                   trimmed at {formatTokens(DEFAULT_BUDGET)} budget
                 </p>
+              )}
+
+              {/* Refine with Forge button */}
+              {app?.entityPatterns?.[0] && (
+                <Link
+                  href={`/skills/forge/${encodeURIComponent(app.entityPatterns[0])}?skillId=${skill.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Button variant="outline" size="sm" className="w-full mt-1">
+                    <Hammer className="h-3 w-3 mr-1.5" />
+                    Refine with Forge
+                  </Button>
+                </Link>
               )}
             </>
           )}

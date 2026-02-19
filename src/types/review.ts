@@ -9,6 +9,8 @@ export interface ReviewCardData {
   milestone: string | null;
   entityId: string;
   entityName: string;
+  parentEntityId: string | null;
+  parentEntityName: string | null;
   status: MappingStatus;
   mappingType: MappingType | null;
   confidence: ConfidenceLevel | null;
@@ -22,9 +24,17 @@ export interface ReviewCardData {
   notes: string | null;
   puntNote: string | null;
   excludeReason: string | null;
+  assigneeId: string | null;
+  assigneeName: string | null;
   createdBy: string;
   batchRunId: string | null;
   createdAt: string;
+}
+
+export interface ChildEntityGroup {
+  entityId: string;
+  entityName: string;
+  cards: ReviewCardData[];
 }
 
 export type ReviewSortBy = "confidence" | "entityName" | "createdAt" | "targetFieldName";

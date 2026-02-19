@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { schemaAsset, entity, field } from "@/lib/db/schema";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and, count, isNull } from "drizzle-orm";
 
 export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   const { id } = await ctx.params;
@@ -28,11 +28,11 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
     return NextResponse.json({ error: "Schema asset not found" }, { status: 404 });
   }
 
-  // Get entities with field counts
+  // Get top-level entities (exclude child/component entities)
   const entities = db
     .select()
     .from(entity)
-    .where(eq(entity.schemaAssetId, id))
+    .where(and(eq(entity.schemaAssetId, id), isNull(entity.parentEntityId)))
     .orderBy(entity.sortOrder)
     .all();
 

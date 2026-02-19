@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { question, questionReply, fieldMapping, learning, field, schemaAsset, entity, user } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { resolveQuestionSchema } from "@/lib/validators/question";
+import { rebuildEntityKnowledge } from "@/lib/generation/entity-knowledge";
+import { evaluateResolution } from "@/lib/generation/answer-evaluator";
 
 /**
  * Heuristic: does the answer indicate the field has no available source data?
@@ -31,6 +33,16 @@ function isExcludeSignal(answer: string): boolean {
     "not in the data",
     "does not provide",
     "doesn't provide",
+    "deprecated",
+    "good to exclude",
+    "skip this",
+    "skip both",
+    "do not map",
+    "don't map",
+    "should not be mapped",
+    "shouldn't be mapped",
+    "exclude it",
+    "exclude this",
   ];
   return patterns.some((p) => lower.includes(p));
 }
@@ -107,6 +119,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
 
   // ── Side effects ──────────────────────────────────────────
   const answerText = resolutionBody || q.answer;
+  let cascadeCount = 0;
 
   if (answerText) {
     // Resolve field name for the learning record
@@ -164,13 +177,126 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
         entityId: updated.entityId,
         fieldName,
         scope: fieldName ? "field" : "entity",
-        content: `SM answered context gap: ${answerText}${schemaContext}`,
+        content: `Q: "${updated.question}" (field: ${fieldName || "entity-level"}) — A: ${answerText}${schemaContext}`,
         source: "review",
         sessionId: updated.chatSessionId,
         createdAt: now,
       })
       .run();
+
+    // 4. Rebuild Entity Knowledge context (single source of truth via RAG)
+    if (updated.entityId) {
+      rebuildEntityKnowledge(workspaceId, updated.entityId);
+    }
+
+    // 5. AI follow-up evaluation (fire-and-forget — async, non-blocking)
+    if (updated.askedBy === "llm" && answerText) {
+      evaluateResolution({
+        workspaceId,
+        questionId: id,
+        resolverUserId: userId,
+        resolverName: authorName,
+        resolutionText: answerText,
+      }).catch((err) => console.warn("[resolve] AI follow-up failed:", err));
+    }
+
+    // 6. Cascade resolution: auto-resolve other open questions for same entity+field
+    //    AND sibling component entities with the same field name (assembly dedup)
+    if (updated.fieldId && updated.entityId) {
+      try {
+        // Resolve the field name for cross-entity matching
+        const resolvedField = db.select({ name: field.name }).from(field)
+          .where(eq(field.id, updated.fieldId)).get();
+
+        // Find sibling component entities (same parentEntityId)
+        const thisEntity = db.select({ parentEntityId: entity.parentEntityId }).from(entity)
+          .where(eq(entity.id, updated.entityId)).get();
+        const siblingEntityIds: string[] = [];
+        if (thisEntity?.parentEntityId && resolvedField) {
+          const siblings = db.select({ id: entity.id }).from(entity)
+            .where(and(
+              eq(entity.workspaceId, workspaceId),
+              eq(entity.parentEntityId, thisEntity.parentEntityId),
+            )).all().filter((s) => s.id !== updated.entityId);
+          siblingEntityIds.push(...siblings.map((s) => s.id));
+        }
+
+        // Build list of all field IDs to cascade to (same field + sibling fields by name)
+        const cascadeFieldIds = [updated.fieldId];
+        if (siblingEntityIds.length > 0 && resolvedField) {
+          const siblingFields = db.select({ id: field.id }).from(field)
+            .where(and(
+              inArray(field.entityId, siblingEntityIds),
+              eq(field.name, resolvedField.name),
+            )).all();
+          cascadeFieldIds.push(...siblingFields.map((f) => f.id));
+        }
+
+        const allEntityIds = [updated.entityId, ...siblingEntityIds];
+
+        const relatedOpen = db
+          .select()
+          .from(question)
+          .where(
+            and(
+              eq(question.workspaceId, workspaceId),
+              inArray(question.entityId, allEntityIds),
+              inArray(question.fieldId, cascadeFieldIds),
+              eq(question.status, "open"),
+            )
+          )
+          .all()
+          .filter((rq) => rq.id !== id);
+
+        for (const rq of relatedOpen) {
+          db.update(question)
+            .set({
+              status: "resolved",
+              answer: answerText,
+              answeredBy: userId,
+              resolvedBy: userId,
+              resolvedByName: authorName,
+              resolvedAt: now,
+              autoResolvedFrom: id,
+              updatedAt: now,
+            })
+            .where(eq(question.id, rq.id))
+            .run();
+
+          db.insert(questionReply)
+            .values({
+              questionId: rq.id,
+              authorId: null,
+              authorName: "System",
+              authorRole: "system",
+              body: `Auto-resolved: sibling entity question about "${resolvedField?.name || "this field"}" was answered — "${answerText}"`,
+              isResolution: true,
+            })
+            .run();
+
+          db.update(question)
+            .set({ replyCount: rq.replyCount + 1 })
+            .where(eq(question.id, rq.id))
+            .run();
+
+          cascadeCount++;
+        }
+
+        // Rebuild entity knowledge for affected sibling entities too
+        for (const sibId of siblingEntityIds) {
+          if (relatedOpen.some((rq) => rq.entityId === sibId)) {
+            rebuildEntityKnowledge(workspaceId, sibId);
+          }
+        }
+
+        if (cascadeCount > 0) {
+          console.log(`[resolve] Cascade-resolved ${cascadeCount} related questions (including ${siblingEntityIds.length} sibling entities) for field "${resolvedField?.name}"`);
+        }
+      } catch (cascadeErr) {
+        console.warn("[resolve] Cascade resolution failed (non-blocking):", cascadeErr);
+      }
+    }
   }
 
-  return NextResponse.json(updated);
+  return NextResponse.json({ ...updated, cascadeCount });
 }, { requiredRole: "editor" });

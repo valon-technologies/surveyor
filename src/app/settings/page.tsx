@@ -2,10 +2,51 @@
 
 import { useSession } from "next-auth/react";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
+import { useEffect, useState, useTransition } from "react";
+import {
+  FIELD_DOMAINS,
+  FIELD_DOMAIN_LABELS,
+  FIELD_DOMAIN_DESCRIPTIONS,
+  FIELD_DOMAIN_COLORS,
+  type FieldDomain,
+} from "@/lib/constants";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
   const { workspaceName, role } = useWorkspace();
+
+  const [domains, setDomains] = useState<FieldDomain[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, startSave] = useTransition();
+  const [saved, setSaved] = useState(false);
+
+  // Load current domain preferences
+  useEffect(() => {
+    fetch("/api/user/profile")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.domains)) setDomains(data.domains);
+        setLoaded(true);
+      });
+  }, []);
+
+  function toggleDomain(d: FieldDomain) {
+    const next = domains.includes(d)
+      ? domains.filter((x) => x !== d)
+      : [...domains, d];
+    setDomains(next);
+    setSaved(false);
+
+    startSave(async () => {
+      await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domains: next }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    });
+  }
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
@@ -29,6 +70,63 @@ export default function SettingsPage() {
           <span className="text-muted-foreground">Your Role</span>
           <span className="capitalize">{role}</span>
         </div>
+      </div>
+
+      <div className="border rounded-lg p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-medium">Domain Specialties</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Select the domains you specialize in. Fields will be auto-assigned to you based on these preferences.
+            </p>
+          </div>
+          {saving && (
+            <span className="text-xs text-muted-foreground">Saving...</span>
+          )}
+          {saved && !saving && (
+            <span className="text-xs text-emerald-600">Saved</span>
+          )}
+        </div>
+
+        {loaded && (
+          <div className="grid gap-2">
+            {FIELD_DOMAINS.map((d) => {
+              const active = domains.includes(d);
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => toggleDomain(d)}
+                  className={`flex items-start gap-3 rounded-md border px-3 py-2.5 text-left transition-colors ${
+                    active
+                      ? "border-foreground/20 bg-accent"
+                      : "border-transparent hover:bg-accent/50"
+                  }`}
+                >
+                  <span
+                    className="mt-0.5 h-3 w-3 shrink-0 rounded-full border-2"
+                    style={{
+                      borderColor: FIELD_DOMAIN_COLORS[d],
+                      backgroundColor: active ? FIELD_DOMAIN_COLORS[d] : "transparent",
+                    }}
+                  />
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium">{FIELD_DOMAIN_LABELS[d]}</span>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+                      {FIELD_DOMAIN_DESCRIPTIONS[d]}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {domains.length === 0 && loaded && (
+          <p className="text-xs text-muted-foreground italic">
+            No domains selected — you&apos;ll be eligible for fields across all domains.
+          </p>
+        )}
       </div>
     </div>
   );

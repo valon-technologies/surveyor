@@ -44,6 +44,8 @@ export function useAcceptMapping() {
       qc.invalidateQueries({ queryKey: ["mappings"] });
       qc.invalidateQueries({ queryKey: ["entities"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["pipeline"] });
+      qc.invalidateQueries({ queryKey: ["sample-data"] });
     },
   });
 }
@@ -60,6 +62,8 @@ export function useExcludeMapping() {
       qc.invalidateQueries({ queryKey: ["mappings"] });
       qc.invalidateQueries({ queryKey: ["entities"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["pipeline"] });
+      qc.invalidateQueries({ queryKey: ["sample-data"] });
     },
   });
 }
@@ -76,6 +80,8 @@ export function useBatchExclude() {
       qc.invalidateQueries({ queryKey: ["mappings"] });
       qc.invalidateQueries({ queryKey: ["entities"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["pipeline"] });
+      qc.invalidateQueries({ queryKey: ["sample-data"] });
     },
   });
 }
@@ -92,6 +98,22 @@ export function useUndoReview() {
       qc.invalidateQueries({ queryKey: ["mappings"] });
       qc.invalidateQueries({ queryKey: ["entities"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["pipeline"] });
+      qc.invalidateQueries({ queryKey: ["sample-data"] });
+    },
+  });
+}
+
+export function useReassignMapping() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "mappings");
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ mappingId, assigneeId }: { mappingId: string; assigneeId: string | null }) =>
+      api.patch(`${basePath}/${mappingId}`, { assigneeId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["review-queue"] });
+      qc.invalidateQueries({ queryKey: ["mappings"] });
     },
   });
 }

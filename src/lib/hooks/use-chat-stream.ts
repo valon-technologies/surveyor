@@ -3,6 +3,10 @@
 import { useState, useCallback, useRef } from "react";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import type { ChatMessage } from "@/types/chat";
+import type { PipelineStructureUpdate } from "@/types/pipeline";
+import type { ForgeClientData } from "@/lib/generation/forge-tools";
+
+export type { ForgeClientData } from "@/lib/generation/forge-tools";
 
 export interface ToolExecution {
   toolName: string;
@@ -16,11 +20,12 @@ export interface ToolExecution {
     durationMs?: number;
     preview?: Record<string, unknown>[];
   };
+  forgeData?: ForgeClientData;
 }
 
 interface StreamEvent {
-  type: "text" | "usage" | "mapping_update" | "tool_start" | "tool_result" | "done" | "error";
-  content?: string | Record<string, unknown>;
+  type: "text" | "usage" | "mapping_update" | "entity_mapping_updates" | "pipeline_structure_update" | "skill_update" | "tool_start" | "tool_result" | "done" | "error";
+  content?: string | Record<string, unknown> | Record<string, unknown>[];
   inputTokens?: number;
   outputTokens?: number;
   error?: string;
@@ -33,6 +38,7 @@ interface StreamEvent {
   rowCount?: number;
   durationMs?: number;
   preview?: Record<string, unknown>[];
+  forgeData?: ForgeClientData;
 }
 
 interface SendMessageOptions {
@@ -45,22 +51,42 @@ interface UseChatStreamReturn {
   isStreaming: boolean;
   streamingContent: string;
   pendingUpdate: Record<string, unknown> | null;
+  pendingEntityUpdates: Record<string, unknown>[] | null;
+  pendingPipelineUpdate: PipelineStructureUpdate | null;
+  pendingSkillUpdate: Record<string, unknown> | null;
   activeToolCall: ToolExecution | null;
   toolHistory: ToolExecution[];
+  forgeToolResults: ToolExecution[];
   sendMessage: (content: string, options?: SendMessageOptions) => Promise<void>;
   setMessages: (messages: ChatMessage[]) => void;
+  resetForgeToolResults: () => void;
 }
 
-export function useChatStream(sessionId: string | null): UseChatStreamReturn {
+interface UseChatStreamOptions {
+  /** API path prefix between workspaceId and sessionId. Default: "chat-sessions" */
+  apiPrefix?: string;
+}
+
+export function useChatStream(sessionId: string | null, options?: UseChatStreamOptions): UseChatStreamReturn {
   const { workspaceId } = useWorkspace();
+  const apiPrefix = options?.apiPrefix || "chat-sessions";
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [pendingUpdate, setPendingUpdate] =
     useState<Record<string, unknown> | null>(null);
+  const [pendingEntityUpdates, setPendingEntityUpdates] =
+    useState<Record<string, unknown>[] | null>(null);
+  const [pendingPipelineUpdate, setPendingPipelineUpdate] =
+    useState<PipelineStructureUpdate | null>(null);
+  const [pendingSkillUpdate, setPendingSkillUpdate] =
+    useState<Record<string, unknown> | null>(null);
   const [activeToolCall, setActiveToolCall] = useState<ToolExecution | null>(null);
   const [toolHistory, setToolHistory] = useState<ToolExecution[]>([]);
+  const [forgeToolResults, setForgeToolResults] = useState<ToolExecution[]>([]);
   const abortRef = useRef<AbortController | null>(null);
+
+  const resetForgeToolResults = useCallback(() => setForgeToolResults([]), []);
 
   const sendMessage = useCallback(
     async (content: string, options?: SendMessageOptions) => {
@@ -85,6 +111,9 @@ export function useChatStream(sessionId: string | null): UseChatStreamReturn {
       setIsStreaming(true);
       setStreamingContent("");
       setPendingUpdate(null);
+      setPendingEntityUpdates(null);
+      setPendingPipelineUpdate(null);
+      setPendingSkillUpdate(null);
       setActiveToolCall(null);
       setToolHistory([]);
 
@@ -93,7 +122,7 @@ export function useChatStream(sessionId: string | null): UseChatStreamReturn {
 
       try {
         const res = await fetch(
-          `/api/workspaces/${workspaceId}/chat-sessions/${sessionId}/messages`,
+          `/api/workspaces/${workspaceId}/${apiPrefix}/${sessionId}/messages`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -139,6 +168,18 @@ export function useChatStream(sessionId: string | null): UseChatStreamReturn {
                 setPendingUpdate(event.content as Record<string, unknown>);
               }
 
+              if (event.type === "entity_mapping_updates" && event.content) {
+                setPendingEntityUpdates(event.content as Record<string, unknown>[]);
+              }
+
+              if (event.type === "pipeline_structure_update" && event.content) {
+                setPendingPipelineUpdate(event.content as unknown as PipelineStructureUpdate);
+              }
+
+              if (event.type === "skill_update" && event.content) {
+                setPendingSkillUpdate(event.content as Record<string, unknown>);
+              }
+
               if (event.type === "tool_start") {
                 const toolExec: ToolExecution = {
                   toolName: event.toolName || "query_bigquery",
@@ -162,9 +203,14 @@ export function useChatStream(sessionId: string | null): UseChatStreamReturn {
                     durationMs: event.durationMs,
                     preview: event.preview,
                   },
+                  forgeData: event.forgeData,
                 };
                 setActiveToolCall(completed);
                 setToolHistory((prev) => [...prev, completed]);
+                // Accumulate forge tool results for persistent cards
+                if (event.forgeData) {
+                  setForgeToolResults((prev) => [...prev, completed]);
+                }
                 // Clear active indicator after a short delay
                 setTimeout(() => setActiveToolCall(null), 500);
               }
@@ -212,7 +258,7 @@ export function useChatStream(sessionId: string | null): UseChatStreamReturn {
         abortRef.current = null;
       }
     },
-    [sessionId, workspaceId, isStreaming]
+    [sessionId, workspaceId, apiPrefix, isStreaming]
   );
 
   return {
@@ -220,9 +266,14 @@ export function useChatStream(sessionId: string | null): UseChatStreamReturn {
     isStreaming,
     streamingContent,
     pendingUpdate,
+    pendingEntityUpdates,
+    pendingPipelineUpdate,
+    pendingSkillUpdate,
     activeToolCall,
     toolHistory,
+    forgeToolResults,
     sendMessage,
     setMessages,
+    resetForgeToolResults,
   };
 }

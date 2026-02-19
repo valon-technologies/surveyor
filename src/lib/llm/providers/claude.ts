@@ -23,12 +23,21 @@ export class ClaudeProvider implements LLMProvider {
     const messages = request.messages ?? [
       { role: "user" as const, content: request.userMessage! },
     ];
+
+    // Build Anthropic tools if provided
+    const tools: Anthropic.Tool[] | undefined = request.tools?.map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
+    }));
+
     const response = await this.client.messages.create({
       model: request.model || DEFAULT_MODEL,
       max_tokens: request.maxTokens || 4096,
       temperature: request.temperature ?? 0,
       system: request.systemMessage,
       messages: messages as Anthropic.MessageParam[],
+      ...(tools && tools.length > 0 ? { tools } : {}),
     });
 
     const content = response.content
@@ -36,11 +45,22 @@ export class ClaudeProvider implements LLMProvider {
       .map((block) => block.text)
       .join("");
 
+    // Extract tool calls from response
+    const toolCalls = response.content
+      .filter((block): block is Anthropic.ToolUseBlock => block.type === "tool_use")
+      .map((block) => ({
+        id: block.id,
+        name: block.name,
+        input: block.input as Record<string, unknown>,
+      }));
+
     return {
       content,
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
       model: response.model,
+      stopReason: response.stop_reason as "end_turn" | "tool_use" | "max_tokens" | undefined,
+      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
     };
   }
 

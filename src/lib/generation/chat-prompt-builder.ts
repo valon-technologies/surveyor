@@ -1,4 +1,6 @@
 import type { AssembledContext } from "./context-assembler";
+import { getSystemContextBundle, renderSystemContextSection } from "./system-context";
+import type { FKConstraint } from "./fk-constraint-store";
 
 interface FieldMetadata {
   name: string;
@@ -26,7 +28,7 @@ interface SourceEntitySchema {
   fields: { name: string; dataType: string | null; description?: string | null }[];
 }
 
-interface SourceDataPreview {
+export interface SourceDataPreview {
   tableName: string;
   rowCount: number;
   sampleRows: Record<string, unknown>[];
@@ -101,6 +103,10 @@ interface ChatPromptInput {
   sourceSchemaStats?: SourceSchemaStats;
   unmatchedPipelineSources?: string[];
   answeredQuestions?: AnsweredQuestion[];
+  workspaceRules?: string[];
+  workspaceId?: string;
+  scaffoldStrategy?: string;
+  fkConstraints?: FKConstraint[];
 }
 
 const CHAT_SYSTEM_MESSAGE = `You are a senior data mapping expert helping a user review and refine field-level data mappings between a source system and a target schema. You are conversational, precise, and grounded in the reference materials provided.
@@ -129,6 +135,10 @@ When you want to propose a change to the current mapping, include a fenced block
   "notes": null
 }
 \`\`\`
+
+VALID VALUES (use ONLY these exact strings):
+- mappingType: "direct" | "rename" | "type_cast" | "enum" | "flatten_to_normalize" | "aggregate" | "join" | "derived" | "pivot" | "conditional"
+- confidence: "high" | "medium" | "low"
 
 Only include fields you want to change. The user must explicitly accept the update for it to be applied.
 
@@ -232,6 +242,42 @@ These principles apply to ALL mappings in this workspace. Follow them unless con
    e. IF NOT FOUND: Use query_bigquery to check if the table exists in the dataset (e.g., SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE table_name LIKE '%Court%').
    f. IF TABLE EXISTS IN BQ BUT NOT IN SCHEMA: Flag this in your response: "CONTEXT GAP: Fields {field_list} describe a '{entity_type}' entity. The source table has FK column '{fk_column}' but no '{table}' reference table is available in the source schema. A human should add this table as a source entity for accurate mapping." Map these fields as unmapped/requires_context rather than guessing.
    g. NEVER fabricate attribute columns on the FK table. If DefaultWorkstations has BankruptcyCourtId, it does NOT have BankruptcyCourtState — that lives on Courts.`;
+
+/**
+ * Hard-coded domain rules from battle-tested mapping experience.
+ * These prevent recurring errors observed across many mapping sessions.
+ */
+export const DOMAIN_RULES = [
+  `ACDC DATE FORMAT: ACDC dates are already YYYY-MM-DD strings. Use SAFE_CAST(x AS DATE), NEVER PARSE_DATE. PARSE_DATE will silently NULL out valid dates if the format doesn't match exactly.`,
+  `ENTITY BOUNDARIES: These fields belong to loan_at_origination_info, NOT loan: original_interest_rate, original_loan_amount, original_loan_term, original_ltv_ratio, original_cltv_ratio, original_dti_ratio, original_upb. Also: principal_balance belongs to loan_accounting_balance, NOT loan.`,
+  `EXHAUSTIVE FIELD SEARCH: Before mapping any field, search ALL tables via INFORMATION_SCHEMA. Compare null rates + distinct values across candidates. Do NOT stop at the first table that has a matching column name — there may be a better source with higher population rates or more accurate data.`,
+  `CONDITIONAL LOGIC FOR PREFIXED FIELDS: Fields prefixed with hamp_*, fannie_*, ginnie_*, fha_*, va_* MUST include investor/program type filtering in their transform. A ginnie_ field should only be populated when the loan is a Ginnie Mae loan. Do NOT return values for loans that don't match the prefix's program.`,
+  `FUTURE-PROOF NULL FIELDS: If a target field is schema-active and semantically relevant but the source column is currently 0% populated, still map it. Use the correct source column even if all values are NULL today — data may appear later. Only use transform: null (unmapped) when no plausible source column exists at all.`,
+  `BIGQUERY TYPES ARE ARTIFACTS: INT64/STRING types in BigQuery may not reflect the true schema. A column typed STRING may contain dates, enums, or booleans stored as text codes. Always check the Ocean ACDC Schema Lookups (enum reference docs) before assuming a column's semantic type from its BigQuery data type.`,
+  `PRE-FLIGHT ENUM CHECKLIST: Before mapping ANY enum field: (1) query source distinct values via BigQuery, (2) compare against target allowed values from the field definition, (3) document gaps between source codes and target enum values. Never assume source codes match target values without checking.`,
+];
+
+/**
+ * Render domain rules + workspace rules as a system message section.
+ */
+export function renderWorkspaceRulesSection(workspaceRules?: string[]): string {
+  const parts: string[] = [];
+
+  parts.push(`\nDOMAIN-SPECIFIC RULES (from battle-tested mapping experience — follow these strictly):`);
+  for (let i = 0; i < DOMAIN_RULES.length; i++) {
+    parts.push(`${i + 1}. ${DOMAIN_RULES[i]}`);
+  }
+
+  if (workspaceRules && workspaceRules.length > 0) {
+    parts.push(`\nWORKSPACE RULES (learned from corrections in this workspace — follow these strictly):`);
+    const capped = workspaceRules.slice(0, 20);
+    for (let i = 0; i < capped.length; i++) {
+      parts.push(`${i + 1}. ${capped[i]}`);
+    }
+  }
+
+  return parts.join("\n");
+}
 
 /**
  * Render a SourceDataPreview as markdown for prompt injection.
@@ -364,6 +410,34 @@ export function buildChatPrompt(input: ChatPromptInput): {
           parts.push(`- \`${src.alias}\` → \`${src.table}\``);
         }
       }
+    }
+  }
+
+  // Scaffold strategy (from Phase 2 scaffolding engine)
+  if (input.scaffoldStrategy) {
+    parts.push(`\n## Mapping Strategy\n${input.scaffoldStrategy}`);
+  }
+
+  // FK constraints from parent entities (Phase 3)
+  if (input.fkConstraints?.length) {
+    parts.push(`\n## Cross-Entity FK Constraints`);
+    parts.push(
+      `The following parent entities have already been mapped. When this entity ` +
+      `references these parent IDs, use the SAME hash pattern for consistency.\n`
+    );
+    for (const c of input.fkConstraints) {
+      parts.push(`### ${c.entityName}.${c.idField}`);
+      if (c.hashColumns?.length) {
+        parts.push(`- Hash columns: [${c.hashColumns.join(", ")}]`);
+      }
+      if (c.transform) {
+        parts.push(`- Transform: ${c.transform}`);
+      }
+      parts.push(
+        `- When this entity has a foreign key referencing ${c.entityName}, ` +
+        `map as identity pass-through from staging dependency.`
+      );
+      parts.push("");
     }
   }
 
@@ -626,8 +700,17 @@ export function buildChatPrompt(input: ChatPromptInput): {
     }
   }
 
-  // Conditionally add BigQuery tool instructions to system message
+  // Append domain-specific rules, workspace-scoped learnings, and universal context
   let systemMessage = CHAT_SYSTEM_MESSAGE;
+  systemMessage += renderWorkspaceRulesSection(input.workspaceRules);
+
+  if (input.workspaceId) {
+    const bundle = getSystemContextBundle(input.workspaceId);
+    if (bundle.totalTokens > 0) {
+      systemMessage += renderSystemContextSection(bundle);
+    }
+  }
+
   if (bigqueryAvailable && baselineDataPreloaded) {
     systemMessage += `
 

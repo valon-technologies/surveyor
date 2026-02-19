@@ -14,7 +14,7 @@ import { useEntity } from "@/queries/entity-queries";
 import { useRippleSimilar } from "@/queries/ripple-queries";
 import { RipplePanel } from "@/components/review/ripple-panel";
 import type { ReviewCardData } from "@/types/review";
-import type { MappingStatus } from "@/lib/constants";
+import { MAPPING_TYPES, CONFIDENCE_LEVELS, type MappingStatus } from "@/lib/constants";
 import {
   useCreateChatSession,
   useChatSession,
@@ -185,8 +185,18 @@ export function DiscussClient() {
 
   const handleApplyUpdate = (update: Record<string, unknown>) => {
     if (!activeMappingId) return;
+    // Sanitize LLM-produced values: strip display-only keys and coerce invalid enums
+    const { sourceEntityName, sourceFieldName, ...patchData } = update;
+    if (patchData.mappingType && !MAPPING_TYPES.includes(patchData.mappingType as typeof MAPPING_TYPES[number])) {
+      console.warn(`[discuss] Unknown mappingType "${patchData.mappingType}", coercing to "derived"`);
+      patchData.mappingType = "derived";
+    }
+    if (patchData.confidence && !CONFIDENCE_LEVELS.includes(patchData.confidence as typeof CONFIDENCE_LEVELS[number])) {
+      console.warn(`[discuss] Unknown confidence "${patchData.confidence}", coercing to "medium"`);
+      patchData.confidence = "medium";
+    }
     updateMapping.mutate(
-      { id: activeMappingId, ...update },
+      { id: activeMappingId, status: "accepted", ...patchData },
       {
         onSuccess: (newVersion) => {
           // Copy-on-write creates a new record — follow the new ID
@@ -338,6 +348,8 @@ export function DiscussClient() {
                 entityId: mapping.targetField?.entityId || "",
                 entityName:
                   mapping.targetField?.entityName || entityName,
+                parentEntityId: null,
+                parentEntityName: null,
                 status: mapping.status,
                 mappingType: mapping.mappingType ?? null,
                 confidence: mapping.confidence ?? null,

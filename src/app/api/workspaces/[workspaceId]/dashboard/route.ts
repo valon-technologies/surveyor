@@ -8,6 +8,7 @@ import {
   question,
   user,
   chatSession,
+  evaluation,
 } from "@/lib/db/schema";
 import { eq, and, sql, count, notInArray } from "drizzle-orm";
 import { MILESTONES } from "@/lib/constants";
@@ -128,8 +129,39 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
     .orderBy(entity.sortOrder)
     .all();
 
+  // Identify assembly parent entities (those that have child entities)
+  // Assembly parents don't have direct field mappings — stats derive from children
+  const assemblyParentIds = new Set<string>();
+  for (const e of entities) {
+    if (e.parentEntityId) {
+      assemblyParentIds.add(e.parentEntityId);
+    }
+  }
+
   // Get field counts and mapping stats per entity
   const entityStats = entities.map((e) => {
+    // Assembly parents: zero out field stats (component aggregates from children)
+    if (assemblyParentIds.has(e.id)) {
+      const openQs = db
+        .select({ cnt: count() })
+        .from(question)
+        .where(and(eq(question.entityId, e.id), eq(question.status, "open")))
+        .get();
+      return {
+        id: e.id,
+        name: e.name,
+        displayName: e.displayName,
+        parentEntityId: e.parentEntityId ?? null,
+        status: e.status,
+        fieldCount: 0,
+        mappedCount: 0,
+        unmappedCount: 0,
+        coveragePercent: 0,
+        openQuestions: openQs?.cnt || 0,
+        statusBreakdown: {} as Record<string, number>,
+      };
+    }
+
     const fields = db
       .select({ id: field.id })
       .from(field)
@@ -179,6 +211,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       id: e.id,
       name: e.name,
       displayName: e.displayName,
+      parentEntityId: e.parentEntityId ?? null,
       status: e.status,
       fieldCount: fields.length,
       mappedCount,
@@ -212,7 +245,10 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
         and(
           eq(entity.workspaceId, workspaceId),
           eq(entity.side, "target"),
-          eq(field.milestone, m)
+          eq(field.milestone, m),
+          assemblyParentIds.size > 0
+            ? sql`${entity.id} NOT IN (${sql.join([...assemblyParentIds].map(id => sql`${id}`), sql`, `)})`
+            : undefined
         )
       )
       .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
@@ -256,7 +292,13 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       )
     )
     .where(
-      and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target"))
+      and(
+        eq(entity.workspaceId, workspaceId),
+        eq(entity.side, "target"),
+        assemblyParentIds.size > 0
+          ? sql`${entity.id} NOT IN (${sql.join([...assemblyParentIds].map(id => sql`${id}`), sql`, `)})`
+          : undefined
+      )
     )
     .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
     .all();
@@ -337,6 +379,22 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
     .limit(10)
     .all() as LeaderboardEntry[];
 
+  // ─── Evaluation Stats ─────────────────────────────────────
+  const evalStats = db
+    .select({
+      totalEvaluations: sql<number>`COUNT(*)`,
+      avgJudgeScore: sql<number | null>`AVG(${evaluation.judgeScore})`,
+      avgTokenOverlap: sql<number | null>`AVG(${evaluation.tokenOverlap})`,
+    })
+    .from(evaluation)
+    .where(
+      and(
+        eq(evaluation.workspaceId, workspaceId),
+        eq(evaluation.status, "completed")
+      )
+    )
+    .get();
+
   return NextResponse.json({
     totalEntities: entities.length,
     totalFields,
@@ -351,6 +409,15 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       mostMapped,
       mostQuestionsAnswered,
       mostBotCollaborations,
+    },
+    evaluationStats: {
+      totalEvaluations: evalStats?.totalEvaluations || 0,
+      avgJudgeScore: evalStats?.avgJudgeScore
+        ? Math.round(evalStats.avgJudgeScore * 10) / 10
+        : null,
+      avgTokenOverlap: evalStats?.avgTokenOverlap
+        ? Math.round(evalStats.avgTokenOverlap)
+        : null,
     },
   });
 });

@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useBatchRunPoll, useBatchRuns } from "@/queries/batch-run-queries";
 import { useReviewStore } from "@/stores/review-store";
-import { Play, Loader2, ExternalLink, CheckCircle2, XCircle } from "lucide-react";
+import { Play, Loader2, ExternalLink, CheckCircle2, XCircle, Square } from "lucide-react";
 import Link from "next/link";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { BatchRunDialog } from "./batch-run-dialog";
 
 /** If a run hasn't been updated in this many ms, treat it as stale */
@@ -41,10 +42,18 @@ function formatDuration(startedAt: string | null, completedAt: string | null): s
 
 export function BatchRunPanel() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [, setTick] = useState(0);
+  const { workspaceId } = useWorkspace();
   const { activeBatchRunId } = useReviewStore();
-  const { data: activeBatchRun } = useBatchRunPoll(activeBatchRunId);
   const { data: allRuns } = useBatchRuns();
+
+  // Auto-detect active run: prefer store ID, fall back to latest active, then most recent
+  const effectiveRunId =
+    activeBatchRunId ||
+    allRuns?.find((r) => r.status === "running" || r.status === "pending")?.id ||
+    null;
+  const { data: activeBatchRun } = useBatchRunPoll(effectiveRunId);
 
   const latestRun = activeBatchRun || allRuns?.[allRuns.length - 1];
   const stale = latestRun ? isStaleRun(latestRun) : false;
@@ -53,6 +62,19 @@ export function BatchRunPanel() {
     (latestRun?.status === "running" || latestRun?.status === "pending");
   const isCompleted = latestRun?.status === "completed";
   const isFailed = latestRun?.status === "failed";
+  const isCancelled = latestRun?.status === "cancelled";
+
+  async function handleCancel() {
+    if (!latestRun || !workspaceId) return;
+    setCancelling(true);
+    try {
+      await fetch(`/api/workspaces/${workspaceId}/batch-runs/${latestRun.id}/cancel`, {
+        method: "POST",
+      });
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   // Tick every second while running to update elapsed time
   useEffect(() => {
@@ -71,13 +93,15 @@ export function BatchRunPanel() {
 
   const statusBadge = stale
     ? { variant: "destructive" as const, label: "stale" }
-    : isFailed
-      ? { variant: "destructive" as const, label: "failed" }
-      : isCompleted
-        ? { variant: "default" as const, label: "completed" }
-        : latestRun?.status === "running"
-          ? { variant: "secondary" as const, label: "running" }
-          : { variant: "secondary" as const, label: "pending" };
+    : isCancelled
+      ? { variant: "outline" as const, label: "cancelled" }
+      : isFailed
+        ? { variant: "destructive" as const, label: "failed" }
+        : isCompleted
+          ? { variant: "default" as const, label: "completed" }
+          : latestRun?.status === "running"
+            ? { variant: "secondary" as const, label: "running" }
+            : { variant: "secondary" as const, label: "pending" };
 
   return (
     <>
@@ -85,23 +109,40 @@ export function BatchRunPanel() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Batch Generation</CardTitle>
-            <Button
-              size="sm"
-              onClick={() => setDialogOpen(true)}
-              disabled={isRunning}
-            >
-              {isRunning ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Running...
-                </>
-              ) : (
-                <>
-                  <Play className="h-3.5 w-3.5" />
-                  Start Batch Run
-                </>
+            <div className="flex items-center gap-2">
+              {isRunning && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                >
+                  {cancelling ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Square className="h-3.5 w-3.5" />
+                  )}
+                  Stop
+                </Button>
               )}
-            </Button>
+              <Button
+                size="sm"
+                onClick={() => setDialogOpen(true)}
+                disabled={isRunning}
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-3.5 w-3.5" />
+                    Start Batch Run
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -170,6 +211,17 @@ export function BatchRunPanel() {
                 </div>
               )}
 
+              {/* Cancelled summary */}
+              {isCancelled && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Square className="h-3.5 w-3.5" />
+                  <span>
+                    Cancelled after {formatDuration(latestRun.startedAt, latestRun.completedAt)}
+                    {" — "}{latestRun.completedEntities} of {latestRun.totalEntities} entities processed
+                  </span>
+                </div>
+              )}
+
               {stale && (
                 <p className="text-xs text-destructive">
                   This run appears to have stalled. You can start a new one.
@@ -177,15 +229,17 @@ export function BatchRunPanel() {
               )}
 
               {/* Progress bar — visible while running AND on completion */}
-              {(isRunning || isCompleted || isFailed) && (
+              {(isRunning || isCompleted || isFailed || isCancelled) && (
                 <div className="w-full bg-muted rounded-full h-2">
                   <div
                     className={`h-2 rounded-full transition-all duration-500 ${
                       isFailed
                         ? "bg-destructive"
-                        : isCompleted
-                          ? "bg-green-600"
-                          : "bg-primary"
+                        : isCancelled
+                          ? "bg-muted-foreground"
+                          : isCompleted
+                            ? "bg-green-600"
+                            : "bg-primary"
                     }`}
                     style={{ width: `${isCompleted ? 100 : progress}%` }}
                   />

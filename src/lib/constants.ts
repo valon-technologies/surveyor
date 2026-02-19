@@ -421,7 +421,7 @@ export const DEFAULT_MODELS: Record<LLMProvider, { singleField: string; batch: s
 };
 
 // ─── Batch Run Statuses ──────────────────────────────────────
-export const BATCH_RUN_STATUSES = ["pending", "running", "completed", "failed"] as const;
+export const BATCH_RUN_STATUSES = ["pending", "running", "completed", "failed", "cancelled"] as const;
 export type BatchRunStatus = (typeof BATCH_RUN_STATUSES)[number];
 
 // ─── Question Priorities ─────────────────────────────────────
@@ -441,6 +441,10 @@ export const QUESTION_PRIORITY_COLORS: Record<QuestionPriority, string> = {
   normal: "#6b7280",
   low: "#d4d4d8",
 };
+
+// ─── Chat Session Types ──────────────────────────────────────
+export const CHAT_SESSION_TYPES = ["discuss", "entity_discuss", "forge"] as const;
+export type ChatSessionType = (typeof CHAT_SESSION_TYPES)[number];
 
 // ─── Chat Session Statuses ───────────────────────────────────
 export const CHAT_SESSION_STATUSES = ["active", "resolved", "abandoned"] as const;

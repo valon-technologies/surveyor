@@ -31,6 +31,11 @@ export interface TargetFieldMeta {
   enumValues: string[] | null;
 }
 
+// Known Python/pandas globals that appear in expressions but are NOT source aliases.
+// pd.NA, pd.to_numeric(), np.where(), np.select(), df.column are all legitimate in expression: fields.
+// They must STILL be flagged as UNDEFINED_ALIAS in source: fields (pd.FieldName is always wrong there).
+const EXPRESSION_GLOBALS = new Set(["pd", "np", "df"]);
+
 // ── Main validator ──
 
 export function validateYamlOutput(
@@ -189,13 +194,13 @@ export function validateYamlOutput(
       }
     }
 
-    // Check expression for alias references too
+    // Check expression for alias references too (skip known globals like pd, np, df)
     if (col.expression) {
       const aliasRefs = col.expression.match(/\b([a-z_][a-z0-9_]*)\.[A-Z]/g);
       if (aliasRefs) {
         for (const ref of aliasRefs) {
           const alias = ref.split(".")[0];
-          if (!definedAliases.has(alias)) {
+          if (!definedAliases.has(alias) && !EXPRESSION_GLOBALS.has(alias)) {
             issues.push({
               field: col.target_column,
               severity: "error",

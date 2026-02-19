@@ -724,6 +724,7 @@ export const POST = withAuth(
       ragEnabled,
       sourceSchemaStats,
       answeredQuestions: answeredQs.length > 0 ? answeredQs : undefined,
+      workspaceId,
     });
 
     // Create session

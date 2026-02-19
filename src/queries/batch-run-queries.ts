@@ -9,6 +9,14 @@ export function useBatchRuns() {
   return useQuery({
     queryKey: ["batch-runs", workspaceId],
     queryFn: () => api.get<BatchRun[]>(basePath),
+    refetchInterval: (query) => {
+      const data = query.state.data as BatchRun[] | undefined;
+      if (!data) return false;
+      const hasActive = data.some(
+        (r) => r.status === "running" || r.status === "pending"
+      );
+      return hasActive ? 3000 : false;
+    },
   });
 }
 
@@ -56,8 +64,34 @@ export interface BatchRunSession {
   } | null;
 }
 
+export interface BatchRunFieldMapping {
+  targetFieldName: string;
+  mappingType: string | null;
+  confidence: string | null;
+  sourceFieldName: string | null;
+  sourceEntityName: string | null;
+  transform: string | null;
+  reasoning: string | null;
+}
+
+export interface BatchRunEntityResult {
+  entityId: string;
+  entityName: string;
+  generationId: string;
+  status: string;
+  fieldCount: number;
+  fieldMappings: BatchRunFieldMapping[];
+  inputTokens: number | null;
+  outputTokens: number | null;
+  durationMs: number | null;
+  validationScore: number | null;
+  error: string | null;
+}
+
 interface BatchRunSessionsResponse {
   sessions: BatchRunSession[];
+  entityResults: BatchRunEntityResult[];
+  mode: "chat" | "single-shot";
   batchRun: BatchRun;
 }
 

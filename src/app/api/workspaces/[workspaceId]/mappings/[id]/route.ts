@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { updateMappingSchema } from "@/lib/validators/mapping";
 import { logActivity } from "@/lib/activity/log-activity";
 import { computeStatusOnSave } from "@/lib/status/status-engine";
+import { extractMappingLearning } from "@/lib/generation/mapping-learning";
 
 export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const params = await ctx.params;
@@ -121,6 +122,7 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
   const parsed = updateMappingSchema.safeParse(body);
 
   if (!parsed.success) {
+    console.error("[PATCH mapping] Validation failed:", parsed.error.message, "Body:", JSON.stringify(body));
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
@@ -136,9 +138,8 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
 
   const { editedBy, ...updateData } = parsed.data;
 
-  // Auto-compute status on save (ignore client-provided status)
-  const autoStatus = computeStatusOnSave(existing.status);
-  const finalStatus = autoStatus;
+  // Use client-provided status if explicitly set, otherwise auto-compute
+  const finalStatus = updateData.status ?? computeStatusOnSave(existing.status);
 
   // Generate change summary
   const changeSummary = generateChangeSummary(
@@ -221,6 +222,25 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
       detail: { from: existing.status, to: finalStatus },
     });
   }
+
+  // Auto-create learning from significant mapping corrections
+  extractMappingLearning(
+    {
+      sourceEntityId: existing.sourceEntityId,
+      sourceFieldId: existing.sourceFieldId,
+      mappingType: existing.mappingType,
+      transform: existing.transform,
+      status: existing.status,
+    },
+    {
+      sourceEntityId: newVersion.sourceEntityId,
+      sourceFieldId: newVersion.sourceFieldId,
+      mappingType: newVersion.mappingType,
+      transform: newVersion.transform,
+      status: newVersion.status,
+    },
+    { workspaceId, targetFieldId: existing.targetFieldId },
+  );
 
   return NextResponse.json(newVersion);
 }, { requiredRole: "editor" });

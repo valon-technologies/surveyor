@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { fieldMapping, field, entity } from "@/lib/db/schema";
+import { fieldMapping, field, entity, user } from "@/lib/db/schema";
 import { eq, and, desc, asc } from "drizzle-orm";
 import type { ReviewCardData } from "@/types/review";
 
@@ -56,7 +56,14 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     // Apply filters
     if (statusFilter && m.status !== statusFilter) continue;
     if (confidence && m.confidence !== confidence) continue;
-    if (entityId && targetEntity.id !== entityId) continue;
+    if (entityId && targetEntity.id !== entityId && targetEntity.parentEntityId !== entityId) continue;
+
+    // Resolve parent entity name
+    let parentEntityName: string | null = null;
+    if (targetEntity.parentEntityId) {
+      const pe = db.select().from(entity).where(eq(entity.id, targetEntity.parentEntityId)).get();
+      parentEntityName = pe?.displayName || pe?.name || null;
+    }
 
     // Resolve source names
     let sourceEntityName: string | null = null;
@@ -71,6 +78,13 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
       sourceFieldName = sf?.displayName || sf?.name || null;
     }
 
+    // Resolve assignee name
+    let assigneeName: string | null = null;
+    if (m.assigneeId) {
+      const assignee = db.select({ name: user.name }).from(user).where(eq(user.id, m.assigneeId)).get();
+      assigneeName = assignee?.name ?? null;
+    }
+
     cards.push({
       id: m.id,
       targetFieldId: m.targetFieldId,
@@ -80,6 +94,8 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
       milestone: targetField.milestone,
       entityId: targetEntity.id,
       entityName: targetEntity.displayName || targetEntity.name,
+      parentEntityId: targetEntity.parentEntityId ?? null,
+      parentEntityName,
       status: m.status as ReviewCardData["status"],
       mappingType: m.mappingType as ReviewCardData["mappingType"],
       confidence: m.confidence as ReviewCardData["confidence"],
@@ -93,6 +109,8 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
       notes: m.notes,
       puntNote: m.puntNote ?? null,
       excludeReason: m.excludeReason ?? null,
+      assigneeId: m.assigneeId ?? null,
+      assigneeName,
       createdBy: m.createdBy,
       batchRunId: m.batchRunId ?? null,
       createdAt: m.createdAt,

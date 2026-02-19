@@ -462,13 +462,26 @@ export function parseGenerationOutput(
     // Resolve source field
     let sourceFieldId: string | null = null;
     if (raw.sourceFieldName) {
-      const candidates = sourceEntityId
+      // Try entity-scoped search first, then fall back to all source fields
+      const scopedCandidates = sourceEntityId
         ? ctx.sourceFields.filter((f) => f.entityId === sourceEntityId)
         : ctx.sourceFields;
 
-      const sourceField = candidates.find((f) =>
+      let sourceField = scopedCandidates.find((f) =>
         matchName(f.name, raw.sourceFieldName!)
       );
+      // Fallback: if scoped search failed but we have more fields to search, try all
+      if (!sourceField && sourceEntityId) {
+        sourceField = ctx.sourceFields.find((f) =>
+          matchName(f.name, raw.sourceFieldName!)
+        );
+        if (sourceField) {
+          sourceEntityId = sourceField.entityId;
+          resolveWarnings.push(
+            `Source field "${raw.sourceFieldName}" found in different entity than LLM suggested`
+          );
+        }
+      }
       if (sourceField) {
         sourceFieldId = sourceField.id;
         if (!sourceEntityId) {
@@ -761,12 +774,26 @@ export function parseYamlOutput(
         }
 
         if (sourceFieldName) {
-          const candidates = sourceEntityId
+          // Try entity-scoped search first, then fall back to all source fields
+          const scopedCandidates = sourceEntityId
             ? ctx.sourceFields.filter((f) => f.entityId === sourceEntityId)
             : ctx.sourceFields;
-          const sourceField = candidates.find((f) =>
+          let sourceField = scopedCandidates.find((f) =>
             matchName(f.name, sourceFieldName!)
           );
+          // Fallback: if scoped search failed but we have more fields to search, try all
+          if (!sourceField && sourceEntityId) {
+            sourceField = ctx.sourceFields.find((f) =>
+              matchName(f.name, sourceFieldName!)
+            );
+            if (sourceField) {
+              // Field exists in a different source entity — fix the entity reference
+              sourceEntityId = sourceField.entityId;
+              resolveWarnings.push(
+                `Source field "${sourceFieldName}" found in different entity than alias suggested`
+              );
+            }
+          }
           if (sourceField) {
             sourceFieldId = sourceField.id;
             if (!sourceEntityId) sourceEntityId = sourceField.entityId;

@@ -6,13 +6,25 @@ import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/types/chat";
 import type { ToolExecution } from "@/lib/hooks/use-chat-stream";
-import { Database, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Database, Loader2, CheckCircle2, XCircle, Hammer } from "lucide-react";
+import { ForgeToolResultCard } from "@/components/forge/forge-tool-result-card";
+
+const FORGE_TOOL_NAMES = new Set([
+  "search_contexts",
+  "browse_contexts",
+  "read_context",
+  "list_target_fields",
+  "get_existing_skill",
+  "list_skills",
+  "get_mapping_feedback",
+]);
 
 interface ChatMessageListProps {
   messages: ChatMessage[];
   streamingContent: string;
   isStreaming: boolean;
   activeToolCall?: ToolExecution | null;
+  forgeToolResults?: ToolExecution[];
 }
 
 export function ChatMessageList({
@@ -20,23 +32,38 @@ export function ChatMessageList({
   streamingContent,
   isStreaming,
   activeToolCall,
+  forgeToolResults,
 }: ChatMessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent, activeToolCall]);
+  }, [messages, streamingContent, activeToolCall, forgeToolResults?.length]);
 
   // Filter out system messages and kickoff messages from display
   const visibleMessages = messages.filter(
     (m) => m.role !== "system" && !m.metadata?.kickoff
   );
 
+  const isForgeToolActive =
+    activeToolCall && FORGE_TOOL_NAMES.has(activeToolCall.toolName);
+  const isNonForgeToolActive =
+    activeToolCall && !FORGE_TOOL_NAMES.has(activeToolCall.toolName);
+
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
       {visibleMessages.map((msg) => (
         <MessageBubble key={msg.id} message={msg} />
       ))}
+
+      {/* Persistent forge tool result cards */}
+      {forgeToolResults && forgeToolResults.length > 0 && (
+        <div className="space-y-2">
+          {forgeToolResults.map((result, i) => (
+            <ForgeToolResultCard key={`forge-${i}`} toolResult={result} />
+          ))}
+        </div>
+      )}
 
       {isStreaming && streamingContent && (
         <div className="flex gap-3">
@@ -54,7 +81,13 @@ export function ChatMessageList({
         </div>
       )}
 
-      {activeToolCall && (
+      {/* Forge tool active indicator (slate) */}
+      {isForgeToolActive && activeToolCall.status === "running" && (
+        <ForgeToolRunningIndicator toolCall={activeToolCall} />
+      )}
+
+      {/* Non-forge tool indicator (amber BigQuery style) */}
+      {isNonForgeToolActive && (
         <ToolCallIndicator toolCall={activeToolCall} />
       )}
 
@@ -71,6 +104,43 @@ export function ChatMessageList({
       )}
 
       <div ref={bottomRef} />
+    </div>
+  );
+}
+
+function ForgeToolRunningIndicator({ toolCall }: { toolCall: ToolExecution }) {
+  return (
+    <div className="flex gap-3">
+      <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center shrink-0">
+        <Hammer className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+      </div>
+      <div className="flex-1 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 rounded-lg px-4 py-3 text-sm">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-500" />
+          <span className="font-medium text-foreground">
+            {toolCall.toolName === "search_contexts"
+              ? "Searching contexts..."
+              : toolCall.toolName === "browse_contexts"
+                ? "Browsing contexts..."
+                : toolCall.toolName === "read_context"
+                  ? "Reading context..."
+                  : toolCall.toolName === "list_skills"
+                    ? "Listing skills..."
+                    : toolCall.toolName === "get_existing_skill"
+                      ? "Reading skill..."
+                      : toolCall.toolName === "list_target_fields"
+                        ? "Listing fields..."
+                        : toolCall.toolName === "get_mapping_feedback"
+                          ? "Getting feedback..."
+                          : "Working..."}
+          </span>
+        </div>
+        {toolCall.purpose && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {toolCall.purpose}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

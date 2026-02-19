@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAcceptMapping, useUndoReview } from "@/queries/review-queries";
+import { useAcceptMapping, useUndoReview, useReassignMapping } from "@/queries/review-queries";
+import { useWorkspaceMembers } from "@/queries/member-queries";
 import { CONFIDENCE_COLORS, MAPPING_TYPE_LABELS, MAPPING_STATUS_LABELS, MAPPING_STATUS_COLORS } from "@/lib/constants";
 import type { ReviewCardData } from "@/types/review";
 import type { ConfidenceLevel, MappingType, MappingStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Check, ArrowRight, Ban, Undo2, ChevronRight, ChevronDown } from "lucide-react";
+import { MessageSquare, Check, ArrowRight, Ban, Undo2, ChevronRight, ChevronDown, UserCircle } from "lucide-react";
 
 interface ReviewCardProps {
   card: ReviewCardData;
@@ -37,7 +38,23 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple }: Revi
   const router = useRouter();
   const acceptMutation = useAcceptMapping();
   const undoMutation = useUndoReview();
+  const reassignMutation = useReassignMapping();
+  const { data: members } = useWorkspaceMembers();
   const [expanded, setExpanded] = useState(false);
+  const [assignDropdownOpen, setAssignDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!assignDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setAssignDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [assignDropdownOpen]);
 
   const isExcluded = card.status === "excluded";
   const isAccepted = card.status === "accepted";
@@ -153,6 +170,60 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple }: Revi
             >
               {MAPPING_STATUS_LABELS[card.status as MappingStatus] || card.status}
             </Badge>
+          )}
+        </div>
+
+        {/* Assignee chip */}
+        <div className="relative shrink-0" ref={dropdownRef}>
+          <button
+            type="button"
+            onClick={() => setAssignDropdownOpen(!assignDropdownOpen)}
+            className={cn(
+              "flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] transition-colors border",
+              card.assigneeName
+                ? "bg-accent border-foreground/10 text-foreground"
+                : "border-dashed border-muted-foreground/30 text-muted-foreground hover:border-foreground/20"
+            )}
+            title={card.assigneeName ? `Assigned to ${card.assigneeName}` : "Unassigned — click to assign"}
+          >
+            <UserCircle className="h-3 w-3" />
+            <span className="max-w-[80px] truncate">
+              {card.assigneeName || "Unassigned"}
+            </span>
+          </button>
+
+          {assignDropdownOpen && (
+            <div className="absolute right-0 top-full mt-1 z-50 bg-popover border rounded-md shadow-md py-1 min-w-[160px]">
+              {/* Unassign option */}
+              {card.assigneeId && (
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent text-muted-foreground"
+                  onClick={() => {
+                    reassignMutation.mutate({ mappingId: card.id, assigneeId: null });
+                    setAssignDropdownOpen(false);
+                  }}
+                >
+                  Unassign
+                </button>
+              )}
+              {/* Member list */}
+              {members
+                ?.filter((m) => m.userId !== card.assigneeId)
+                .map((m) => (
+                  <button
+                    key={m.userId}
+                    type="button"
+                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent"
+                    onClick={() => {
+                      reassignMutation.mutate({ mappingId: card.id, assigneeId: m.userId });
+                      setAssignDropdownOpen(false);
+                    }}
+                  >
+                    {m.name || m.email}
+                  </button>
+                ))}
+            </div>
           )}
         </div>
 
