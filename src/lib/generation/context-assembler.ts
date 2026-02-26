@@ -5,6 +5,7 @@ import { estimateTokens } from "@/lib/llm/token-counter";
 import { getCachedContext, setCachedContext } from "./context-cache";
 import { searchContextsFts } from "@/lib/rag/fts5-search";
 import { SYSTEM_EMBEDDED_NAMES, RAG_ONLY_NAMES } from "./system-context";
+import { emitFeedbackEvent } from "@/lib/feedback/emit-event";
 
 const SM_TABLE_PREFIX = "ServiceMac > Tables > ";
 const SM_ENUM_PREFIX = "ServiceMac > Enums > ";
@@ -338,6 +339,24 @@ export function assembleContext(
     supplementaryContexts: keptSupplementary,
     totalTokens,
   };
+
+  // Emit context_assembled event for feedback trail
+  if (entityId) {
+    const ekContexts = referenceContexts.filter(
+      (c) => c.name.startsWith("Entity Knowledge >")
+    );
+    emitFeedbackEvent({
+      workspaceId,
+      entityId,
+      eventType: "context_assembled",
+      payload: {
+        entityKnowledgeIncluded: ekContexts.length > 0,
+        ekTokens: ekContexts.reduce((sum, c) => sum + c.tokenCount, 0),
+        totalContextTokens: totalTokens,
+        skillCount: matched.length,
+      },
+    });
+  }
 
   setCachedContext(workspaceId, entityName, tokenBudget, result, query, entityId);
 
