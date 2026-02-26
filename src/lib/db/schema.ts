@@ -722,6 +722,26 @@ export const sotEvaluation = sqliteTable(
   ]
 );
 
+// ─── Feedback Trail ──────────────────────────────────────────
+
+export const feedbackEvent = sqliteTable(
+  "feedback_event",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id").notNull().references(() => workspace.id, { onDelete: "cascade" }),
+    entityId: text("entity_id").notNull().references(() => entity.id, { onDelete: "cascade" }),
+    fieldMappingId: text("field_mapping_id").references(() => fieldMapping.id, { onDelete: "set null" }),
+    eventType: text("event_type").notNull(),
+    payload: text("payload", { mode: "json" }).$type<Record<string, unknown>>().notNull().default({}),
+    correlationId: text("correlation_id"),
+    createdAt: text("created_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("idx_feedback_event_entity").on(table.entityId),
+    index("idx_feedback_event_correlation").on(table.correlationId),
+  ],
+);
+
 export const entityPipeline = sqliteTable(
   "entity_pipeline",
   {
