@@ -24,6 +24,10 @@ export interface FieldMapping {
   changeSummary: string | null;
   createdAt: string;
   updatedAt: string;
+  sourceVerdict: string | null;
+  sourceVerdictNotes: string | null;
+  transformVerdict: string | null;
+  transformVerdictNotes: string | null;
 }
 
 export interface FieldMappingCreateInput {

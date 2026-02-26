@@ -115,3 +115,16 @@ export function useUpdateQuestionFeedback() {
     }) => api.patch(`${basePath}/${id}/feedback`, data),
   });
 }
+
+export function useFieldMappingQuestion(fieldMappingId: string | undefined) {
+  const { workspaceId } = useWorkspace();
+  return useQuery({
+    queryKey: ["questions", "mapping", fieldMappingId],
+    queryFn: () =>
+      api.get<Array<{ id: string; question: string; feedbackHelpful: boolean | null; feedbackWhyNot: string | null; feedbackBetterQuestion: string | null }>>(
+        workspacePath(workspaceId, `questions?fieldMappingId=${fieldMappingId}`)
+      ),
+    enabled: !!fieldMappingId && !!workspaceId,
+    select: (data) => data[0] ?? null,
+  });
+}

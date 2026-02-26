@@ -13,6 +13,10 @@ import { useExcludeMapping } from "@/queries/review-queries";
 import { useEntity } from "@/queries/entity-queries";
 import { useRippleSimilar } from "@/queries/ripple-queries";
 import { RipplePanel } from "@/components/review/ripple-panel";
+import { SourceVerdictCard } from "@/components/review/source-verdict-card";
+import { TransformVerdictCard } from "@/components/review/transform-verdict-card";
+import { QuestionFeedbackCard } from "@/components/review/question-feedback-card";
+import { useFieldMappingQuestion } from "@/queries/question-queries";
 import type { ReviewCardData } from "@/types/review";
 import { MAPPING_TYPES, CONFIDENCE_LEVELS, type MappingStatus } from "@/lib/constants";
 import {
@@ -40,6 +44,8 @@ export function DiscussClient() {
   const createSession = useCreateChatSession();
   const updateMapping = useUpdateMapping();
   const excludeMutation = useExcludeMapping();
+
+  const { data: linkedQuestion } = useFieldMappingQuestion(fieldMappingId);
 
   // Ripple propagation state
   const [showRipple, setShowRipple] = useState(false);
@@ -128,6 +134,10 @@ export function DiscussClient() {
         reasoning: mapping.reasoning ?? null,
         confidence: mapping.confidence ?? null,
         notes: mapping.notes ?? null,
+        sourceVerdict: mapping.sourceVerdict ?? null,
+        sourceVerdictNotes: mapping.sourceVerdictNotes ?? null,
+        transformVerdict: mapping.transformVerdict ?? null,
+        transformVerdictNotes: mapping.transformVerdictNotes ?? null,
       }
     : null;
 
@@ -279,6 +289,39 @@ export function DiscussClient() {
               pendingUpdate={pendingUpdate}
               onApplyUpdate={handleApplyUpdate}
               applied={hasApplied}
+            />
+          )}
+
+          {/* Feedback verdict cards */}
+          {mappingState && (
+            <SourceVerdictCard
+              mappingId={fieldMappingId}
+              sourceEntityName={mappingState.sourceEntityName ?? null}
+              sourceFieldName={mappingState.sourceFieldName ?? null}
+              initialVerdict={mappingState.sourceVerdict ?? null}
+              initialNotes={mappingState.sourceVerdictNotes ?? null}
+            />
+          )}
+
+          {mappingState &&
+            (mappingState.transform ||
+              (mappingState.mappingType && mappingState.mappingType !== "direct")) && (
+            <TransformVerdictCard
+              mappingId={fieldMappingId}
+              mappingType={mappingState.mappingType ?? null}
+              transform={mappingState.transform ?? null}
+              initialVerdict={mappingState.transformVerdict ?? null}
+              initialNotes={mappingState.transformVerdictNotes ?? null}
+            />
+          )}
+
+          {linkedQuestion && (
+            <QuestionFeedbackCard
+              questionId={linkedQuestion.id}
+              questionText={linkedQuestion.question}
+              initialHelpful={linkedQuestion.feedbackHelpful ?? null}
+              initialWhyNot={linkedQuestion.feedbackWhyNot ?? null}
+              initialBetterQuestion={linkedQuestion.feedbackBetterQuestion ?? null}
             />
           )}
 

@@ -14,6 +14,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   if (status) conditions.push(eq(question.status, status));
   if (entityId) conditions.push(eq(question.entityId, entityId));
 
+  const fieldMappingId = searchParams.get("fieldMappingId");
+  if (fieldMappingId) {
+    conditions.push(eq(question.fieldMappingId, fieldMappingId));
+  }
+
   const targetForTeam = searchParams.get("targetForTeam");
   if (targetForTeam) conditions.push(eq(question.targetForTeam, targetForTeam));
 
