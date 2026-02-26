@@ -99,3 +99,19 @@ export function useReopenQuestion() {
     },
   });
 }
+
+export function useUpdateQuestionFeedback() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "questions");
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: string;
+      feedbackHelpful?: boolean;
+      feedbackWhyNot?: string;
+      feedbackBetterQuestion?: string;
+    }) => api.patch(`${basePath}/${id}/feedback`, data),
+  });
+}

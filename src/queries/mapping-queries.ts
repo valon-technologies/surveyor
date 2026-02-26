@@ -234,3 +234,20 @@ export function useLatestValidation(mappingId: string | undefined) {
     enabled: !!mappingId,
   });
 }
+
+export function useUpdateMappingVerdict() {
+  const { workspaceId } = useWorkspace();
+  const basePath = workspacePath(workspaceId, "mappings");
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: string;
+      sourceVerdict?: string;
+      sourceVerdictNotes?: string;
+      transformVerdict?: string;
+      transformVerdictNotes?: string;
+    }) => api.patch(`${basePath}/${id}/verdict`, data),
+  });
+}
