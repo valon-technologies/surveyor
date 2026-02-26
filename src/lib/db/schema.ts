@@ -281,6 +281,13 @@ export const fieldMapping = sqliteTable(
     // reviewStatus column dropped — status field is now unified
     puntNote: text("punt_note"),
     excludeReason: text("exclude_reason"),
+    // Reviewer feedback verdicts (annotations — do not trigger copy-on-write)
+    sourceVerdict: text("source_verdict"),
+    // correct | wrong_table | wrong_field | should_be_unmapped | missing_source
+    sourceVerdictNotes: text("source_verdict_notes"),
+    transformVerdict: text("transform_verdict"),
+    // correct | not_needed | needed_but_missing | wrong_enum | wrong_logic
+    transformVerdictNotes: text("transform_verdict_notes"),
     batchRunId: text("batch_run_id"),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
@@ -410,6 +417,11 @@ export const question = sqliteTable(
     targetForTeam: text("target_for_team"), // SM | VT
     fieldMappingId: text("field_mapping_id").references(() => fieldMapping.id, { onDelete: "set null" }),
     chatSessionId: text("chat_session_id"),
+    // Reviewer feedback on auto-generated questions
+    feedbackHelpful: integer("feedback_helpful", { mode: "boolean" }),
+    feedbackWhyNot: text("feedback_why_not"),
+    // too_vague | wrong_thing | already_answered | not_needed
+    feedbackBetterQuestion: text("feedback_better_question"),
     schemaAssetIds: text("schema_asset_ids", { mode: "json" }).$type<string[]>(),
     assigneeIds: text("assignee_ids", { mode: "json" }).$type<string[]>(),
     // Threaded question fields
