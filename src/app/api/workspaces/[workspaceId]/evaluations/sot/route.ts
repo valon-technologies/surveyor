@@ -5,6 +5,7 @@ import { sotEvaluation, entity, fieldMapping, field } from "@/lib/db/schema";
 import { eq, and, sql, desc, exists } from "drizzle-orm";
 import { evaluateEntityMappings } from "@/lib/evaluation/mapping-evaluator";
 import { listAvailableSotEntities } from "@/lib/evaluation/sot-loader";
+import { emitFeedbackEvent } from "@/lib/feedback/emit-event";
 
 // GET — List SOT evaluations with summary
 export const GET = withAuth(async (req, ctx, { workspaceId }) => {
@@ -170,6 +171,37 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
           fieldResults: evalResult.fieldResults,
         })
         .run();
+
+      // Look up previous eval for delta calculation
+      const previousEval = db
+        .select({ sourceExactPct: sotEvaluation.sourceExactPct })
+        .from(sotEvaluation)
+        .where(
+          and(
+            eq(sotEvaluation.workspaceId, workspaceId),
+            eq(sotEvaluation.entityId, te.id),
+            sql`${sotEvaluation.id} != ${evalId}`,
+          )
+        )
+        .orderBy(desc(sotEvaluation.createdAt))
+        .limit(1)
+        .get();
+
+      emitFeedbackEvent({
+        workspaceId,
+        entityId: te.id,
+        eventType: "sot_evaluated",
+        payload: {
+          evaluationId: evalId,
+          sourceExactPct: evalResult.sourceExactPct,
+          sourceLenientPct: evalResult.sourceLenientPct,
+          scoredFields: evalResult.scoredFields,
+          sourceExactCount: evalResult.sourceExactCount,
+          deltaFromPrevious: previousEval
+            ? Math.round((evalResult.sourceExactPct - previousEval.sourceExactPct) * 10) / 10
+            : null,
+        },
+      });
 
       results.push({
         entityId: te.id,
