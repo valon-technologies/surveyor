@@ -68,9 +68,11 @@ export function resolveProvider(
  * ~5K for YAML + gold examples/renderer refs in user message ~20-40K),
  * source schema (~5-15K), and target fields (~2-5K).
  *
- * Claude 200K model: 200K limit - 8K output - 50K prompt overhead ≈ 140K for context
+ * Claude 200K model: actual tokenization ~3.1 chars/token for structured YAML/markdown
+ * (not the assumed 4), so actual overhead is ~85K, not 50K. Budget set conservatively.
+ * Claude 200K model: 200K limit - 16K output - 85K overhead ≈ 99K for context → use 80K
  * OpenAI GPT-4o 128K: 128K limit - 8K output - 30K prompt overhead ≈ 90K for context
  */
 export function getTokenBudget(providerName: "claude" | "openai"): number {
-  return providerName === "claude" ? 120_000 : 90_000;
+  return providerName === "claude" ? 80_000 : 90_000;
 }

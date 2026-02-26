@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { sotEvaluation, entity } from "@/lib/db/schema";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { sotEvaluation, entity, fieldMapping, field } from "@/lib/db/schema";
+import { eq, and, sql, desc, exists } from "drizzle-orm";
 import { evaluateEntityMappings } from "@/lib/evaluation/mapping-evaluator";
 import { listAvailableSotEntities } from "@/lib/evaluation/sot-loader";
 
@@ -11,7 +11,15 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const url = new URL(req.url);
   const entityId = url.searchParams.get("entityId");
 
-  const conditions = [eq(sotEvaluation.workspaceId, workspaceId)];
+  // Only return evals for entities that currently have generated mappings
+  const hasMappings = exists(
+    db.select({ one: sql`1` })
+      .from(fieldMapping)
+      .innerJoin(field, eq(fieldMapping.targetFieldId, field.id))
+      .where(and(eq(field.entityId, sotEvaluation.entityId), eq(fieldMapping.isLatest, true)))
+  );
+
+  const conditions = [eq(sotEvaluation.workspaceId, workspaceId), hasMappings];
   if (entityId) {
     conditions.push(eq(sotEvaluation.entityId, entityId));
   }
@@ -92,7 +100,22 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
       .all()
       .filter((e) => entityIds.includes(e.id));
   } else {
-    // All target entities in workspace
+    // Only entities that have at least one generated mapping (is_latest=1)
+    // Evaluating entities with no mappings produces meaningless results
+    const { fieldMapping, field } = await import("@/lib/db/schema");
+    const { inArray } = await import("drizzle-orm");
+    const mappedEntityIds = db
+      .selectDistinct({ entityId: field.entityId })
+      .from(fieldMapping)
+      .innerJoin(field, eq(fieldMapping.targetFieldId, field.id))
+      .where(eq(fieldMapping.isLatest, true))
+      .all()
+      .map((r) => r.entityId);
+
+    if (mappedEntityIds.length === 0) {
+      return NextResponse.json({ message: "No entities with generated mappings found", results: [] });
+    }
+
     targetEntities = db
       .select({ id: entity.id, name: entity.name })
       .from(entity)
@@ -100,6 +123,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
         and(
           eq(entity.workspaceId, workspaceId),
           eq(entity.side, "target"),
+          inArray(entity.id, mappedEntityIds),
         )
       )
       .all();

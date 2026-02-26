@@ -15,13 +15,7 @@ import {
 } from "@/lib/constants";
 import type { Entity } from "@/types/entity";
 
-const DEFAULT_INCLUDE: MappingStatus[] = [
-  "unmapped",
-  "unreviewed",
-  "punted",
-  "needs_discussion",
-  "excluded",
-];
+const DEFAULT_INCLUDE: MappingStatus[] = [...MAPPING_STATUSES];
 
 type EntityWithCounts = Entity & { fieldCount: number; statusBreakdown: Record<string, number> };
 

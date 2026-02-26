@@ -111,11 +111,12 @@ export function assembleContext(
   query?: string,
   sourceEntityNames?: string[],
   excludeEntityName?: string,
+  entityId?: string,
 ): AssembledContext {
   // Skip cache when sourceEntityNames are provided — the cache key doesn't
   // include them, so a cached result might be missing enum contexts.
   if (!sourceEntityNames?.length) {
-    const cached = getCachedContext(workspaceId, entityName, tokenBudget, query);
+    const cached = getCachedContext(workspaceId, entityName, tokenBudget, query, entityId);
     if (cached) return cached;
   }
 
@@ -159,6 +160,52 @@ export function assembleContext(
       else if (sc.role === "reference") referenceContexts.push(entry);
       else supplementaryContexts.push(entry);
     }
+  }
+
+  // Direct inclusion 1: Entity Knowledge doc for this specific entity (bypasses skill routing).
+  // This is the fast-loop feedback path — corrections and resolved questions flow here.
+  if (entityId) {
+    const ekDocs = db
+      .select()
+      .from(context)
+      .where(
+        and(
+          eq(context.workspaceId, workspaceId),
+          eq(context.subcategory, "entity_knowledge"),
+          eq(context.entityId, entityId),
+          eq(context.isActive, true),
+        ),
+      )
+      .all();
+
+    for (const doc of ekDocs) {
+      if (seenContextIds.has(doc.id) || !doc.content) continue;
+      seenContextIds.add(doc.id);
+      const tokenCount = doc.tokenCount || estimateTokens(doc.content);
+      referenceContexts.push({ id: doc.id, name: doc.name, content: doc.content, tokenCount });
+    }
+  }
+
+  // Direct inclusion 2: Foundational docs (distilled learnings, mortgage domain) for all entities.
+  // These don't need skill routing — they're always relevant.
+  const foundationalDocs = db
+    .select()
+    .from(context)
+    .where(
+      and(
+        eq(context.workspaceId, workspaceId),
+        eq(context.category, "foundational"),
+        eq(context.isActive, true),
+      ),
+    )
+    .all();
+
+  for (const doc of foundationalDocs) {
+    if (seenContextIds.has(doc.id) || !doc.content) continue;
+    if (SYSTEM_EMBEDDED_NAMES.has(doc.name) || RAG_ONLY_NAMES.has(doc.name)) continue;
+    seenContextIds.add(doc.id);
+    const tokenCount = doc.tokenCount || estimateTokens(doc.content);
+    supplementaryContexts.push({ id: doc.id, name: doc.name, content: doc.content, tokenCount });
   }
 
   // Auto-include enum_map contexts for source tables in primary contexts
@@ -292,7 +339,7 @@ export function assembleContext(
     totalTokens,
   };
 
-  setCachedContext(workspaceId, entityName, tokenBudget, result, query);
+  setCachedContext(workspaceId, entityName, tokenBudget, result, query, entityId);
 
   return result;
 }

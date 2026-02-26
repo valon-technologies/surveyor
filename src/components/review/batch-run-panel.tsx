@@ -10,6 +10,7 @@ import { Play, Loader2, ExternalLink, CheckCircle2, XCircle, Square } from "luci
 import Link from "next/link";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { BatchRunDialog } from "./batch-run-dialog";
+import { useQueryClient } from "@tanstack/react-query";
 
 /** If a run hasn't been updated in this many ms, treat it as stale */
 const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
@@ -45,6 +46,7 @@ export function BatchRunPanel() {
   const [cancelling, setCancelling] = useState(false);
   const [, setTick] = useState(0);
   const { workspaceId } = useWorkspace();
+  const qc = useQueryClient();
   const { activeBatchRunId } = useReviewStore();
   const { data: allRuns } = useBatchRuns();
 
@@ -82,6 +84,13 @@ export function BatchRunPanel() {
     const interval = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(interval);
   }, [isRunning]);
+
+  // Invalidate entity cache when a run finishes so the dialog shows fresh eligible counts
+  useEffect(() => {
+    if (!isRunning && latestRun) {
+      qc.invalidateQueries({ queryKey: ["entities", workspaceId] });
+    }
+  }, [isRunning]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Use field-level progress for more granular tracking
   const progress =

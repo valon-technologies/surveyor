@@ -10,8 +10,9 @@ const MAX_ENTRIES = 20;
 
 const cache = new Map<string, CacheEntry>();
 
-function makeKey(workspaceId: string, entityName: string, tokenBudget: number, query?: string): string {
-  const base = `${workspaceId}:${entityName}:${tokenBudget}`;
+function makeKey(workspaceId: string, entityName: string, tokenBudget: number, query?: string, entityId?: string): string {
+  let base = `${workspaceId}:${entityName}:${tokenBudget}`;
+  if (entityId) base += `:e${entityId.slice(0, 8)}`;
   if (!query) return base;
   // Simple hash of the query string to keep cache keys manageable
   let hash = 0;
@@ -25,9 +26,10 @@ export function getCachedContext(
   workspaceId: string,
   entityName: string,
   tokenBudget: number,
-  query?: string
+  query?: string,
+  entityId?: string,
 ): AssembledContext | null {
-  const key = makeKey(workspaceId, entityName, tokenBudget, query);
+  const key = makeKey(workspaceId, entityName, tokenBudget, query, entityId);
   const entry = cache.get(key);
   if (!entry) return null;
   if (Date.now() - entry.createdAt > TTL_MS) {
@@ -42,9 +44,10 @@ export function setCachedContext(
   entityName: string,
   tokenBudget: number,
   context: AssembledContext,
-  query?: string
+  query?: string,
+  entityId?: string,
 ): void {
-  const key = makeKey(workspaceId, entityName, tokenBudget, query);
+  const key = makeKey(workspaceId, entityName, tokenBudget, query, entityId);
 
   // Evict oldest if at capacity
   if (cache.size >= MAX_ENTRIES && !cache.has(key)) {

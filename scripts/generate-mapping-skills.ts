@@ -16,8 +16,10 @@ import path from "path";
 import crypto from "crypto";
 
 const DB_PATH = path.resolve(process.cwd(), "surveyor.db");
-const WORKSPACE_ID = "fbc37e23-39b4-4cdc-b162-f1f7d9772ab0";
 const db = new Database(DB_PATH);
+const WORKSPACE_ID = (
+  db.prepare("SELECT id FROM workspace LIMIT 1").get() as { id: string }
+).id;
 
 // --- Build context lookup maps from DB ---
 type CtxRow = { id: string; name: string };
@@ -418,6 +420,35 @@ ${sourceTableList}
       insertSkillContext.run(crypto.randomUUID(), skillId, qaId, "reference", ctxOrder++,
         `Prior Q&A: ${qaName}`);
       linkCount++;
+    }
+
+    // 7. Related entity SOT examples (supplementary) — confirmed M1 ground truth mappings
+    // from sibling entities in the same domain. Provides few-shot mapping patterns.
+    // Own SOT is excluded here (and also guarded by assembler's excludeEntityName).
+    const relatedEntityNames = Object.entries(ENTITY_PAIRINGS)
+      .filter(([name, p]) =>
+        name !== entityName &&
+        p.sm_domains.some((d) => pairing.sm_domains.includes(d))
+      )
+      .map(([name]) => name);
+
+    // Fallback: name-prefix match for entities with no shared domain
+    if (relatedEntityNames.length === 0) {
+      const prefix = entityName.split("_")[0];
+      for (const [name] of Object.entries(ENTITY_PAIRINGS)) {
+        if (name !== entityName && name.startsWith(prefix + "_")) {
+          relatedEntityNames.push(name);
+        }
+      }
+    }
+
+    for (const relatedName of relatedEntityNames) {
+      const sotCtxId = findCtx(`SOT > ${relatedName} (M1)`);
+      if (sotCtxId) {
+        insertSkillContext.run(crypto.randomUUID(), skillId, sotCtxId, "supplementary", ctxOrder++,
+          `Confirmed M1 mappings for ${relatedName} — use EXACT rows as mapping patterns`);
+        linkCount++;
+      }
     }
 
     skillCount++;

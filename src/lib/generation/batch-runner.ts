@@ -8,6 +8,7 @@ import { issueToQuestion, type ValidationIssue } from "./yaml-validator";
 import { parseYamlOutput, type YamlParseResult } from "./output-parser";
 import type { ParseResult, ParsedFieldMapping } from "@/types/generation";
 import type { MappingStatus } from "@/lib/constants";
+import { createBulkChatRun, executeBulkChatRun } from "./bulk-chat-runner";
 import type { BigQueryConfig } from "@/types/workspace";
 import {
   generateScaffold,
@@ -1183,6 +1184,30 @@ export async function executeBatchRun(
       })
       .where(eq(batchRun.id, batchRunId))
       .run();
+
+    // Chain chat-quality pass: for each unreviewed field, run a focused
+    // per-field session with RAG tools and replace the batch mapping in-place.
+    if (finalStatus === "completed") {
+      try {
+        const { batchRunId: chatRunId, entities: chatEntities } = createBulkChatRun({
+          workspaceId: input.workspaceId,
+          userId: input.userId,
+          entityIds: input.entityIds,
+          includeStatuses: ["unreviewed"],
+        });
+        executeBulkChatRun(chatRunId, chatEntities, {
+          workspaceId: input.workspaceId,
+          userId: input.userId,
+          entityIds: input.entityIds,
+          includeStatuses: ["unreviewed"],
+        }).catch((err) => {
+          console.error("[batch-runner] Chat enrichment pass failed:", err);
+        });
+      } catch (err) {
+        // Non-critical — batch run already succeeded
+        console.warn("[batch-runner] Could not start chat enrichment pass:", err);
+      }
+    }
   } catch (error) {
     // Ensure batch run is always marked as failed on unexpected errors
     try {

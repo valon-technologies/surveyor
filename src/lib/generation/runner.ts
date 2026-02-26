@@ -297,11 +297,12 @@ export function startGeneration(
     workspaceId, targetEntity.name, tokenBudget, undefined,
     yamlSourceTableNames?.length ? yamlSourceTableNames : undefined,
     targetEntity.name,
+    targetEntity.id,
   );
 
   // 7. Build prompt (reshape source data for the LLM prompt)
-  // Note: learnings are now surfaced via Entity Knowledge context docs
-  // through the normal RAG/skill retrieval path — no direct injection.
+  // Note: learnings are surfaced via Entity Knowledge context docs,
+  // included directly by entityId in assembleContext — no skill dependency.
   const outputFormat = input.outputFormat ?? "json";
   const promptBuilder = outputFormat === "yaml" ? buildYamlPrompt : buildPrompt;
 
