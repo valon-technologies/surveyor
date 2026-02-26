@@ -110,6 +110,7 @@ export function assembleContext(
   tokenBudget: number,
   query?: string,
   sourceEntityNames?: string[],
+  excludeEntityName?: string,
 ): AssembledContext {
   // Skip cache when sourceEntityNames are provided — the cache key doesn't
   // include them, so a cached result might be missing enum contexts.
@@ -147,6 +148,9 @@ export function assembleContext(
 
       // Skip contexts that are now embedded in system message or RAG-only
       if (SYSTEM_EMBEDDED_NAMES.has(ctx.name) || RAG_ONLY_NAMES.has(ctx.name)) continue;
+
+      // Exclude the current entity's SOT to prevent cheating during eval
+      if (excludeEntityName && ctx.name === `SOT > ${excludeEntityName} (M1)`) continue;
 
       const tokenCount = ctx.tokenCount || estimateTokens(ctx.content);
       const entry = { id: ctx.id, name: ctx.name, content: ctx.content, tokenCount };

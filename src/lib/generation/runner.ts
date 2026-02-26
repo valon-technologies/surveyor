@@ -296,6 +296,7 @@ export function startGeneration(
   const assembledCtx = assembleContext(
     workspaceId, targetEntity.name, tokenBudget, undefined,
     yamlSourceTableNames?.length ? yamlSourceTableNames : undefined,
+    targetEntity.name,
   );
 
   // 7. Build prompt (reshape source data for the LLM prompt)

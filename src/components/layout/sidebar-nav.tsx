@@ -17,6 +17,7 @@ import {
   LogOut,
   Settings,
   HelpCircle,
+  Target,
 } from "lucide-react";
 import { useQuestions } from "@/queries/question-queries";
 
@@ -27,6 +28,7 @@ const navItems = [
   { href: "/schemas", label: "Schemas", icon: Database },
   { href: "/context", label: "Context", icon: BookOpen },
   { href: "/skills", label: "Skills", icon: PenTool },
+  { href: "/evaluation", label: "SOT Accuracy", icon: Target },
   { href: "/topology", label: "Topology", icon: Waypoints },
   { href: "/atlas", label: "Atlas", icon: Globe },
 ];

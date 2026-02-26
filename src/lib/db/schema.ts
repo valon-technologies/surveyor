@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 import { relations, sql } from "drizzle-orm";
 
 // Helper defaults
@@ -683,6 +683,33 @@ export const evaluation = sqliteTable(
   ]
 );
 
+export const sotEvaluation = sqliteTable(
+  "sot_evaluation",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    entityId: text("entity_id")
+      .notNull()
+      .references(() => entity.id, { onDelete: "cascade" }),
+    generationId: text("generation_id"),
+    batchRunId: text("batch_run_id"),
+    totalFields: integer("total_fields").notNull(),
+    scoredFields: integer("scored_fields").notNull(),
+    sourceExactCount: integer("source_exact_count").notNull(),
+    sourceLenientCount: integer("source_lenient_count").notNull(),
+    sourceExactPct: real("source_exact_pct").notNull(),
+    sourceLenientPct: real("source_lenient_pct").notNull(),
+    fieldResults: text("field_results", { mode: "json" }).$type<import("@/lib/evaluation/source-matcher").FieldSourceMatch[]>(),
+    createdAt: text("created_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("sot_eval_workspace_idx").on(table.workspaceId),
+    index("sot_eval_entity_idx").on(table.entityId),
+  ]
+);
+
 export const entityPipeline = sqliteTable(
   "entity_pipeline",
   {
@@ -1144,6 +1171,17 @@ export const evaluationRelations = relations(evaluation, ({ one }) => ({
   question: one(question, {
     fields: [evaluation.questionId],
     references: [question.id],
+  }),
+}));
+
+export const sotEvaluationRelations = relations(sotEvaluation, ({ one }) => ({
+  workspace: one(workspace, {
+    fields: [sotEvaluation.workspaceId],
+    references: [workspace.id],
+  }),
+  entity: one(entity, {
+    fields: [sotEvaluation.entityId],
+    references: [entity.id],
   }),
 }));
 
