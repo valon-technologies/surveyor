@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { learning, field, entity } from "@/lib/db/schema";
+import { learning, field, entity, fieldMapping } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { rebuildEntityKnowledge } from "./entity-knowledge";
 import { emitSignal } from "./skill-signals";
@@ -244,6 +244,111 @@ function detectEntityBoundaryPattern(
       }
     }
   }
+}
+
+/**
+ * Create learning records from reviewer verdict feedback.
+ * Called when a non-'correct' source or transform verdict is saved.
+ * Triggers rebuildEntityKnowledge so the next generation sees the feedback.
+ */
+export function extractVerdictLearning(
+  workspaceId: string,
+  fieldMappingId: string,
+): void {
+  // Load verdict fields + source entity/field names from the mapping
+  const mapping = db
+    .select({
+      id: fieldMapping.id,
+      sourceVerdict: fieldMapping.sourceVerdict,
+      sourceVerdictNotes: fieldMapping.sourceVerdictNotes,
+      transformVerdict: fieldMapping.transformVerdict,
+      transformVerdictNotes: fieldMapping.transformVerdictNotes,
+      sourceEntityName: entity.name,
+      sourceFieldName: field.name,
+    })
+    .from(fieldMapping)
+    .leftJoin(entity, eq(fieldMapping.sourceEntityId, entity.id))
+    .leftJoin(field, eq(fieldMapping.sourceFieldId, field.id))
+    .where(eq(fieldMapping.id, fieldMappingId))
+    .get();
+
+  if (!mapping) return;
+
+  // Load target field + entity (separate query to avoid alias conflicts)
+  const targetInfo = db
+    .select({
+      fieldName: field.name,
+      entityId: field.entityId,
+      entityName: entity.name,
+    })
+    .from(fieldMapping)
+    .innerJoin(field, eq(fieldMapping.targetFieldId, field.id))
+    .innerJoin(entity, eq(field.entityId, entity.id))
+    .where(eq(fieldMapping.id, fieldMappingId))
+    .get();
+
+  if (!targetInfo) return;
+
+  const prefix = `For ${targetInfo.entityName}.${targetInfo.fieldName}`;
+  const learningValues: Array<{ content: string; fieldName: string }> = [];
+
+  // Source verdict → learning content
+  if (mapping.sourceVerdict && mapping.sourceVerdict !== "correct") {
+    const notes = mapping.sourceVerdictNotes ? ` Notes: ${mapping.sourceVerdictNotes}` : "";
+    const currentSrc =
+      mapping.sourceEntityName && mapping.sourceFieldName
+        ? `${mapping.sourceEntityName}.${mapping.sourceFieldName}`
+        : mapping.sourceEntityName || "unknown";
+
+    const contentMap: Record<string, string> = {
+      wrong_table: `${prefix}: Source table is wrong. Model used ${currentSrc}.${notes}`,
+      wrong_field: `${prefix}: Source field is wrong within ${mapping.sourceEntityName || "the entity"}.${notes}`,
+      should_be_unmapped: `${prefix}: This field has no source. Do NOT attempt to map it — leave unmapped.`,
+      missing_source: `${prefix}: This field has a source but was left unmapped.${notes}`,
+    };
+
+    const content = contentMap[mapping.sourceVerdict];
+    if (content) learningValues.push({ content, fieldName: targetInfo.fieldName });
+  }
+
+  // Transform verdict → learning content
+  if (mapping.transformVerdict && mapping.transformVerdict !== "correct") {
+    const notes = mapping.transformVerdictNotes ? ` Notes: ${mapping.transformVerdictNotes}` : "";
+
+    const contentMap: Record<string, string> = {
+      not_needed: `${prefix}: No transform required — map directly.`,
+      needed_but_missing: `${prefix}: A transform is required.${notes}`,
+      wrong_enum: `${prefix}: Enum mapping is incorrect.${notes}`,
+      wrong_logic: `${prefix}: Transform logic is wrong.${notes}`,
+    };
+
+    const content = contentMap[mapping.transformVerdict];
+    if (content) learningValues.push({ content, fieldName: targetInfo.fieldName });
+  }
+
+  if (learningValues.length === 0) return;
+
+  for (const lv of learningValues) {
+    db.insert(learning).values({
+      id: crypto.randomUUID(),
+      workspaceId,
+      entityId: targetInfo.entityId,
+      fieldName: lv.fieldName,
+      scope: "field",
+      source: "review",
+      content: lv.content,
+    }).run();
+  }
+
+  rebuildEntityKnowledge(workspaceId, targetInfo.entityId);
+  emitSignal({
+    workspaceId,
+    entityId: targetInfo.entityId,
+    signalType: "mapping_correction",
+    summary: `Verdict feedback for ${targetInfo.entityName}.${targetInfo.fieldName}`,
+    sourceId: fieldMappingId,
+    sourceType: "field_mapping",
+  });
 }
 
 // ─── Manual Rule Promotion ──────────────────────────────────────
