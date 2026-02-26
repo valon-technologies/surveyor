@@ -9,6 +9,7 @@ import {
 } from "@/queries/sot-evaluation-queries";
 import { AccuracyBadge } from "@/components/evaluation/accuracy-badge";
 import { FieldEvalView } from "@/components/evaluation/field-eval-view";
+import { FeedbackTrail } from "@/components/evaluation/feedback-trail";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -175,6 +176,19 @@ export function EvaluationClient() {
             {detail.entityName} — Per-Field Results
           </h2>
           <FieldEvalView fieldResults={detail.fieldResults} />
+        </div>
+      )}
+
+      {/* Feedback Trail */}
+      {selectedEvalId && detail && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">
+            Feedback Trail
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Pipeline events showing how reviewer feedback flows through learning extraction, Entity Knowledge rebuilds, context assembly, and SOT evaluation.
+          </p>
+          <FeedbackTrail entityId={detail.entityId} />
         </div>
       )}
     </div>
