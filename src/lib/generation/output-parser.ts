@@ -836,15 +836,22 @@ export function parseYamlOutput(
 
     // Hallucination check
     const hallucinated = sourceFieldName && !sourceFieldId;
-    const confidence: ConfidenceLevel = hallucinated ? "low" : (isNull ? "low" : "high");
+    const yamlConfidence = coerceConfidence(((col as Record<string, unknown>).confidence as string | null) ?? null);
+    const confidence: ConfidenceLevel = hallucinated ? "low" : (yamlConfidence || (isNull ? "low" : "high"));
+    const yamlReviewComment = ((col as Record<string, unknown>).review_comment as string | null) ?? null;
     const reviewComment = hallucinated
       ? `Source field "${sourceFieldName}" was not found in the available schema. This may be a hallucinated field name.`
-      : null;
+      : yamlReviewComment;
 
     // Infer uncertainty type for non-high confidence YAML mappings
     const uncertaintyType = confidence !== "high"
       ? inferUncertaintyType(reviewComment, { sourceFieldName, confidence })
       : null;
+
+    // Preserve Claude's reasoning from the YAML note field
+    const yamlNote = ((col as Record<string, unknown>).note as string | null) ?? null;
+    const reasoning = yamlNote
+      || (col.expression ? `Transform: ${col.expression.trim().slice(0, 100)}` : (sourceFieldName ? `Direct mapping from ${sourceEntityName}.${sourceFieldName}` : "No source match"));
 
     fieldMappings.push({
       targetFieldName: col.target_column,
@@ -858,7 +865,7 @@ export function parseYamlOutput(
       transform,
       defaultValue,
       enumMapping,
-      reasoning: col.expression ? `Transform: ${transformStr}` : `Direct mapping (${transformStr})`,
+      reasoning,
       confidence,
       notes: null,
       reviewComment,

@@ -21,6 +21,7 @@ export interface ReviewCardData {
   transform: string | null;
   defaultValue: string | null;
   reasoning: string | null;
+  reviewComment: string | null;
   notes: string | null;
   puntNote: string | null;
   excludeReason: string | null;

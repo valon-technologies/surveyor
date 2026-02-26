@@ -106,6 +106,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
       transform: m.transform,
       defaultValue: m.defaultValue,
       reasoning: m.reasoning,
+      reviewComment: m.notes,
       notes: m.notes,
       puntNote: m.puntNote ?? null,
       excludeReason: m.excludeReason ?? null,

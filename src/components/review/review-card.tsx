@@ -297,6 +297,11 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple }: Revi
               {card.reasoning}
             </p>
           )}
+          {card.notes && card.confidence !== "high" && (
+            <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded px-2 py-1 mt-1">
+              {card.notes}
+            </p>
+          )}
         </div>
       )}
 

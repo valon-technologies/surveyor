@@ -283,11 +283,19 @@ columns:
       <pandas expression>
     transform: identity|expression|null|literal|hash_id
     dtype: string|int|float|date|datetime|boolean
+    note: |                        # REQUIRED — 1-2 sentence explanation of why this mapping was chosen,
+                                   # what context informed it, and any caveats. For unmapped fields,
+                                   # explain why no source exists. Be specific and human-readable.
+    confidence: high|medium|low    # REQUIRED — how confident you are in this mapping
+    review_comment: |              # REQUIRED when confidence is medium or low — explain specifically
+                                   # what additional info is needed to make this 100% certain.
 
   - target_column: <unmapped_field>
     source: []
     transform: null
     dtype: string
+    note: "No source field found — <explain why>"
+    confidence: low
 
 TRANSFORM TYPES:
 - identity: Direct 1:1 field mapping. Use \`source: alias.FieldName\`

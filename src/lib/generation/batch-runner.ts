@@ -718,7 +718,7 @@ function saveMappingsAndQuestions(
         enumMapping: fm.enumMapping,
         reasoning: fm.reasoning,
         confidence: fm.confidence,
-        notes: fm.notes,
+        notes: fm.reviewComment || fm.notes,
         createdBy: "llm",
         assigneeId: userId,
         generationId,
