@@ -4,6 +4,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { estimateTokens } from "@/lib/llm/token-counter";
 import { matchSkills } from "./context-assembler";
 import { invalidateWorkspaceContextCache } from "./context-cache";
+import { emitFeedbackEvent } from "@/lib/feedback/emit-event";
 
 const CATEGORY = "adhoc";
 const SUBCATEGORY = "entity_knowledge";
@@ -48,6 +49,7 @@ interface ThreadDecision {
 export function rebuildEntityKnowledge(
   workspaceId: string,
   entityId: string,
+  correlationId?: string,
 ): { contextId: string; created: boolean } | null {
   // Resolve entity name
   const e = db
@@ -170,6 +172,30 @@ export function rebuildEntityKnowledge(
 
   // Upsert the context doc
   const { contextId, created } = upsertContext(workspaceId, entityId, entityName, content);
+
+  // Emit feedback event for pipeline tracing
+  const correctionLearnings = learnings.filter((l) => l.source === "review");
+  const trainingLearnings = learnings.filter((l) => l.source === "training");
+  const snippets = correctionLearnings.slice(0, 5).map((c) => c.content.slice(0, 120));
+
+  emitFeedbackEvent({
+    workspaceId,
+    entityId,
+    eventType: "entity_knowledge_rebuilt",
+    payload: {
+      contextId,
+      sectionCount: [
+        correctionLearnings.length > 0,
+        trainingLearnings.length > 0,
+        questions.length > 0,
+        threadDecisions.length > 0,
+      ].filter(Boolean).length,
+      totalTokens: estimateTokens(content),
+      correctionCount: correctionLearnings.length,
+      snippets,
+    },
+    correlationId,
+  });
 
   // Link to matching skills
   linkToMatchingSkills(workspaceId, contextId, entityName);

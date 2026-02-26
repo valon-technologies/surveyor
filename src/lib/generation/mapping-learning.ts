@@ -3,6 +3,7 @@ import { learning, field, entity, fieldMapping } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { rebuildEntityKnowledge } from "./entity-knowledge";
 import { emitSignal } from "./skill-signals";
+import { emitFeedbackEvent } from "@/lib/feedback/emit-event";
 
 interface MappingVersion {
   sourceEntityId: string | null;
@@ -254,6 +255,7 @@ function detectEntityBoundaryPattern(
 export function extractVerdictLearning(
   workspaceId: string,
   fieldMappingId: string,
+  correlationId?: string,
 ): void {
   // Load verdict fields + source entity/field names from the mapping
   const mapping = db
@@ -329,8 +331,9 @@ export function extractVerdictLearning(
   if (learningValues.length === 0) return;
 
   for (const lv of learningValues) {
+    const learningId = crypto.randomUUID();
     db.insert(learning).values({
-      id: crypto.randomUUID(),
+      id: learningId,
       workspaceId,
       entityId: targetInfo.entityId,
       fieldName: lv.fieldName,
@@ -338,9 +341,18 @@ export function extractVerdictLearning(
       source: "review",
       content: lv.content,
     }).run();
+
+    emitFeedbackEvent({
+      workspaceId,
+      entityId: targetInfo.entityId,
+      fieldMappingId,
+      eventType: "learning_created",
+      payload: { learningId, scope: "field", content: lv.content, fieldName: lv.fieldName },
+      correlationId,
+    });
   }
 
-  rebuildEntityKnowledge(workspaceId, targetInfo.entityId);
+  rebuildEntityKnowledge(workspaceId, targetInfo.entityId, correlationId);
   emitSignal({
     workspaceId,
     entityId: targetInfo.entityId,

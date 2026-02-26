@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { fieldMapping } from "@/lib/db/schema";
+import { fieldMapping, field, entity } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { extractVerdictLearning } from "@/lib/generation/mapping-learning";
+import { emitFeedbackEvent } from "@/lib/feedback/emit-event";
 
 export const PATCH = withAuth(
   async (req, ctx, { workspaceId }) => {
@@ -47,8 +48,51 @@ export const PATCH = withAuth(
       (sourceVerdict && sourceVerdict !== "correct") ||
       (transformVerdict && transformVerdict !== "correct");
 
+    // Look up target field info for event payload
+    const mappingDetail = db
+      .select({
+        targetFieldId: fieldMapping.targetFieldId,
+        sourceEntityName: entity.name,
+      })
+      .from(fieldMapping)
+      .leftJoin(entity, eq(fieldMapping.sourceEntityId, entity.id))
+      .where(eq(fieldMapping.id, id))
+      .get();
+
+    let entityId: string | undefined;
+    let targetFieldName: string | undefined;
+    if (mappingDetail?.targetFieldId) {
+      const targetFieldInfo = db
+        .select({ name: field.name, entityId: field.entityId })
+        .from(field)
+        .where(eq(field.id, mappingDetail.targetFieldId))
+        .get();
+      entityId = targetFieldInfo?.entityId;
+      targetFieldName = targetFieldInfo?.name;
+    }
+
+    const correlationId = crypto.randomUUID();
+
+    if (entityId) {
+      emitFeedbackEvent({
+        workspaceId,
+        entityId,
+        fieldMappingId: id,
+        eventType: "verdict_submitted",
+        payload: {
+          sourceVerdict: body.sourceVerdict,
+          sourceVerdictNotes: body.sourceVerdictNotes,
+          transformVerdict: body.transformVerdict,
+          transformVerdictNotes: body.transformVerdictNotes,
+          fieldName: targetFieldName,
+          sourceEntity: mappingDetail?.sourceEntityName,
+        },
+        correlationId,
+      });
+    }
+
     if (shouldExtract) {
-      extractVerdictLearning(workspaceId, id);
+      extractVerdictLearning(workspaceId, id, correlationId);
     }
 
     return NextResponse.json({ success: true });
