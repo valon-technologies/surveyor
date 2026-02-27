@@ -83,23 +83,22 @@ async function processEntity(name: string) {
 
     if (wf.matchType === "NO_GEN") {
       verdict = "missing_source";
-      notes = `Should map to: ${wf.sotSources.join(", ")}`;
+      notes = `REQUIRED: Map to ${wf.sotSources.join(", ")}. This is a verified correction.`;
     } else if (wf.matchType === "DISJOINT") {
       // Check if it's a table mismatch or field mismatch
       const genTables = wf.genSources.map((s: string) => s.split(".")[0]);
       const sotTables = wf.sotSources.map((s: string) => s.split(".")[0]);
       const tableMatch = genTables.some((t: string) => sotTables.includes(t));
       verdict = tableMatch ? "wrong_field" : "wrong_table";
-      notes = `Should be: ${wf.sotSources.join(", ")}. Currently mapped to: ${wf.genSources.join(", ")}`;
+      notes = `REQUIRED: Use ${wf.sotSources.join(", ")} (not ${wf.genSources.join(", ")}). This is a verified correction — do not override.`;
     } else if (wf.matchType === "OVERLAP" || wf.matchType === "SUBSET") {
       verdict = "wrong_field";
-      notes = `Expected sources: ${wf.sotSources.join(", ")}. Generated: ${wf.genSources.join(", ")}`;
+      notes = `REQUIRED: Must include all of: ${wf.sotSources.join(", ")} (currently only: ${wf.genSources.join(", ")}). Verified correction.`;
     } else if (wf.matchType === "SUPERSET") {
-      // SUPERSET means correct + extra — arguably correct, but give a mild verdict
       verdict = "wrong_field";
-      notes = `Has extra sources beyond expected. Expected: ${wf.sotSources.join(", ")}. Generated: ${wf.genSources.join(", ")}`;
+      notes = `REQUIRED: Use only ${wf.sotSources.join(", ")} (not ${wf.genSources.join(", ")}). Extra sources are incorrect. Verified correction.`;
     } else {
-      continue; // Skip unknown types
+      continue;
     }
 
     db.update(fieldMapping)
