@@ -8,7 +8,7 @@ interface ExemplarData {
   sourceFieldName: string | null;
   transform: string | null;
   defaultValue: string | null;
-  enumMapping: Record<string, string> | null;
+  enumMapping: Record<string, string | null> | null;
   reasoning: string | null;
   confidence: string | null;
   notes: string | null;

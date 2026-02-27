@@ -7,7 +7,7 @@ export interface MappingCodeInput {
   mappingType: string | null;
   transform: string | null;
   defaultValue: string | null;
-  enumMapping: Record<string, string> | null;
+  enumMapping: Record<string, string | null> | null;
 }
 
 export function generateSQL(input: MappingCodeInput): string {

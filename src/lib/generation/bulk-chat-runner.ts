@@ -1083,7 +1083,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
         sourceFieldId: enriched.sourceFieldId as string || null,
         transform: enriched.transform as string || null,
         defaultValue: enriched.defaultValue as string || null,
-        enumMapping: enriched.enumMapping as Record<string, string> || null,
+        enumMapping: enriched.enumMapping as Record<string, string | null> || null,
         reasoning: enriched.reasoning as string || null,
         confidence: enriched.confidence as string || null,
         notes: enriched.notes as string || null,

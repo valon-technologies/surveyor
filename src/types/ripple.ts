@@ -25,7 +25,7 @@ export interface MappingSnapshot {
   sourceFieldId: string | null;
   transform: string | null;
   defaultValue: string | null;
-  enumMapping: Record<string, string> | null;
+  enumMapping: Record<string, string | null> | null;
   reasoning: string | null;
   confidence: ConfidenceLevel | null;
   notes: string | null;

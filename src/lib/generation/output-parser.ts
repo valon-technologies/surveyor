@@ -24,7 +24,7 @@ const llmMappingSchema = z.object({
   sourceFieldName: z.string().nullable().optional().default(null),
   transform: z.string().nullable().optional().default(null),
   defaultValue: z.string().nullable().optional().default(null),
-  enumMapping: z.record(z.string(), z.string()).nullable().optional().default(null),
+  enumMapping: z.record(z.string(), z.string().nullable()).nullable().optional().default(null),
   reasoning: z.string().nullable().optional().default(null),
   confidence: z.string().nullable().optional().default(null),
   uncertaintyType: z.string().nullable().optional().default(null),

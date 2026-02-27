@@ -267,7 +267,7 @@ export const fieldMapping = sqliteTable(
     sourceFieldId: text("source_field_id").references(() => field.id),
     transform: text("transform"), // SQL expression
     defaultValue: text("default_value"),
-    enumMapping: text("enum_mapping", { mode: "json" }).$type<Record<string, string>>(),
+    enumMapping: text("enum_mapping", { mode: "json" }).$type<Record<string, string | null>>(),
     reasoning: text("reasoning"),
     confidence: text("confidence"), // high | medium | low
     notes: text("notes"),

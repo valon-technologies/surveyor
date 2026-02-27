@@ -72,7 +72,7 @@ function toSnapshot(
     sourceFieldId: (mapping.sourceFieldId as string) || null,
     transform: (mapping.transform as string) || null,
     defaultValue: (mapping.defaultValue as string) || null,
-    enumMapping: (mapping.enumMapping as Record<string, string>) || null,
+    enumMapping: (mapping.enumMapping as Record<string, string | null>) || null,
     reasoning: (mapping.reasoning as string) || null,
     confidence: (mapping.confidence as ConfidenceLevel) || null,
     notes: (mapping.notes as string) || null,

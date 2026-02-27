@@ -11,7 +11,7 @@ export interface FieldMapping {
   sourceFieldId: string | null;
   transform: string | null;
   defaultValue: string | null;
-  enumMapping: Record<string, string> | null;
+  enumMapping: Record<string, string | null> | null;
   reasoning: string | null;
   confidence: ConfidenceLevel | null;
   notes: string | null;
@@ -39,7 +39,7 @@ export interface FieldMappingCreateInput {
   sourceFieldId?: string;
   transform?: string;
   defaultValue?: string;
-  enumMapping?: Record<string, string>;
+  enumMapping?: Record<string, string | null>;
   reasoning?: string;
   confidence?: ConfidenceLevel;
   notes?: string;
@@ -55,7 +55,7 @@ export interface FieldMappingUpdateInput {
   sourceFieldId?: string | null;
   transform?: string | null;
   defaultValue?: string | null;
-  enumMapping?: Record<string, string> | null;
+  enumMapping?: Record<string, string | null> | null;
   reasoning?: string | null;
   confidence?: ConfidenceLevel | null;
   notes?: string | null;
