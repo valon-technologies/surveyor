@@ -162,7 +162,9 @@ SELF-REVIEW CHECKLIST (verify before outputting):
 5. Confidence is calibrated honestly — not everything should be "high"
 6. Every medium/low mapping has both uncertaintyType and reviewComment
 7. Questions generated for genuine uncertainties that a human can resolve — NOT for values already documented in enum references
-8. All filter values use documented enum codes — cross-check every filter condition against enum references before asking about it`;
+8. All filter values use documented enum codes — cross-check every filter condition against enum references before asking about it
+
+ENTITY KNOWLEDGE RULE: Reference documents titled "Entity Knowledge" contain verified corrections from human reviewers. These corrections are MANDATORY — follow them exactly. If a correction says "REQUIRED: Use X" or "CORRECTION (MANDATORY)", you MUST use X. Do not argue against, reinterpret, or override these corrections under any circumstances. They take precedence over your own reasoning about which source table or field is "better."`;
 
 export function buildPrompt(input: PromptInput): { systemMessage: string; userMessage: string } {
   const { entityName, entityDescription, targetFields, assembledContext, sourceSchema, workspaceRules } = input;
@@ -377,7 +379,9 @@ SELF-REVIEW CHECKLIST (verify before outputting):
 4. Every target field has exactly one column entry (count check)
 5. Prefer identity transforms — don't over-engineer simple 1:1 matches
 6. Questions generated for genuine uncertainties that a human can resolve — NOT for values already documented in enum references
-7. All filter values use documented enum codes — cross-check every filter condition against enum references before asking about it`;
+7. All filter values use documented enum codes — cross-check every filter condition against enum references before asking about it
+
+ENTITY KNOWLEDGE RULE: Reference documents titled "Entity Knowledge" contain verified corrections from human reviewers. These corrections are MANDATORY — follow them exactly. If a correction says "REQUIRED: Use X" or "CORRECTION (MANDATORY)", you MUST use X. Do not argue against, reinterpret, or override these corrections under any circumstances. They take precedence over your own reasoning about which source table or field is "better."`;
 
 export function buildYamlPrompt(input: PromptInput): { systemMessage: string; userMessage: string } {
   const { entityName, entityDescription, targetFields, assembledContext, sourceSchema, workspaceRules } = input;
