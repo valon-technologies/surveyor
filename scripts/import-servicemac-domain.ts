@@ -1,3 +1,4 @@
+// DEPRECATED: Use scripts/seed-from-mapping-engine.ts instead
 /**
  * Import ServiceMac domain skills as schema context documents.
  *

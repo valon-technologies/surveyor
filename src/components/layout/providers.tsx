@@ -5,6 +5,7 @@ import { SessionProvider } from "next-auth/react";
 import { useState, type ReactNode } from "react";
 import { WorkspaceProvider } from "./workspace-provider";
 import { ToastProvider } from "@/components/ui/toast";
+import { ThemeProvider } from "./theme-provider";
 import { GenerationPoller } from "@/components/generation/generation-poller";
 import { GenerationQueue } from "@/components/generation/generation-queue";
 
@@ -24,13 +25,15 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
-        <WorkspaceProvider>
-          <ToastProvider>
-            {children}
-            <GenerationPoller />
-            <GenerationQueue />
-          </ToastProvider>
-        </WorkspaceProvider>
+        <ThemeProvider>
+          <WorkspaceProvider>
+            <ToastProvider>
+              {children}
+              <GenerationPoller />
+              <GenerationQueue />
+            </ToastProvider>
+          </WorkspaceProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </SessionProvider>
   );

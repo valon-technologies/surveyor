@@ -1,3 +1,4 @@
+// DEPRECATED: Use scripts/seed-from-mapping-engine.ts instead
 /**
  * Import mortgage-domain skills as foundational context documents.
  *

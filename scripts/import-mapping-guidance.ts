@@ -1,3 +1,4 @@
+// DEPRECATED: Use scripts/seed-from-mapping-engine.ts instead
 /**
  * Import mapping guidance, patterns, decisions, and entity Q&A as context documents.
  *

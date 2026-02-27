@@ -1185,9 +1185,9 @@ export async function executeBatchRun(
       .where(eq(batchRun.id, batchRunId))
       .run();
 
-    // Chain chat-quality pass: for each unreviewed field, run a focused
-    // per-field session with RAG tools and replace the batch mapping in-place.
-    if (finalStatus === "completed") {
+    // Chat enrichment pass disabled — using Opus for batch which handles long context well.
+    // Re-enable if per-field RAG tool access is needed.
+    if (false && finalStatus === "completed") {
       try {
         const { batchRunId: chatRunId, entities: chatEntities } = createBulkChatRun({
           workspaceId: input.workspaceId,
@@ -1209,6 +1209,7 @@ export async function executeBatchRun(
       }
     }
   } catch (error) {
+    console.error("[batch-runner] Fatal error in executeBatchRun:", error);
     // Ensure batch run is always marked as failed on unexpected errors
     try {
       db.update(batchRun)

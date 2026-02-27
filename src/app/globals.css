@@ -41,3 +41,73 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ── Vaporwave theme ───────────────────────────────────────────────────────── */
+[data-theme="vaporwave"] {
+  --color-background: #0d0d14;
+  --color-foreground: #e2d9f3;
+  --color-muted: #1a1028;
+  --color-muted-foreground: #9b8bb8;
+  --color-border: #2d1b69;
+  --color-input: #2d1b69;
+  --color-ring: #c084fc;
+  --color-primary: #c084fc;
+  --color-primary-foreground: #0d0d14;
+  --color-secondary: #1a1028;
+  --color-secondary-foreground: #e2d9f3;
+  --color-accent: #2d1b4e;
+  --color-accent-foreground: #f472b6;
+  --color-destructive: #ff3366;
+  --color-destructive-foreground: #0d0d14;
+  --color-card: #13131f;
+  --color-card-foreground: #e2d9f3;
+  --color-popover: #13131f;
+  --color-popover-foreground: #e2d9f3;
+  --color-sidebar: #0a0a12;
+  --color-sidebar-foreground: #e2d9f3;
+  --color-sidebar-border: #2d1b69;
+  --color-sidebar-accent: #1a1028;
+  --color-sidebar-accent-foreground: #c084fc;
+}
+
+/* Grid overlay */
+[data-theme="vaporwave"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(192, 132, 252, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(192, 132, 252, 0.06) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Scanline overlay */
+[data-theme="vaporwave"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.04) 2px,
+    rgba(0, 0, 0, 0.04) 4px
+  );
+}
+
+/* Neon glow on focus */
+[data-theme="vaporwave"] input:focus,
+[data-theme="vaporwave"] textarea:focus,
+[data-theme="vaporwave"] button:focus-visible {
+  box-shadow: 0 0 0 1px var(--color-ring), 0 0 10px color-mix(in srgb, var(--color-ring) 50%, transparent);
+  outline: none;
+}
+
+/* Neon border glow on cards/panels in vaporwave */
+[data-theme="vaporwave"] .border {
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-border) 40%, transparent);
+}

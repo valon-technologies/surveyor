@@ -7,7 +7,7 @@ import type {
 } from "../provider";
 import { countTokensTiktoken } from "../token-counter";
 
-const DEFAULT_MODEL = "claude-sonnet-4-5-20250929";
+const DEFAULT_MODEL = "claude-opus-4-6";
 
 export class ClaudeProvider implements LLMProvider {
   name = "claude";

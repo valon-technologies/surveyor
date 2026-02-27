@@ -18,8 +18,11 @@ import {
   Settings,
   HelpCircle,
   Target,
+  Zap,
+  Sun,
 } from "lucide-react";
 import { useQuestions } from "@/queries/question-queries";
+import { useTheme } from "./theme-provider";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -37,13 +40,21 @@ export function SidebarNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const { data: openQuestions } = useQuestions({ status: "open" });
+  const { theme, toggle } = useTheme();
 
   return (
     <aside className="w-56 border-r bg-sidebar h-screen flex flex-col shrink-0">
       {/* Logo */}
       <div className="flex items-center gap-2 px-4 py-4 border-b">
         <Compass className="h-5 w-5 text-primary" />
-        <span className="font-semibold text-sm">Surveyor</span>
+        <span className="font-semibold text-sm flex-1">Surveyor</span>
+        <button
+          onClick={toggle}
+          title={theme === "vaporwave" ? "Switch to default" : "Switch to vaporwave"}
+          className="text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
+        >
+          {theme === "vaporwave" ? <Sun className="h-3.5 w-3.5" /> : <Zap className="h-3.5 w-3.5" />}
+        </button>
       </div>
 
       {/* Workspace switcher */}

@@ -1,125 +1,102 @@
 /**
- * Persist field mappings from last generation output, then run SOT eval.
+ * Persist field mappings from the latest generation's output_parsed and run SOT eval.
  *
- * Usage: env $(grep -v '^#' .env.local | xargs) npx tsx scripts/persist-and-eval.ts
+ * Usage: npx tsx scripts/persist-and-eval.ts
  */
+import { readFileSync } from "fs";
+for (const line of readFileSync(".env.local", "utf-8").split("\n")) {
+  const match = line.match(/^([^#=]+)=(.*)$/);
+  if (match) process.env[match[1].trim()] = match[2].trim();
+}
 
 import { db } from "../src/lib/db";
-import { generation, fieldMapping, sotEvaluation } from "../src/lib/db/schema";
+import { generation, fieldMapping, field } from "../src/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { evaluateEntityMappings } from "../src/lib/evaluation/mapping-evaluator";
 
 const WORKSPACE_ID = "2ac4e497-1c82-4b0d-a86e-83bec30761c8";
+const USER_ID = "4758a2e0-f727-4180-9f9b-6cd468e84598";
 const ENTITY_ID = "07d0678a-637e-4917-9099-bd6ce09622dc";
 
-// Find latest completed generation
 const gen = db
   .select()
   .from(generation)
-  .where(
-    and(
-      eq(generation.entityId, ENTITY_ID),
-      eq(generation.status, "completed"),
-    )
-  )
+  .where(and(
+    eq(generation.workspaceId, WORKSPACE_ID),
+    eq(generation.entityId, ENTITY_ID),
+    eq(generation.status, "completed"),
+  ))
   .orderBy(desc(generation.createdAt))
+  .limit(1)
   .get();
 
-if (!gen) {
-  console.log("No completed generation found.");
+if (!gen || !gen.outputParsed) {
+  console.log("No completed generation found");
   process.exit(1);
 }
 
-console.log(`Using generation: ${gen.id}`);
+const parsed = gen.outputParsed as any;
+console.log(`Generation ${gen.id} from ${gen.createdAt}`);
+console.log(`Output has ${parsed.fieldMappings.length} mappings\n`);
 
-// Check if mappings already exist
-const existing = db
-  .select({ id: fieldMapping.id })
-  .from(fieldMapping)
-  .where(eq(fieldMapping.generationId, gen.id))
-  .all();
-
-if (existing.length > 0) {
-  console.log(`${existing.length} field mappings already exist for this generation.`);
-} else {
-  // Persist field mappings from outputParsed
-  const outputParsed = gen.outputParsed as Record<string, unknown> | null;
-  const fms = (outputParsed?.fieldMappings ?? []) as Array<Record<string, unknown>>;
-
-  let persisted = 0;
-  for (const fm of fms) {
-    if (!fm.targetFieldId) continue;
-
-    db.insert(fieldMapping)
-      .values({
-        id: crypto.randomUUID(),
-        workspaceId: WORKSPACE_ID,
-        targetFieldId: fm.targetFieldId as string,
-        status: (fm.status as string) || "unreviewed",
-        mappingType: (fm.mappingType as string) || null,
-        sourceEntityId: (fm.sourceEntityId as string) || null,
-        sourceFieldId: (fm.sourceFieldId as string) || null,
-        transform: (fm.transform as string) || null,
-        defaultValue: (fm.defaultValue as string) || null,
-        enumMapping: (fm.enumMapping as Record<string, string>) || null,
-        reasoning: (fm.reasoning as string) || null,
-        confidence: (fm.confidence as string) || null,
-        notes: (fm.reviewComment as string) || (fm.notes as string) || null,
-        createdBy: "llm",
-        generationId: gen.id,
-        version: 1,
-        isLatest: true,
-      })
-      .run();
-    persisted++;
-  }
-  console.log(`Persisted ${persisted} field mappings.`);
+// Clear existing latest
+const targetFields = db.select({ id: field.id }).from(field).where(eq(field.entityId, ENTITY_ID)).all();
+for (const tf of targetFields) {
+  db.update(fieldMapping)
+    .set({ isLatest: false })
+    .where(and(eq(fieldMapping.targetFieldId, tf.id), eq(fieldMapping.isLatest, true)))
+    .run();
 }
+console.log(`Cleared ${targetFields.length} field isLatest flags`);
 
-// Run evaluation
-console.log("\n=== SOT Evaluation ===\n");
-
-const evalResult = evaluateEntityMappings(WORKSPACE_ID, ENTITY_ID);
-if (!evalResult) {
-  console.log("No SOT data available for this entity.");
-  process.exit(1);
-}
-
-console.log(`Entity: ${evalResult.entityName}`);
-console.log(`Total fields: ${evalResult.totalFields}`);
-console.log(`Scored fields: ${evalResult.scoredFields} (have SOT data)`);
-console.log(`Source EXACT:   ${evalResult.sourceExactCount}/${evalResult.scoredFields} (${evalResult.sourceExactPct}%)`);
-console.log(`Source LENIENT: ${evalResult.sourceLenientCount}/${evalResult.scoredFields} (${evalResult.sourceLenientPct}%)`);
-
-// Persist evaluation
-const evalId = crypto.randomUUID();
-db.insert(sotEvaluation)
-  .values({
-    id: evalId,
+// Persist new mappings
+let persisted = 0;
+for (const fm of parsed.fieldMappings) {
+  if (!fm.targetFieldId) continue;
+  db.insert(fieldMapping).values({
+    id: crypto.randomUUID(),
     workspaceId: WORKSPACE_ID,
-    entityId: ENTITY_ID,
-    generationId: evalResult.generationId,
-    totalFields: evalResult.totalFields,
-    scoredFields: evalResult.scoredFields,
-    sourceExactCount: evalResult.sourceExactCount,
-    sourceLenientCount: evalResult.sourceLenientCount,
-    sourceExactPct: evalResult.sourceExactPct,
-    sourceLenientPct: evalResult.sourceLenientPct,
-    fieldResults: evalResult.fieldResults,
-  })
-  .run();
-
-console.log(`\nEvaluation saved: ${evalId}`);
-
-// Per-field breakdown
-console.log("\n=== Per-field results ===\n");
-const scorable = evalResult.fieldResults.filter(
-  (r) => r.matchType !== "NO_SOT" && r.matchType !== "SOT_NULL"
-);
-for (const r of scorable) {
-  const pad = r.field.padEnd(50);
-  const genStr = r.genSources.length > 0 ? r.genSources.join(", ") : "(none)";
-  const sotStr = r.sotSources.length > 0 ? r.sotSources.join(", ") : "(none)";
-  console.log(`${pad} ${r.matchType.padEnd(10)} gen=${genStr}`);
-  console.log(`${"".padEnd(50)} ${"".padEnd(10)} sot=${sotStr}`);
+    targetFieldId: fm.targetFieldId,
+    status: "unreviewed",
+    mappingType: fm.mappingType || "direct",
+    sourceEntityId: fm.sourceEntityId || null,
+    sourceFieldId: fm.sourceFieldId || null,
+    transform: fm.transform || null,
+    defaultValue: fm.defaultValue || null,
+    enumMapping: fm.enumMapping || null,
+    reasoning: fm.reasoning || null,
+    confidence: fm.confidence || null,
+    notes: fm.notes || fm.reviewComment || null,
+    createdBy: "llm",
+    assigneeId: USER_ID,
+    generationId: gen.id,
+    version: 1,
+    isLatest: true,
+  }).run();
+  persisted++;
 }
+console.log(`Persisted ${persisted} field mappings\n`);
+
+// SOT eval
+console.log("Running SOT evaluation...");
+const result = evaluateEntityMappings(WORKSPACE_ID, ENTITY_ID);
+if (!result) { console.log("No SOT data"); process.exit(1); }
+
+console.log(`\nScore: ${result.sourceExactPct}% exact (${result.sourceExactCount}/${result.scoredFields})`);
+console.log(`Lenient: ${result.sourceLenientPct}%`);
+console.log(`\nBaseline was: 65% exact (13/20)\n`);
+
+const delta = result.sourceExactPct - 65;
+if (delta > 0) console.log(`*** IMPROVED by +${delta.toFixed(1)}% ***`);
+else if (delta === 0) console.log("No change from baseline.");
+else console.log(`Regressed by ${delta.toFixed(1)}%`);
+
+console.log("\n--- Fields still wrong ---");
+for (const r of result.fieldResults) {
+  if (["NO_SOT", "SOT_NULL", "EXACT", "BOTH_NULL"].includes(r.matchType)) continue;
+  const g = r.genSources.join(", ") || "(unmapped)";
+  const s = r.sotSources.join(", ") || "(none)";
+  console.log(`${r.matchType.padEnd(12)} ${r.field.padEnd(50)} gen=${g.padEnd(55)} sot=${s}`);
+}
+const wrong = result.fieldResults.filter(r => !["NO_SOT","SOT_NULL","EXACT","BOTH_NULL"].includes(r.matchType)).length;
+if (wrong === 0) console.log("(none - all scored fields are correct!)");

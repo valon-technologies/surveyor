@@ -1,3 +1,4 @@
+// DEPRECATED: Use scripts/seed-from-mapping-engine.ts instead
 /**
  * Import ServiceMac mapping session transcripts as adhoc/transcript context docs.
  *
