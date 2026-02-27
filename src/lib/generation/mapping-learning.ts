@@ -303,10 +303,10 @@ export function extractVerdictLearning(
         : mapping.sourceEntityName || "unknown";
 
     const contentMap: Record<string, string> = {
-      wrong_table: `${prefix}: Source table is wrong. Model used ${currentSrc}.${notes}`,
-      wrong_field: `${prefix}: Source field is wrong within ${mapping.sourceEntityName || "the entity"}.${notes}`,
+      wrong_table: `${prefix}: CORRECTION (MANDATORY): Wrong source table. Do NOT use ${currentSrc}.${notes}`,
+      wrong_field: `${prefix}: CORRECTION (MANDATORY): Wrong source field within ${mapping.sourceEntityName || "the entity"}.${notes}`,
       should_be_unmapped: `${prefix}: This field has no source. Do NOT attempt to map it — leave unmapped.`,
-      missing_source: `${prefix}: This field has a source but was left unmapped.${notes}`,
+      missing_source: `${prefix}: CORRECTION (MANDATORY): This field MUST be mapped — do not leave unmapped.${notes}`,
     };
 
     const content = contentMap[mapping.sourceVerdict];
