@@ -225,7 +225,8 @@ function renderDocument(
   // Section 1: Mapping corrections (source="review") — deduplicated by field
   const corrections = learnings.filter((l) => l.source === "review");
   if (corrections.length > 0) {
-    parts.push(`## Source & Transform Corrections\n`);
+    parts.push(`## Source & Transform Corrections (MANDATORY)\n`);
+    parts.push(`These corrections have been verified by human reviewers. Follow each one exactly. Do NOT override or argue against them.\n`);
     const seen = new Set<string>();
     for (const c of corrections) {
       // Most recent first (already ordered by createdAt DESC), skip dupes
