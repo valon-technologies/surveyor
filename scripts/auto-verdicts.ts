@@ -10,7 +10,7 @@
  */
 import { readFileSync } from "fs";
 for (const line of readFileSync(".env.local", "utf-8").split("\n")) {
-  const match = line.match(/^([^#=]+)=(.*)$/);
+  const match = line.match(/^([^#=]+)=(.*)/);
   if (match) process.env[match[1].trim()] = match[2].trim();
 }
 
