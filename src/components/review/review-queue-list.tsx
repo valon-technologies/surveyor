@@ -140,22 +140,50 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
   const excludedCount = cards.filter((c) => c.status === "excluded").length;
   const puntedCount = cards.filter((c) => c.status === "punted").length;
 
+  const reviewedCount = acceptedCount + excludedCount;
+  const reviewPct = cards.length > 0 ? Math.round((reviewedCount / cards.length) * 100) : 0;
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-4 text-xs text-muted-foreground mb-1">
-        <span>{cards.length} total across {entityGroups.length} entities</span>
-        {unreviewedCount > 0 && (
-          <span className="text-blue-600">{unreviewedCount} to review</span>
-        )}
-        {acceptedCount > 0 && (
-          <span className="text-green-600">{acceptedCount} accepted</span>
-        )}
-        {puntedCount > 0 && (
-          <span className="text-amber-600">{puntedCount} punted</span>
-        )}
-        {excludedCount > 0 && (
-          <span className="text-stone-400">{excludedCount} excluded</span>
-        )}
+      {/* Overall progress */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center gap-4 text-muted-foreground">
+            <span>{cards.length} fields across {entityGroups.length} entities</span>
+            {unreviewedCount > 0 && (
+              <span className="text-blue-600">{unreviewedCount} to review</span>
+            )}
+            {puntedCount > 0 && (
+              <span className="text-amber-600">{puntedCount} punted</span>
+            )}
+          </div>
+          <span className={reviewedCount > 0 ? "text-green-600 font-medium" : "text-muted-foreground"}>
+            {reviewedCount}/{cards.length} reviewed ({reviewPct}%)
+          </span>
+        </div>
+        <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+          {acceptedCount > 0 && (
+            <div
+              className="h-full bg-green-500 transition-all"
+              style={{ width: `${(acceptedCount / cards.length) * 100}%` }}
+              title={`${acceptedCount} accepted`}
+            />
+          )}
+          {excludedCount > 0 && (
+            <div
+              className="h-full bg-stone-400 transition-all"
+              style={{ width: `${(excludedCount / cards.length) * 100}%` }}
+              title={`${excludedCount} excluded`}
+            />
+          )}
+          {puntedCount > 0 && (
+            <div
+              className="h-full bg-amber-500 transition-all"
+              style={{ width: `${(puntedCount / cards.length) * 100}%` }}
+              title={`${puntedCount} punted`}
+            />
+          )}
+        </div>
       </div>
 
       {entityGroups.map((group) => (

@@ -10,7 +10,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const statusFilter = searchParams.get("status");
   const confidence = searchParams.get("confidence");
   const entityId = searchParams.get("entityId");
-  const sortBy = searchParams.get("sortBy") || "createdAt";
+  const sortBy = searchParams.get("sortBy") || "confidence";
   const sortOrder = searchParams.get("sortOrder") || "desc";
 
   // Query all latest LLM-generated mappings

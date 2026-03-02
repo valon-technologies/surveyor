@@ -140,6 +140,216 @@ The critical path is: **quick SUBSET stopgap → push → Postgres migration →
 
 ---
 
+## Supabase Postgres Migration Plan (ready to execute)
+
+**Blocker:** Need Supabase project access + connection string before starting.
+
+**Approach:** `postgres` (postgres-js) + `drizzle-orm/postgres-js` via Supabase Connection Pooler (Transaction mode, `prepare: false`). Interactive transactions fully supported.
+
+### Scope
+- 34 tables, 39 JSON columns, 11 boolean columns
+- ~700 sync DB calls → async across ~119 files
+- FTS5 skipped for MVP (already fails gracefully)
+
+### Phases
+1. **Dependencies** — install `postgres`, remove `better-sqlite3`, update configs
+2. **Schema** — `sqliteTable` → `pgTable`, `text(json)` → `jsonb`, `integer(boolean)` → `boolean`, timestamp defaults
+3. **Driver swap** — replace `db/index.ts` with postgres-js client, async `withTransaction`
+4. **Sync→async conversion** (~119 files) — `.all()` → `await`, `.get()` → `[0]`, `.run()` → `await`, `withTransaction` callers
+5. **Push schema** — `drizzle-kit push` to Supabase
+6. **Fresh seed** — re-run import-all-entities, seed-from-mapping-engine, generate-mapping-skills
+7. **Vercel deploy** — connect repo, set env vars, smoke test
+
+### Conversion cheatsheet
+| SQLite | Postgres |
+|--------|----------|
+| `.all()` | `await ...` (drop `.all()`) |
+| `.get()` | `(await ...limit(1))[0]` |
+| `.run()` | `await ...` (drop `.run()`) |
+| `.returning().all()` | `await ...returning()` |
+| `withTransaction(() => { ... })` | `await withTransaction(async (tx) => { ... })` |
+
+Full plan: `docs/plans/2026-03-02-supabase-migration-plan.md` (to be committed)
+
+---
+
+## Next Steps (priority order)
+
+### 1. Pre-generate AI reviews (eliminates reviewer wait time)
+Currently the AI assistant takes several seconds to analyze a mapping when the reviewer opens the discuss page. Pre-generate reviews during batch generation:
+- After batch generation produces mappings, run a second pass per field: AI analyzes the mapping, produces a proposed update (source/transform/question), stores in DB
+- When reviewer opens discuss page, pre-generated review loads instantly from DB
+- Chat stays live — reviewer can still dialogue with AI to revise the proposal
+- AI session starts with the pre-generated review as context so follow-ups are coherent
+- **Touches**: batch-runner.ts (add review pass), discuss-client.tsx (load pre-generated review), DB schema (store proposed updates per mapping)
+
+### 2. Supabase migration (blocker for deployment)
+See migration plan above. Need Supabase project access first.
+
+### 3. Verify end-to-end feedback loop
+1. Give a structured verdict on a foreclosure field
+2. Confirm learning created → EK rebuilt → correction appears in context
+3. Regenerate the entity
+4. Confirm the corrected field improves
+
+### 4. Deploy to mapping team
+Push, migrate, seed, create accounts, pre-generate mappings.
+
+### 5. Client access (ServiceMac)
+See client access design section above.
+
+---
+
+## Model Choices (documented)
+
+| Stage | Model | Rationale |
+|-------|-------|-----------|
+| Initial mapping generation | Opus (`claude-opus-4-6`) | Highest quality for source identification — the binding constraint |
+| AI review pass (pre-generated) | Opus (`claude-opus-4-6`) | Consistency requires Opus — Sonnet produced incoherent source/transform proposals. ~$0.15/field, ~$30 for 200 fields. |
+| Live chat (discuss page) | Opus (`claude-opus-4-6`) | Highest quality for interactive dialogue with reviewer |
+
+Code locations:
+- Generation model: `src/lib/llm/providers/claude.ts:10` (`DEFAULT_MODEL`)
+- Review model: `src/lib/generation/ai-review.ts` (`REVIEW_MODEL`)
+- Chat model: configured in chat session API route
+
+---
+
+## UI Improvements Made This Session
+
+### Layout & Navigation
+- **Field sort order**: review queue and entity detail sort by confidence (high → medium → low)
+- **Discuss page layout**: 3-row vertical stack — (1) current mapping, (2) AI assistant, (3) source/transform/question feedback columns
+- **Prior sessions**: collapsed by default at bottom, expandable
+- **Confidence labels**: "medium confidence" (not just "medium") consistently across the entire app
+
+### Discuss Page — Current Mapping
+- Condensed to single summary row: badges + source → target on left, transform wrapping on right
+- No truncation anywhere — all source fields, transforms, and questions display in full
+
+### Discuss Page — Layout (final)
+1. **Current Mapping** — source/target/reasoning on left (1/3), transform on right (2/3) with SQL keyword line breaks
+2. **Source | Transform | Question** — three equal columns with checkbox-based review, blue backdrop
+3. **Other Notes** — full-width textarea
+4. **Submit Review & Next** — status bar with per-component dots
+5. **AI Assistant** — below feedback, available for follow-up dialogue
+6. **Prior Sessions** — collapsed at bottom
+
+### Discuss Page — Pre-generated AI Reviews
+- New `aiReview` JSON column on `fieldMapping` stores pre-generated proposed update + review text
+- AI review runs during batch generation (Opus model) — produces source/transform/question proposals
+- Discuss page loads AI review **instantly** from DB — no waiting for LLM
+- Live chat still available for follow-up — doesn't auto-kickoff when pre-generated review exists
+- Chat can revise the proposal; new proposals override pre-generated ones
+- Consistency rules in review prompt: source fields must match transform references
+- Script: `scripts/generate-ai-reviews.ts` — generates reviews for specified entities
+- Script: `scripts/review-single-field.ts` — re-reviews a single mapping by ID
+
+### Discuss Page — Feedback Columns (Source | Transform | Question)
+- **Checkbox-based review model** — one selection per section:
+  - `[☐] current value` — with "AI Review confirms" green label when AI agrees
+  - `[☐] AI Review suggestion` — shown in blue when AI proposes different value
+  - `[☐] free text (specify)` — check + type to provide a different answer
+- **All checkboxes unchecked by default** — reviewer must explicitly select one per section
+- **Only one checkbox active per section** — selecting one deselects others (radio behavior)
+- When AI agrees with current: green "AI Review confirms" label shown, but checkbox still unchecked until reviewer confirms
+- When AI differs: two options shown (current vs AI Review) for reviewer to choose
+- Accepting AI suggestion saves as "wrong" verdict → triggers learning extraction pipeline
+- Suggestions reset when AI generates a new proposal via live chat
+- No truncation/abbreviation on any values
+- LLM chat prompt updated: no emojis, uses (!) for corrections and (X) for blocked items
+
+### Discuss Page — Question Section
+- QuestionFeedbackCard: "Is this question acceptable?" Yes/No with why-not dropdown and better question textarea
+- CreateQuestionCard: AI suggested question with checkbox + custom question textarea + SM/VT team selector
+- Question decision required before Submit Review & Next becomes clickable
+
+### Discuss Page — Submit Review Bar
+- Shows per-component decision status: Source / Transform / Question with green/gray dots
+- **Requires all three** (source + transform + question) resolved before button activates
+- Light blue (`bg-blue-200`) when disabled, full blue (`bg-blue-600`) when ready
+- Navigates to next unreviewed field on submit
+- Session complete card removed — navigation only through Submit button
+
+### Review Queue — Progress Tracking
+- **Overall progress bar** at top of review queue: "X/Y reviewed (Z%)" with colored segments (green=accepted, gray=excluded, amber=punted)
+- **Per-entity progress badge**: "X/Y reviewed" — green when complete, blue when in progress, gray when not started
+- Entity headers show reviewed count next to entity name
+
+### Review Queue — Sorting
+- Default sort: confidence (high → medium → low within status groups)
+- Accepted/excluded fields sort to bottom
+
+### New Files Created
+- `src/lib/generation/ai-review.ts` — pre-generate AI reviews for field mappings (Opus, ~$0.15/field)
+- `src/components/review/create-question-card.tsx` — question creation with AI suggestion checkbox
+- `scripts/generate-ai-reviews.ts` — batch AI review generation per entity
+- `scripts/review-single-field.ts` — single mapping AI review
+
+### Files Modified (key changes)
+- `src/components/chat/mapping-state-card.tsx` — split into `MappingSummary` + `ProposedUpdateCard`
+- `src/lib/generation/chat-prompt-builder.ts` — added `question` field to mapping-update schema, no-emoji formatting rules, consistency rules
+- `src/lib/db/schema.ts` — added `aiReview` JSON column on `fieldMapping`
+- `src/app/mapping/discuss/[fieldMappingId]/discuss-client.tsx` — major refactor: vertical layout, pre-generated review loading, checkbox model, effectiveUpdate pattern
+- `src/components/review/source-verdict-card.tsx` — checkbox model with AI agrees/differs logic
+- `src/components/review/transform-verdict-card.tsx` — same
+- `src/components/review/entity-group.tsx` — per-entity reviewed count badge
+- `src/components/review/review-queue-list.tsx` — overall progress bar
+
+---
+
+## Client Access Design (ServiceMac and future clients)
+
+### Concept
+Allow ServiceMac staff to log into Surveyor and answer structured questions about their source system. Their answers flow into Entity Knowledge and improve mapping accuracy. Design should generalize to future clients.
+
+### Data Isolation
+- **Workspace per client** — ServiceMac gets their own workspace. Source schemas, mappings, questions, EK all scoped to workspace.
+- **Shared knowledge** — mortgage domain docs, VDS skills, distilled learnings are transferable (same VDS target). Copied to each workspace, not cross-referenced.
+- **EK is client-specific** — corrections reference client-specific source tables (ACDC for SM, different for future clients).
+
+### Role Model
+| Role | Who | Can do | Cannot do |
+|------|-----|--------|-----------|
+| admin | Valon eng | Everything, cross-workspace | — |
+| reviewer | Valon mapping team | Review, verdicts, manage EK | Other client workspaces |
+| client | ServiceMac staff | Answer questions, provide domain context | See EK, SOT scores, internal reasoning, other clients |
+
+### What Clients See vs. Don't See
+**Show:** Questions tagged for them, their source schema, mapping proposals needing input.
+**Hide:** EK corrections, SOT eval scores, Valon verdicts/notes, LLM chat (leaks internal context), confidence calibration, other clients.
+
+### Client Question Workflow
+1. Valon reviewer (or auto-gen) creates question → `targetForTeam: "SM"`
+2. SM user logs in, sees question queue
+3. Answers in plain English
+4. Answer → EK → next generation improves
+5. Valon reviewer validates
+
+### Security Risks
+1. LLM chat prompt includes EK/SOT — must hide from clients or build client-safe prompt
+2. `withAuth` checks workspace but not role — need role-based route guards
+3. Client answers enter EK → LLM prompts — sanitize for prompt injection
+4. Audit all routes for cross-workspace leakage
+
+### Build Order (ServiceMac-first, then generalize)
+1. Role-based route guards — extend `withAuth` to check role
+2. Client question view — simplified page for SM questions only
+3. Hide internal data — strip EK/verdicts/SOT from client API responses
+4. Workspace provisioning for new clients
+5. Client invite flow with role assignment
+
+### Can we build this on the current instance?
+Yes — the existing workspace/role infrastructure supports it. The `userWorkspace` table has `role` and `team` fields. The `question` table has `targetForTeam`. The main work is:
+- Add a `"client"` role option
+- Build role-based API guards (extend `withAuth`)
+- Create a client-facing question view (stripped-down page)
+- Create SM user accounts with `role: "client"`
+
+This can be done incrementally — start with the question view for SM, then add isolation as we prepare for additional clients.
+
+---
+
 ## Git History Reference
 
 ### Surveyor — unpushed commits (12)

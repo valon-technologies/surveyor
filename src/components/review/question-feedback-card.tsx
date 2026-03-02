@@ -18,6 +18,7 @@ interface QuestionFeedbackCardProps {
   initialHelpful?: boolean | null;
   initialWhyNot?: string | null;
   initialBetterQuestion?: string | null;
+  onDecisionMade?: () => void;
 }
 
 export function QuestionFeedbackCard({
@@ -26,6 +27,7 @@ export function QuestionFeedbackCard({
   initialHelpful,
   initialWhyNot,
   initialBetterQuestion,
+  onDecisionMade,
 }: QuestionFeedbackCardProps) {
   const [expanded, setExpanded] = useState(true);
   const [helpful, setHelpful] = useState<boolean | null>(initialHelpful ?? null);
@@ -48,6 +50,7 @@ export function QuestionFeedbackCard({
   function handleHelpfulToggle(value: boolean) {
     setHelpful(value);
     save({ feedbackHelpful: value });
+    onDecisionMade?.();
   }
 
   function handleWhyNotChange(value: string) {
@@ -107,7 +110,7 @@ export function QuestionFeedbackCard({
 
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-muted-foreground">
-              Does this unblock you?
+              Is this question acceptable?
             </span>
             <div className="flex gap-1">
               <button

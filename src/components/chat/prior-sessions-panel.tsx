@@ -16,29 +16,41 @@ export function PriorSessionsPanel({
   viewedSessionId,
   onToggle,
 }: PriorSessionsPanelProps) {
+  const [expanded, setExpanded] = useState(false);
+
   if (sessions.length === 0) return null;
 
   return (
     <div className="border-t">
-      <div className="px-4 py-2.5 flex items-center gap-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full px-4 py-2 flex items-center gap-2 hover:bg-muted/50 transition-colors"
+      >
+        {expanded ? (
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
         <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-        <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
           Prior Sessions
-        </h4>
+        </span>
         <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">
           {sessions.length}
         </span>
-      </div>
-      <div className="px-3 pb-3 space-y-1.5">
-        {sessions.map((session) => (
-          <SessionCard
-            key={session.id}
-            session={session}
-            isExpanded={viewedSessionId === session.id}
-            onToggle={() => onToggle(session.id)}
-          />
-        ))}
-      </div>
+      </button>
+      {expanded && (
+        <div className="px-3 pb-3 space-y-1.5">
+          {sessions.map((session) => (
+            <SessionCard
+              key={session.id}
+              session={session}
+              isExpanded={viewedSessionId === session.id}
+              onToggle={() => onToggle(session.id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -168,7 +180,7 @@ function MappingUpdateSummary({
     parts.push(`Transform: ${truncate(String(update.transform), 80)}`);
   }
   if (update.confidence) {
-    parts.push(`Confidence: ${String(update.confidence)}`);
+    parts.push(`${String(update.confidence)} confidence`);
   }
   if (parts.length === 0) {
     parts.push("Update applied");

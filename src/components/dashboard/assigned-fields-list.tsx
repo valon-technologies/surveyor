@@ -87,7 +87,7 @@ export function AssignedFieldsList({
                   </span>
                   {f.confidence && (
                     <Badge variant="outline" className="ml-auto text-[10px] py-0">
-                      {f.confidence}
+                      {f.confidence} confidence
                     </Badge>
                   )}
                 </Link>

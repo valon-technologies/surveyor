@@ -140,7 +140,7 @@ export function EntityMappingOverviewCard({
                         color: confColor,
                       }}
                     >
-                      {f.confidence}
+                      {f.confidence} confidence
                     </Badge>
                   )}
                   {isUnmapped && (

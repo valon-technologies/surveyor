@@ -139,7 +139,7 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple }: Revi
         <span
           className="inline-block w-2 h-2 rounded-full shrink-0"
           style={{ backgroundColor: confidenceColor }}
-          title={`Confidence: ${card.confidence || "unknown"}`}
+          title={`${card.confidence || "unknown"} confidence`}
         />
 
         {/* Field name */}

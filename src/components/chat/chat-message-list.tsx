@@ -51,7 +51,7 @@ export function ChatMessageList({
     activeToolCall && !FORGE_TOOL_NAMES.has(activeToolCall.toolName);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
       {visibleMessages.map((msg) => (
         <MessageBubble key={msg.id} message={msg} />
       ))}
@@ -66,12 +66,10 @@ export function ChatMessageList({
       )}
 
       {isStreaming && streamingContent && (
-        <div className="flex gap-3">
-          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-medium text-primary">
-            AI
-          </div>
-          <div className="flex-1 bg-muted rounded-lg px-4 py-3 text-sm">
-            <article className="prose prose-sm prose-neutral max-w-none">
+        <div className="text-xs py-1">
+          <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">AI</span>
+          <div className="mt-0.5">
+            <article className="prose prose-sm prose-neutral text-xs max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {streamingContent}
               </ReactMarkdown>
@@ -92,14 +90,9 @@ export function ChatMessageList({
       )}
 
       {isStreaming && !activeToolCall && (
-        <div className="flex gap-3 items-center">
-          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-medium text-primary">
-            AI
-          </div>
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          {streamingContent && (
-            <span className="text-xs text-muted-foreground">Working...</span>
-          )}
+        <div className="flex items-center gap-2 py-1">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Thinking...</span>
         </div>
       )}
 
@@ -203,31 +196,15 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
 
   return (
-    <div
-      className={cn("flex gap-3", isUser && "flex-row-reverse")}
-    >
-      <div
-        className={cn(
-          "w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-medium",
-          isUser
-            ? "bg-primary text-primary-foreground"
-            : "bg-primary/10 text-primary"
-        )}
-      >
+    <div className={cn("text-xs", isUser ? "border-l-2 border-primary/40 pl-3 py-1" : "py-1")}>
+      <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
         {isUser ? "You" : "AI"}
-      </div>
-      <div
-        className={cn(
-          "max-w-[80%] rounded-lg px-4 py-3 text-sm",
-          isUser
-            ? "bg-primary text-primary-foreground whitespace-pre-wrap"
-            : "bg-muted"
-        )}
-      >
+      </span>
+      <div className={cn("mt-0.5", isUser && "text-muted-foreground")}>
         {isUser ? (
-          message.content
+          <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
-          <article className="prose prose-sm prose-neutral max-w-none">
+          <article className="prose prose-sm prose-neutral text-xs max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {message.content}
             </ReactMarkdown>

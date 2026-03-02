@@ -28,6 +28,11 @@ export interface FieldMapping {
   sourceVerdictNotes: string | null;
   transformVerdict: string | null;
   transformVerdictNotes: string | null;
+  aiReview: {
+    proposedUpdate: Record<string, unknown> | null;
+    reviewText: string;
+    generatedAt: string;
+  } | null;
 }
 
 export interface FieldMappingCreateInput {

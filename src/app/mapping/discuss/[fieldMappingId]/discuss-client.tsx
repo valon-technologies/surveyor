@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChatMessageList } from "@/components/chat/chat-message-list";
 import { ChatInput } from "@/components/chat/chat-input";
-import { MappingStateCard } from "@/components/chat/mapping-state-card";
+import { MappingSummary } from "@/components/chat/mapping-state-card";
 import { PriorSessionsPanel } from "@/components/chat/prior-sessions-panel";
 import { SessionCompleteCard } from "@/components/chat/session-complete-card";
 import { useMapping, useUpdateMapping } from "@/queries/mapping-queries";
@@ -16,9 +16,11 @@ import { RipplePanel } from "@/components/review/ripple-panel";
 import { SourceVerdictCard } from "@/components/review/source-verdict-card";
 import { TransformVerdictCard } from "@/components/review/transform-verdict-card";
 import { QuestionFeedbackCard } from "@/components/review/question-feedback-card";
+import { CreateQuestionCard } from "@/components/review/create-question-card";
 import { useFieldMappingQuestion } from "@/queries/question-queries";
 import type { ReviewCardData } from "@/types/review";
 import { MAPPING_TYPES, CONFIDENCE_LEVELS, type MappingStatus } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import {
   useCreateChatSession,
   useChatSession,
@@ -72,6 +74,16 @@ export function DiscussClient() {
 
   const [kickoffSent, setKickoffSent] = useState(false);
 
+  // Pre-generated AI review (loaded from DB, overridden by live chat)
+  const aiReview = (mapping as any)?.aiReview as {
+    proposedUpdate: Record<string, unknown> | null;
+    reviewText: string;
+    generatedAt: string;
+  } | null | undefined;
+
+  // Effective proposed update: live chat overrides pre-generated
+  const effectiveUpdate = pendingUpdate ?? aiReview?.proposedUpdate ?? null;
+
   const startNewSession = useCallback(() => {
     if (!fieldMappingId) return;
     setActiveSessionId(null);
@@ -106,8 +118,10 @@ export function DiscussClient() {
   }, [sessionData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-send kickoff message to start the conversation
+  // Skip if a pre-generated AI review already exists — reviewer can chat on demand
   useEffect(() => {
     if (!activeSessionId || kickoffSent || isStreaming) return;
+    if (aiReview?.reviewText) return; // Pre-generated review available, don't auto-kick
     // Only kick off if no user/assistant messages exist yet (fresh session)
     const hasConversation = messages.some((m) => m.role !== "system");
     if (hasConversation) return;
@@ -117,7 +131,7 @@ export function DiscussClient() {
       "Review this mapping and help me improve it. What questions do you have?",
       { kickoff: true }
     );
-  }, [activeSessionId, messages, kickoffSent, isStreaming]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeSessionId, messages, kickoffSent, isStreaming, aiReview]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derive mapping state for the right panel
   const mappingState = mapping
@@ -146,9 +160,26 @@ export function DiscussClient() {
   const entityName =
     mapping?.targetField?.entityName || "Entity";
 
-  // Fetch entity data for sibling field navigation (only after apply)
+  // Review completion tracking
+  const [sourceDecision, setSourceDecision] = useState<string | null>(mappingState?.sourceVerdict ?? null);
+  const [transformDecision, setTransformDecision] = useState<string | null>(mappingState?.transformVerdict ?? null);
+  const [questionDecision, setQuestionDecision] = useState<boolean>(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [suggestionKey, setSuggestionKey] = useState(0);
+
+  // Reset checkbox state when AI proposes a new update (live or pre-generated)
+  useEffect(() => {
+    if (effectiveUpdate && !hasApplied) {
+      setSourceDecision(null);
+      setTransformDecision(null);
+      setQuestionDecision(false);
+      setSuggestionKey((k) => k + 1);
+    }
+  }, [effectiveUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch entity data for sibling field navigation
   const entityId = mapping?.targetField?.entityId;
-  const { data: entityData } = useEntity(hasApplied ? entityId : undefined);
+  const { data: entityData } = useEntity(entityId);
 
   // Build sibling navigation data
   const siblingNav = useMemo(() => {
@@ -214,7 +245,6 @@ export function DiscussClient() {
           // Trigger ripple similarity check
           setRippleMappingId(newVersion.id);
           setShowRipple(false);
-          // Show session complete navigation
           setHasApplied(true);
         },
       }
@@ -238,10 +268,20 @@ export function DiscussClient() {
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <span className="font-medium text-sm">{targetFieldName}</span>
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-sm">{entityName}.{targetFieldName}</span>
+            {mapping?.confidence && (
+              <span className={cn(
+                "text-[10px] font-semibold px-1.5 py-0.5 rounded",
+                mapping.confidence === "high" && "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
+                mapping.confidence === "medium" && "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
+                mapping.confidence === "low" && "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
+              )}>
+                {mapping.confidence} confidence
+              </span>
+            )}
             {mapping?.targetField?.dataType && (
-              <span className="text-xs text-muted-foreground ml-2">
+              <span className="text-xs text-muted-foreground">
                 {mapping.targetField.dataType}
               </span>
             )}
@@ -263,77 +303,133 @@ export function DiscussClient() {
         </Button>
       </div>
 
-      {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: Chat */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <ChatMessageList
-            messages={messages}
-            streamingContent={streamingContent}
-            isStreaming={isStreaming}
-            activeToolCall={activeToolCall}
-          />
-          <ChatInput
-            onSend={sendMessage}
-            disabled={isStreaming || !activeSessionId}
-          />
+      {/* Main content — vertical stack */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Row 1: Current mapping (full width) */}
+        <div className="border-b bg-muted/20 shrink-0">
+          {mappingState ? (
+            <MappingSummary targetFieldName={targetFieldName} mapping={mappingState} />
+          ) : (
+            <div className="px-4 py-2 text-xs text-muted-foreground">Loading mapping...</div>
+          )}
         </div>
 
-        {/* Right: Mapping state + prior sessions + ripple suggestion */}
-        <div className="w-80 border-l flex flex-col overflow-y-auto">
-          {mappingState && (
-            <MappingStateCard
-              targetFieldName={targetFieldName}
-              entityName={entityName}
-              mapping={mappingState}
-              pendingUpdate={pendingUpdate}
-              onApplyUpdate={handleApplyUpdate}
-              applied={hasApplied}
+        {/* Row 2: Source | Transform | Question — with layered AI proposals */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-3 divide-x divide-blue-200 dark:divide-blue-800 bg-blue-50 dark:bg-blue-950/40 min-h-full">
+            {/* Source column */}
+            <div className="flex flex-col">
+              {mappingState && (
+                <SourceVerdictCard
+                  key={`source-${suggestionKey}`}
+                  mappingId={fieldMappingId}
+                  sourceEntityName={mappingState.sourceEntityName ?? null}
+                  sourceFieldName={mappingState.sourceFieldName ?? null}
+                  initialVerdict={mappingState.sourceVerdict ?? null}
+                  initialNotes={mappingState.sourceVerdictNotes ?? null}
+                  onVerdictChange={(v) => setSourceDecision(v)}
+                  suggestedSource={effectiveUpdate?.sourceEntityName
+                    ? `${effectiveUpdate.sourceEntityName}.${effectiveUpdate.sourceFieldName || "?"}`
+                    : effectiveUpdate?.sourceFieldName ? String(effectiveUpdate.sourceFieldName) : null}
+                  onAcceptSuggestion={() => effectiveUpdate && handleApplyUpdate(effectiveUpdate)}
+                  suggestionApplied={hasApplied}
+                  aiHasOpinion={!!effectiveUpdate}
+                />
+              )}
+            </div>
+
+            {/* Transform column */}
+            <div className="flex flex-col">
+              {mappingState && (
+                <TransformVerdictCard
+                  key={`transform-${suggestionKey}`}
+                  mappingId={fieldMappingId}
+                  mappingType={mappingState.mappingType ?? null}
+                  transform={mappingState.transform ?? null}
+                  initialVerdict={mappingState.transformVerdict ?? null}
+                  initialNotes={mappingState.transformVerdictNotes ?? null}
+                  onVerdictChange={(v) => setTransformDecision(v)}
+                  suggestedTransform={effectiveUpdate?.transform ? String(effectiveUpdate.transform) : null}
+                  suggestedMappingType={effectiveUpdate?.mappingType ? String(effectiveUpdate.mappingType) : null}
+                  onAcceptSuggestion={() => effectiveUpdate && handleApplyUpdate(effectiveUpdate)}
+                  suggestionApplied={hasApplied}
+                  aiHasOpinion={!!effectiveUpdate}
+                />
+              )}
+            </div>
+
+            {/* Question column */}
+            <div className="flex flex-col">
+              {linkedQuestion ? (
+                <QuestionFeedbackCard
+                  questionId={linkedQuestion.id}
+                  questionText={linkedQuestion.question}
+                  initialHelpful={linkedQuestion.feedbackHelpful ?? null}
+                  initialWhyNot={linkedQuestion.feedbackWhyNot ?? null}
+                  initialBetterQuestion={linkedQuestion.feedbackBetterQuestion ?? null}
+                  onDecisionMade={() => setQuestionDecision(true)}
+                />
+              ) : mapping ? (
+                <CreateQuestionCard
+                  key={`question-${suggestionKey}`}
+                  workspaceId={mapping.workspaceId}
+                  entityId={mapping.targetField?.entityId ?? ""}
+                  fieldId={mapping.targetFieldId}
+                  fieldMappingId={fieldMappingId}
+                  suggestedQuestion={effectiveUpdate?.question ? String(effectiveUpdate.question) : null}
+                  suggestionApplied={false}
+                  aiHasOpinion={!!effectiveUpdate}
+                  onDecisionMade={() => setQuestionDecision(true)}
+                />
+              ) : null}
+            </div>
+          </div>
+
+          {/* Other Notes — spans full width */}
+          <div className="border-t border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-3 py-2">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Other Notes</span>
+            </div>
+            <textarea
+              placeholder="Additional context, observations, or notes about this field..."
+              rows={2}
+              className={cn(
+                "w-full text-xs rounded border bg-background px-2 py-1 resize-none",
+                "border-border focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
+              )}
             />
-          )}
+          </div>
 
-          {/* Feedback verdict cards */}
-          {mappingState && (
-            <SourceVerdictCard
-              mappingId={fieldMappingId}
-              sourceEntityName={mappingState.sourceEntityName ?? null}
-              sourceFieldName={mappingState.sourceFieldName ?? null}
-              initialVerdict={mappingState.sourceVerdict ?? null}
-              initialNotes={mappingState.sourceVerdictNotes ?? null}
+        </div>
+
+        {/* AI Assistant — below feedback, available for follow-up conversation */}
+        <div className="flex-1 flex flex-col min-h-0 border-t">
+          <div className="px-3 py-1.5 border-b bg-muted/30 shrink-0">
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">AI Assistant</span>
+          </div>
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {/* Pre-generated review (shows immediately, before chat loads) */}
+            {aiReview?.reviewText && messages.length === 0 && !isStreaming && (
+              <div className="px-3 py-2 text-xs border-b bg-muted/10">
+                <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">AI Review</span>
+                <div className="mt-0.5 whitespace-pre-wrap text-foreground leading-relaxed">{aiReview.reviewText}</div>
+              </div>
+            )}
+            <ChatMessageList
+              messages={messages}
+              streamingContent={streamingContent}
+              isStreaming={isStreaming}
+              activeToolCall={activeToolCall}
             />
-          )}
-
-          {mappingState &&
-            (mappingState.transform ||
-              (mappingState.mappingType && mappingState.mappingType !== "direct")) && (
-            <TransformVerdictCard
-              mappingId={fieldMappingId}
-              mappingType={mappingState.mappingType ?? null}
-              transform={mappingState.transform ?? null}
-              initialVerdict={mappingState.transformVerdict ?? null}
-              initialNotes={mappingState.transformVerdictNotes ?? null}
+            <ChatInput
+              onSend={sendMessage}
+              disabled={isStreaming || !activeSessionId}
             />
-          )}
+          </div>
+        </div>
 
-          {linkedQuestion && (
-            <QuestionFeedbackCard
-              questionId={linkedQuestion.id}
-              questionText={linkedQuestion.question}
-              initialHelpful={linkedQuestion.feedbackHelpful ?? null}
-              initialWhyNot={linkedQuestion.feedbackWhyNot ?? null}
-              initialBetterQuestion={linkedQuestion.feedbackBetterQuestion ?? null}
-            />
-          )}
-
-          {/* Prior sessions panel */}
-          <PriorSessionsPanel
-            sessions={displayedPriorSessions}
-            viewedSessionId={viewedPriorSessionId}
-            onToggle={(id) =>
-              setViewedPriorSessionId((prev) => (prev === id ? null : id))
-            }
-          />
-
+        {/* Extras */}
+        <div className="shrink-0">
           {/* Ripple suggestion after Apply */}
           {similarData && similarData.similar.length > 0 && !showRipple && (
             <div className="mx-3 mb-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
@@ -359,19 +455,62 @@ export function DiscussClient() {
             </div>
           )}
 
-          {/* Session complete navigation after Apply */}
-          {hasApplied && siblingNav && (
-            <SessionCompleteCard
-              entityName={entityName}
-              totalFields={siblingNav.totalFields}
-              completedFields={siblingNav.completedFields}
-              nextFields={siblingNav.nextFields}
-              onNavigateToField={(mappingId) =>
-                router.push(`/mapping/discuss/${mappingId}`)
-              }
-              onBackToQueue={() => router.push("/mapping")}
-            />
-          )}
+          {/* Session complete navigation removed — Submit Review & Next button handles this */}
+        </div>
+
+        {/* Submit review bar */}
+        {(() => {
+          const canSubmit = !!sourceDecision && !!transformDecision && questionDecision;
+          return (
+            <div className="shrink-0 border-t border-blue-200 dark:border-blue-800 px-4 py-2.5 flex items-center justify-between bg-blue-50 dark:bg-blue-950/40">
+              <div className="flex items-center gap-4 text-xs">
+                <span className={cn("flex items-center gap-1.5", sourceDecision ? "text-green-600" : "text-muted-foreground")}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", sourceDecision ? "bg-green-500" : "bg-muted-foreground/30")} />
+                  Source: {sourceDecision || "awaiting review"}
+                </span>
+                <span className={cn("flex items-center gap-1.5", transformDecision ? "text-green-600" : "text-muted-foreground")}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", transformDecision ? "bg-green-500" : "bg-muted-foreground/30")} />
+                  Transform: {transformDecision || "awaiting review"}
+                </span>
+                <span className={cn("flex items-center gap-1.5", questionDecision ? "text-green-600" : "text-muted-foreground")}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", questionDecision ? "bg-green-500" : "bg-muted-foreground/30")} />
+                  Question: {questionDecision ? "resolved" : "awaiting review"}
+                </span>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setReviewSubmitted(true);
+                  const next = siblingNav?.nextFields?.[0];
+                  if (next?.mappingId) {
+                    router.push(`/mapping/discuss/${next.mappingId}`);
+                  } else {
+                    router.push("/mapping");
+                  }
+                }}
+                disabled={!canSubmit}
+                className={cn(
+                  "text-xs border",
+                  canSubmit
+                    ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                    : "bg-blue-200 text-blue-400 border-blue-300 cursor-not-allowed dark:bg-blue-950/30 dark:text-blue-700 dark:border-blue-800"
+                )}
+              >
+                Submit Review & Next
+              </Button>
+            </div>
+          );
+        })()}
+
+        {/* Bottom: Prior sessions */}
+        <div className="shrink-0">
+          <PriorSessionsPanel
+            sessions={displayedPriorSessions}
+            viewedSessionId={viewedPriorSessionId}
+            onToggle={(id) =>
+              setViewedPriorSessionId((prev) => (prev === id ? null : id))
+            }
+          />
         </div>
 
         {/* Ripple panel (sheet overlay) */}

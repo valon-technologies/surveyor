@@ -1,17 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUpdateMappingVerdict } from "@/queries/mapping-queries";
-
-const TRANSFORM_VERDICT_OPTIONS = [
-  { value: "correct", label: "Correct" },
-  { value: "not_needed", label: "Transform not needed — map directly" },
-  { value: "needed_but_missing", label: "Transform needed but missing" },
-  { value: "wrong_enum", label: "Incorrect enum mapping" },
-  { value: "wrong_logic", label: "Logic is wrong" },
-] as const;
+import { Check } from "lucide-react";
 
 interface TransformVerdictCardProps {
   mappingId: string;
@@ -19,6 +11,12 @@ interface TransformVerdictCardProps {
   transform: string | null;
   initialVerdict?: string | null;
   initialNotes?: string | null;
+  onVerdictChange?: (verdict: string) => void;
+  suggestedTransform?: string | null;
+  suggestedMappingType?: string | null;
+  onAcceptSuggestion?: () => void;
+  suggestionApplied?: boolean;
+  aiHasOpinion?: boolean;
 }
 
 export function TransformVerdictCard({
@@ -27,18 +25,24 @@ export function TransformVerdictCard({
   transform,
   initialVerdict,
   initialNotes,
+  onVerdictChange,
+  suggestedTransform,
+  suggestedMappingType,
+  onAcceptSuggestion,
+  suggestionApplied,
+  aiHasOpinion,
 }: TransformVerdictCardProps) {
-  const [expanded, setExpanded] = useState(true);
-  const [verdict, setVerdict] = useState(initialVerdict ?? "");
-  const [notes, setNotes] = useState(initialNotes ?? "");
+  const [notes, setNotes] = useState("");
+  const [selected, setSelected] = useState<"current" | "suggested" | "custom" | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const mutation = useUpdateMappingVerdict();
 
-  const transformLabel = transform
-    ? transform.length > 60
-      ? transform.slice(0, 60) + "…"
-      : transform
-    : mappingType || "direct";
+  const transformLabel = transform || mappingType || "direct";
+
+  const suggestedLabel = suggestedTransform || suggestedMappingType || null;
+
+  const aiAgrees = suggestedLabel && suggestedLabel === transformLabel;
+  const aiDiffers = suggestedLabel && suggestedLabel !== transformLabel;
 
   async function save(newVerdict: string, newNotes: string) {
     if (!newVerdict) return;
@@ -50,91 +54,147 @@ export function TransformVerdictCard({
         transformVerdictNotes: newNotes || undefined,
       });
       setSaveStatus("saved");
+      onVerdictChange?.(newVerdict);
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch {
       setSaveStatus("idle");
     }
   }
 
-  function handleVerdictChange(value: string) {
-    setVerdict(value);
-    if (value === "correct" || value === "not_needed") {
-      save(value, "");
+  function handleSelectCurrent() {
+    setSelected("current");
+    save("correct", "");
+  }
+
+  function handleSelectSuggested() {
+    setSelected("suggested");
+    onAcceptSuggestion?.();
+    // Save as "wrong" so the learning pipeline captures the correction
+    save("wrong", "Accepted AI suggestion");
+  }
+
+  function handleSelectCustom() {
+    setSelected("custom");
+    if (notes.trim()) {
+      save("wrong", notes);
     }
   }
 
   function handleNotesBlur() {
-    if (verdict && verdict !== "correct") {
-      save(verdict, notes);
+    if (selected === "custom" && notes.trim()) {
+      save("wrong", notes);
     }
   }
 
-  const isWrong = verdict && verdict !== "correct";
-  const StatusIcon =
-    verdict === "correct" ? (
-      <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-    ) : verdict ? (
-      <XCircle className="h-3.5 w-3.5 text-red-400" />
-    ) : null;
-
   return (
-    <div className="border-b">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-      >
-        {expanded ? (
-          <ChevronDown className="h-3.5 w-3.5" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5" />
-        )}
-        <span className="flex-1 text-left">Transform Verdict</span>
-        {StatusIcon}
+    <div className="px-3 py-2 space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Transform</span>
         {saveStatus === "saving" && (
           <span className="text-[10px] text-muted-foreground">saving…</span>
         )}
         {saveStatus === "saved" && (
-          <span className="text-[10px] text-green-500">saved ✓</span>
+          <span className="text-[10px] text-green-500">saved</span>
         )}
-      </button>
+      </div>
 
-      {expanded && (
-        <div className="px-3 pb-3 space-y-2">
-          <div className="text-[11px] text-muted-foreground font-mono bg-muted/50 rounded px-2 py-1 truncate">
-            {transformLabel}
-          </div>
-
-          <select
-            value={verdict}
-            onChange={(e) => handleVerdictChange(e.target.value)}
-            className={cn(
-              "w-full text-xs rounded border bg-background px-2 py-1.5",
-              "border-border focus:outline-none focus:ring-1 focus:ring-ring"
-            )}
-          >
-            <option value="">— verdict —</option>
-            {TRANSFORM_VERDICT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-
-          {isWrong && verdict !== "not_needed" && (
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              onBlur={handleNotesBlur}
-              placeholder="Describe what's wrong or what should change"
-              rows={2}
+      {(() => {
+        return (
+          <>
+            {/* Current transform — with AI confirmation if AI agrees */}
+            <button
+              onClick={handleSelectCurrent}
               className={cn(
-                "w-full text-xs rounded border bg-background px-2 py-1.5 resize-none",
-                "border-border focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
+                "w-full flex items-start gap-2 text-left text-[11px] font-mono rounded px-2 py-1 border transition-colors",
+                selected === "current"
+                  ? "border-green-400 bg-green-50 dark:bg-green-950/30 dark:border-green-700"
+                  : "border-border bg-muted/50 hover:border-muted-foreground/30"
               )}
-            />
+            >
+              <span className={cn(
+                "shrink-0 w-3.5 h-3.5 rounded border flex items-center justify-center mt-0.5",
+                selected === "current" ? "bg-green-500 border-green-500 text-white" : "border-muted-foreground/30"
+              )}>
+                {selected === "current" && <Check className="w-2.5 h-2.5" />}
+              </span>
+              <span className="flex-1 break-words whitespace-pre-wrap">{transformLabel}</span>
+              {aiAgrees ? (
+                <span className="text-[9px] text-green-600 shrink-0 mt-0.5">AI Review confirms</span>
+              ) : (
+                <span className="text-[9px] text-muted-foreground shrink-0 mt-0.5">current</span>
+              )}
+            </button>
+
+            {/* AI suggestion — only if different from current */}
+            {aiDiffers && (
+              <button
+                onClick={handleSelectSuggested}
+                className={cn(
+                  "w-full flex items-start gap-2 text-left text-[11px] font-mono rounded px-2 py-1 border transition-colors",
+                  selected === "suggested" || suggestionApplied
+                    ? "border-green-400 bg-green-50 dark:bg-green-950/30 dark:border-green-700"
+                    : "border-blue-300 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-700 hover:border-blue-400"
+                )}
+              >
+                <span className={cn(
+                  "shrink-0 w-3.5 h-3.5 rounded border flex items-center justify-center mt-0.5",
+                  selected === "suggested" || suggestionApplied
+                    ? "bg-green-500 border-green-500 text-white"
+                    : "border-blue-400"
+                )}>
+                  {(selected === "suggested" || suggestionApplied) && <Check className="w-2.5 h-2.5" />}
+                </span>
+                <span className="flex-1 break-words whitespace-pre-wrap">{suggestedLabel}</span>
+                <span className="text-[9px] text-blue-500 shrink-0 mt-0.5">AI Review</span>
+              </button>
+            )}
+
+            {/* AI confirms but no specific suggestion */}
+            {!suggestedLabel && aiHasOpinion && (
+              <div className="w-full flex items-center gap-2 text-[11px] rounded px-2 py-1 border border-green-300 bg-green-50 dark:bg-green-950/30 dark:border-green-700">
+                <span className="shrink-0 w-3.5 h-3.5 rounded border bg-green-500 border-green-500 text-white flex items-center justify-center">
+                  <Check className="w-2.5 h-2.5" />
+                </span>
+                <span className="text-green-700 dark:text-green-400">AI Review confirms current</span>
+              </div>
+            )}
+          </>
+        );
+      })()}
+
+      {/* Custom — checkbox + free text */}
+      <div className={cn(
+        "flex items-start gap-2 rounded px-2 py-1 border transition-colors",
+        selected === "custom"
+          ? "border-green-400 bg-green-50 dark:bg-green-950/30 dark:border-green-700"
+          : "border-border bg-background hover:border-muted-foreground/30"
+      )}>
+        <button
+          onClick={handleSelectCustom}
+          className="shrink-0 mt-1"
+        >
+          <span className={cn(
+            "w-3.5 h-3.5 rounded border flex items-center justify-center",
+            selected === "custom" ? "bg-green-500 border-green-500 text-white" : "border-muted-foreground/30"
+          )}>
+            {selected === "custom" && <Check className="w-2.5 h-2.5" />}
+          </span>
+        </button>
+        <textarea
+          value={notes}
+          onChange={(e) => {
+            setNotes(e.target.value);
+            if (e.target.value.trim()) setSelected("custom");
+          }}
+          onBlur={handleNotesBlur}
+          onFocus={() => { if (notes.trim()) setSelected("custom"); }}
+          placeholder="Correct transform (specify)"
+          rows={2}
+          className={cn(
+            "flex-1 text-xs bg-transparent px-0 py-0 resize-none border-0 focus:outline-none focus:ring-0 placeholder:text-muted-foreground"
           )}
-        </div>
-      )}
+        />
+      </div>
     </div>
   );
 }

@@ -120,6 +120,14 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
     });
   }
 
+  // Sort by confidence: high → medium → low → unmapped
+  const confidenceOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  fieldsWithMappings.sort((a, b) => {
+    const aOrder = a.mapping?.confidence ? (confidenceOrder[a.mapping.confidence] ?? 3) : 3;
+    const bOrder = b.mapping?.confidence ? (confidenceOrder[b.mapping.confidence] ?? 3) : 3;
+    return aOrder - bOrder;
+  });
+
   // Build status breakdown from field mappings
   const statusBreakdown: Record<string, number> = {};
   for (const f of fieldsWithMappings) {

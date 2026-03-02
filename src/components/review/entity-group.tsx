@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Component, MessageSquare } from "lucide-react";
 import { ReviewCard } from "./review-card";
+import { cn } from "@/lib/utils";
 import { useReviewStore } from "@/stores/review-store";
 import {
   MAPPING_STATUS_COLORS,
@@ -30,10 +31,18 @@ const CARD_SORT_ORDER: Record<string, number> = {
   excluded: 2,
 };
 
+const CONFIDENCE_ORDER: Record<string, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
 function sortCards(cards: ReviewCardData[]) {
-  return [...cards].sort((a, b) =>
-    (CARD_SORT_ORDER[a.status] ?? 0) - (CARD_SORT_ORDER[b.status] ?? 0)
-  );
+  return [...cards].sort((a, b) => {
+    const statusCmp = (CARD_SORT_ORDER[a.status] ?? 0) - (CARD_SORT_ORDER[b.status] ?? 0);
+    if (statusCmp !== 0) return statusCmp;
+    return (CONFIDENCE_ORDER[a.confidence ?? "low"] ?? 3) - (CONFIDENCE_ORDER[b.confidence ?? "low"] ?? 3);
+  });
 }
 
 interface EntityGroupProps {
@@ -106,6 +115,23 @@ export function EntityGroup({
         )}
 
         <span className="font-semibold text-sm">{entityName}</span>
+
+        {/* Reviewed count */}
+        {(() => {
+          const reviewed = (statusCounts.get("accepted") || 0) + (statusCounts.get("excluded") || 0);
+          return (
+            <span className={cn(
+              "text-[11px] font-medium px-1.5 py-0.5 rounded",
+              reviewed === total && total > 0
+                ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400"
+                : reviewed > 0
+                  ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400"
+                  : "bg-muted text-muted-foreground"
+            )}>
+              {reviewed}/{total} reviewed
+            </span>
+          );
+        })()}
 
         {/* Status counts */}
         <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground ml-1">

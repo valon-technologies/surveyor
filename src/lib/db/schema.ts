@@ -288,6 +288,12 @@ export const fieldMapping = sqliteTable(
     transformVerdict: text("transform_verdict"),
     // correct | not_needed | needed_but_missing | wrong_enum | wrong_logic
     transformVerdictNotes: text("transform_verdict_notes"),
+    // Pre-generated AI review (proposed update + analysis text)
+    aiReview: text("ai_review", { mode: "json" }).$type<{
+      proposedUpdate: Record<string, unknown> | null;
+      reviewText: string;
+      generatedAt: string;
+    }>(),
     batchRunId: text("batch_run_id"),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),

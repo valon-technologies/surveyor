@@ -104,7 +104,7 @@ export function SessionCompleteCard({
                         className="text-[9px] h-4 px-1"
                         style={{ borderColor: statusColor, color: statusColor }}
                       >
-                        {f.status === "unmapped" ? "unmapped" : f.confidence ? `${f.status} (${f.confidence})` : f.status}
+                        {f.status === "unmapped" ? "unmapped" : f.confidence ? `${f.status} (${f.confidence} confidence)` : f.status}
                       </Badge>
                     </div>
                   </div>

@@ -52,7 +52,7 @@ export function ReviewFilters() {
         const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
         return (order[a] ?? 3) - (order[b] ?? 3);
       })
-      .map((c) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) })),
+      .map((c) => ({ value: c, label: `${c.charAt(0).toUpperCase() + c.slice(1)} confidence` })),
   ];
 
   const statusOptions: { value: string; label: string }[] = [
