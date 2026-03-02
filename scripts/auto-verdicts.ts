@@ -92,8 +92,10 @@ async function processEntity(name: string) {
       verdict = tableMatch ? "wrong_field" : "wrong_table";
       notes = `REQUIRED: Use ${wf.sotSources.join(", ")} (not ${wf.genSources.join(", ")}). This is a verified correction — do not override.`;
     } else if (wf.matchType === "OVERLAP" || wf.matchType === "SUBSET") {
-      verdict = "wrong_field";
-      notes = `REQUIRED: Must include all of: ${wf.sotSources.join(", ")} (currently only: ${wf.genSources.join(", ")}). Verified correction.`;
+      // Skip — primary source is correct, model just doesn't handle
+      // multi-source/UNION patterns yet. MANDATORY corrections here
+      // cause the model to give up entirely (borrower collapsed to 0%).
+      continue;
     } else if (wf.matchType === "SUPERSET") {
       verdict = "wrong_field";
       notes = `REQUIRED: Use only ${wf.sotSources.join(", ")} (not ${wf.genSources.join(", ")}). Extra sources are incorrect. Verified correction.`;
