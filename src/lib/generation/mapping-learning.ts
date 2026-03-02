@@ -340,6 +340,7 @@ export function extractVerdictLearning(
       scope: "field",
       source: "review",
       content: lv.content,
+      validationStatus: "pending", // Requires admin validation before entering EK
     }).run();
 
     emitFeedbackEvent({
@@ -347,20 +348,13 @@ export function extractVerdictLearning(
       entityId: targetInfo.entityId,
       fieldMappingId,
       eventType: "learning_created",
-      payload: { learningId, scope: "field", content: lv.content, fieldName: lv.fieldName },
+      payload: { learningId, scope: "field", content: lv.content, fieldName: lv.fieldName, validationStatus: "pending" },
       correlationId,
     });
   }
 
-  rebuildEntityKnowledge(workspaceId, targetInfo.entityId, correlationId);
-  emitSignal({
-    workspaceId,
-    entityId: targetInfo.entityId,
-    signalType: "mapping_correction",
-    summary: `Verdict feedback for ${targetInfo.entityName}.${targetInfo.fieldName}`,
-    sourceId: fieldMappingId,
-    sourceType: "field_mapping",
-  });
+  // NOTE: rebuildEntityKnowledge is NOT called here — admin must validate first.
+  // EK rebuild happens in the admin validation route when learning is approved.
 }
 
 // ─── Manual Rule Promotion ──────────────────────────────────────

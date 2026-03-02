@@ -147,6 +147,26 @@ export const POST = withAuth(
         content: m.content,
       }));
 
+    // Inject pre-generated AI review as prior assistant context on first user message
+    const isFirstUserMessage = conversationMessages.filter((m) => m.role === "user").length === 1;
+    if (isFirstUserMessage && session.fieldMappingId) {
+      const mappingWithReview = db.select({ aiReview: fieldMapping.aiReview })
+        .from(fieldMapping)
+        .where(eq(fieldMapping.id, session.fieldMappingId))
+        .get();
+      const aiReview = mappingWithReview?.aiReview as { reviewText?: string; proposedUpdate?: Record<string, unknown> } | null;
+      if (aiReview?.reviewText) {
+        const reviewContext = aiReview.proposedUpdate
+          ? `${aiReview.reviewText}\n\n\`\`\`mapping-update\n${JSON.stringify(aiReview.proposedUpdate, null, 2)}\n\`\`\``
+          : aiReview.reviewText;
+        // Prepend as assistant message before the user's first message
+        conversationMessages.splice(conversationMessages.length - 1, 0, {
+          role: "assistant",
+          content: `[Pre-generated review]\n\n${reviewContext}`,
+        });
+      }
+    }
+
     // On kickoff: inject pre-fetched BQ baseline data into system message
     if (parsed.data.kickoff && systemMsg && session.fieldMappingId) {
       try {

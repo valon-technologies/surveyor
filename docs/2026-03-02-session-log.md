@@ -195,7 +195,30 @@ See migration plan above. Need Supabase project access first.
 ### 4. Deploy to mapping team
 Push, migrate, seed, create accounts, pre-generate mappings.
 
-### 5. Client access (ServiceMac)
+### 5. Validation gates (critical before team use)
+Two new pipelines needed to prevent unvalidated data from corrupting future generations:
+
+**Question Curation Pipeline:**
+- Questions start as `draft` (from reviewer or AI)
+- Admin/senior reviewer dedupes against existing Q&A and checks quality
+- Promotes to `approved` → only then visible to ServiceMac
+- Prevents duplicate or low-quality questions from reaching the client
+
+**Correction Validation Pipeline:**
+- Reviewer verdicts (source/transform corrections) save as `pending_validation`
+- Validator (senior reviewer or admin) reviews for accuracy
+- Marks `validated` → THEN triggers `extractVerdictLearning` → `rebuildEntityKnowledge`
+- Until validated, corrections are stored but NOT applied to future generations
+- Prevents one bad verdict from cascading into all subsequent mappings
+
+**Implementation:**
+- Add `validationStatus` column to `fieldMapping` (pending_validation / validated / rejected)
+- Add `curationStatus` column to `question` (draft / approved / rejected)
+- Gate `extractVerdictLearning` on `validationStatus === 'validated'`
+- Gate question visibility to SM on `curationStatus === 'approved'`
+- Build admin validation queue UI
+
+### 6. Client access (ServiceMac)
 See client access design section above.
 
 ---

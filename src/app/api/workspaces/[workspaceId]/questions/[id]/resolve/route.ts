@@ -182,14 +182,13 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
         content: `Q: "${updated.question}" (field: ${fieldName || "entity-level"}) — A: ${answerText}${schemaContext}`,
         source: "review",
         sessionId: updated.chatSessionId,
+        validationStatus: "pending", // Requires admin validation before entering EK
         createdAt: now,
       })
       .run();
 
-    // 4. Rebuild Entity Knowledge context (single source of truth via RAG)
-    if (updated.entityId) {
-      rebuildEntityKnowledge(workspaceId, updated.entityId);
-    }
+    // NOTE: rebuildEntityKnowledge is NOT called here — admin must validate first.
+    // EK rebuild happens in the admin validation route when learning is approved.
 
     // 5. AI follow-up evaluation (fire-and-forget — async, non-blocking)
     if (updated.askedBy === "llm" && answerText) {

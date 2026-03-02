@@ -61,11 +61,21 @@ export function SourceVerdictCard({
   }
 
   function handleSelectCurrent() {
+    if (selected === "current") {
+      setSelected(null);
+      onVerdictChange?.("");
+      return;
+    }
     setSelected("current");
     save("correct", "");
   }
 
   function handleSelectSuggested() {
+    if (selected === "suggested") {
+      setSelected(null);
+      onVerdictChange?.("");
+      return;
+    }
     setSelected("suggested");
     onAcceptSuggestion?.();
     // Save as "wrong" so the learning pipeline captures the correction
@@ -73,6 +83,11 @@ export function SourceVerdictCard({
   }
 
   function handleSelectCustom() {
+    if (selected === "custom" && !notes.trim()) {
+      setSelected(null);
+      onVerdictChange?.("");
+      return;
+    }
     setSelected("custom");
     if (notes.trim()) {
       save("wrong", notes);
@@ -151,9 +166,6 @@ export function SourceVerdictCard({
             {/* AI confirms but no specific suggestion */}
             {!suggestedSource && aiHasOpinion && (
               <div className="w-full flex items-center gap-2 text-[11px] rounded px-2 py-1 border border-green-300 bg-green-50 dark:bg-green-950/30 dark:border-green-700">
-                <span className="shrink-0 w-3.5 h-3.5 rounded border bg-green-500 border-green-500 text-white flex items-center justify-center">
-                  <Check className="w-2.5 h-2.5" />
-                </span>
                 <span className="text-green-700 dark:text-green-400">AI Review confirms current</span>
               </div>
             )}

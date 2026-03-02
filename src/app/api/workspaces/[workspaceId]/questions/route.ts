@@ -20,7 +20,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   }
 
   const targetForTeam = searchParams.get("targetForTeam");
-  if (targetForTeam) conditions.push(eq(question.targetForTeam, targetForTeam));
+  if (targetForTeam) {
+    conditions.push(eq(question.targetForTeam, targetForTeam));
+    // Client views only see approved questions
+    conditions.push(eq(question.curationStatus, "approved"));
+  }
 
   const rows = db
     .select({

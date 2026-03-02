@@ -437,6 +437,11 @@ export const question = sqliteTable(
     replyCount: integer("reply_count").notNull().default(0),
     createdByUserId: text("created_by_user_id").references(() => user.id, { onDelete: "set null" }),
     autoResolvedFrom: text("auto_resolved_from"), // question.id that triggered cascade resolution
+    // Curation gate: draft → approved → rejected → duplicate (admin-only curation)
+    curationStatus: text("curation_status").notNull().default("draft"), // "draft" | "approved" | "rejected" | "duplicate"
+    curatedBy: text("curated_by"),
+    curatedAt: text("curated_at"),
+    duplicateOf: text("duplicate_of"), // question.id for dedup tracking
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
   },
@@ -655,12 +660,17 @@ export const learning = sqliteTable(
     content: text("content").notNull(),
     source: text("source").notNull(), // "training" | "review" | "manual"
     sessionId: text("session_id"),
+    // Validation gate: pending → validated → rejected (admin-only validation)
+    validationStatus: text("validation_status").notNull().default("pending"), // "pending" | "validated" | "rejected"
+    validatedBy: text("validated_by"),
+    validatedAt: text("validated_at"),
     createdAt: text("created_at").notNull().default(nowDefault),
   },
   (table) => [
     index("learning_workspace_idx").on(table.workspaceId),
     index("learning_entity_idx").on(table.entityId),
     index("learning_scope_idx").on(table.scope),
+    index("learning_validation_idx").on(table.validationStatus),
   ]
 );
 

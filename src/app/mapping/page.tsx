@@ -49,7 +49,8 @@ export default function MappingPage() {
         </Button>
       </div>
 
-      <BatchRunPanel />
+      {/* TODO: Move BatchRunPanel to admin-only page */}
+      {/* <BatchRunPanel /> */}
 
       <ReviewFilters />
 

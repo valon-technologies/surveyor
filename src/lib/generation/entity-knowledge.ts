@@ -61,7 +61,7 @@ export function rebuildEntityKnowledge(
   if (!e) return null;
   const entityName = e.displayName || e.name;
 
-  // Gather all learning records for this entity
+  // Gather only VALIDATED learning records for this entity
   const learnings = db
     .select({
       fieldName: learning.fieldName,
@@ -70,7 +70,11 @@ export function rebuildEntityKnowledge(
       createdAt: learning.createdAt,
     })
     .from(learning)
-    .where(and(eq(learning.workspaceId, workspaceId), eq(learning.entityId, entityId)))
+    .where(and(
+      eq(learning.workspaceId, workspaceId),
+      eq(learning.entityId, entityId),
+      eq(learning.validationStatus, "validated"),
+    ))
     .orderBy(desc(learning.createdAt))
     .all();
 

@@ -83,6 +83,8 @@ export function DiscussClient() {
 
   // Effective proposed update: live chat overrides pre-generated
   const effectiveUpdate = pendingUpdate ?? aiReview?.proposedUpdate ?? null;
+  // AI has reviewed this field (even if it confirms current with no changes)
+  const aiHasReviewed = !!pendingUpdate || !!aiReview;
 
   const startNewSession = useCallback(() => {
     if (!fieldMappingId) return;
@@ -331,9 +333,9 @@ export function DiscussClient() {
                   suggestedSource={effectiveUpdate?.sourceEntityName
                     ? `${effectiveUpdate.sourceEntityName}.${effectiveUpdate.sourceFieldName || "?"}`
                     : effectiveUpdate?.sourceFieldName ? String(effectiveUpdate.sourceFieldName) : null}
-                  onAcceptSuggestion={() => effectiveUpdate && handleApplyUpdate(effectiveUpdate)}
+                  onAcceptSuggestion={() => {}}
                   suggestionApplied={hasApplied}
-                  aiHasOpinion={!!effectiveUpdate}
+                  aiHasOpinion={aiHasReviewed}
                 />
               )}
             </div>
@@ -351,9 +353,9 @@ export function DiscussClient() {
                   onVerdictChange={(v) => setTransformDecision(v)}
                   suggestedTransform={effectiveUpdate?.transform ? String(effectiveUpdate.transform) : null}
                   suggestedMappingType={effectiveUpdate?.mappingType ? String(effectiveUpdate.mappingType) : null}
-                  onAcceptSuggestion={() => effectiveUpdate && handleApplyUpdate(effectiveUpdate)}
+                  onAcceptSuggestion={() => {}}
                   suggestionApplied={hasApplied}
-                  aiHasOpinion={!!effectiveUpdate}
+                  aiHasOpinion={aiHasReviewed}
                 />
               )}
             </div>
@@ -378,7 +380,7 @@ export function DiscussClient() {
                   fieldMappingId={fieldMappingId}
                   suggestedQuestion={effectiveUpdate?.question ? String(effectiveUpdate.question) : null}
                   suggestionApplied={false}
-                  aiHasOpinion={!!effectiveUpdate}
+                  aiHasOpinion={aiHasReviewed}
                   onDecisionMade={() => setQuestionDecision(true)}
                 />
               ) : null}
@@ -481,12 +483,39 @@ export function DiscussClient() {
                 size="sm"
                 onClick={() => {
                   setReviewSubmitted(true);
-                  const next = siblingNav?.nextFields?.[0];
-                  if (next?.mappingId) {
-                    router.push(`/mapping/discuss/${next.mappingId}`);
-                  } else {
-                    router.push("/mapping");
+                  if (!activeMappingId) return;
+
+                  // Build update payload: if reviewer accepted AI suggestion, include the proposed changes
+                  const hasAiCorrection = effectiveUpdate && (sourceDecision === "wrong" || transformDecision === "wrong");
+                  const updatePayload: Record<string, unknown> = { id: activeMappingId, status: "accepted" };
+
+                  if (hasAiCorrection && effectiveUpdate) {
+                    // Include all proposed fields — the API will resolve names to IDs
+                    const patchData = { ...effectiveUpdate };
+                    if (patchData.mappingType && !MAPPING_TYPES.includes(patchData.mappingType as typeof MAPPING_TYPES[number])) {
+                      patchData.mappingType = "derived";
+                    }
+                    if (patchData.confidence && !CONFIDENCE_LEVELS.includes(patchData.confidence as typeof CONFIDENCE_LEVELS[number])) {
+                      patchData.confidence = "medium";
+                    }
+                    // Remove question field — not a mapping field
+                    delete patchData.question;
+                    Object.assign(updatePayload, patchData);
                   }
+
+                  updateMapping.mutate(
+                    updatePayload as unknown as Parameters<typeof updateMapping.mutate>[0],
+                    {
+                      onSuccess: () => {
+                        const next = siblingNav?.nextFields?.[0];
+                        if (next?.mappingId) {
+                          router.push(`/mapping/discuss/${next.mappingId}`);
+                        } else {
+                          router.push("/mapping");
+                        }
+                      },
+                    }
+                  );
                 }}
                 disabled={!canSubmit}
                 className={cn(

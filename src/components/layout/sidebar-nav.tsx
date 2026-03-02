@@ -20,6 +20,7 @@ import {
   Target,
   Zap,
   Sun,
+  Shield,
 } from "lucide-react";
 import { useQuestions } from "@/queries/question-queries";
 import { useTheme } from "./theme-provider";
@@ -34,6 +35,7 @@ const navItems = [
   { href: "/evaluation", label: "SOT Accuracy", icon: Target },
   { href: "/topology", label: "Topology", icon: Waypoints },
   { href: "/atlas", label: "Atlas", icon: Globe },
+  { href: "/admin", label: "Admin", icon: Shield },
 ];
 
 export function SidebarNav() {

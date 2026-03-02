@@ -128,6 +128,26 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
 
   const { editedBy, ...updateData } = parsed.data;
 
+  // Resolve source entity/field names to IDs if provided (from AI review proposals)
+  const bodyAny = body as Record<string, unknown>;
+  if (bodyAny.sourceEntityName && !updateData.sourceEntityId) {
+    const matchName = (a: string, b: string) => a.toLowerCase().replace(/[_\s]/g, "") === b.toLowerCase().replace(/[_\s]/g, "");
+    const se = db.select({ id: entity.id, name: entity.name }).from(entity)
+      .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
+      .all()
+      .find(e => matchName(e.name, String(bodyAny.sourceEntityName)));
+    if (se) {
+      updateData.sourceEntityId = se.id;
+      if (bodyAny.sourceFieldName && !updateData.sourceFieldId) {
+        const sf = db.select({ id: field.id, name: field.name }).from(field)
+          .where(eq(field.entityId, se.id))
+          .all()
+          .find(f => matchName(f.name, String(bodyAny.sourceFieldName)));
+        if (sf) updateData.sourceFieldId = sf.id;
+      }
+    }
+  }
+
   // Transaction: read existing + mark-old + insert-new (prevents duplicate isLatest)
   const txResult = withTransaction(() => {
     const existing = db
