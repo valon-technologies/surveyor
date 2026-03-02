@@ -373,6 +373,90 @@ This can be done incrementally — start with the question view for SM, then add
 
 ---
 
+---
+
+## Validation Gates (built this session)
+
+### Correction Validation Pipeline
+- Reviewer verdicts create learnings with `validationStatus: "pending"`
+- `rebuildEntityKnowledge` only includes `"validated"` learnings
+- `extractVerdictLearning` no longer auto-rebuilds EK
+- Admin validates/rejects at `/admin` → Corrections tab → then EK rebuilds
+- Schema: `validation_status`, `validated_by`, `validated_at` on `learning` table
+
+### Question Curation Pipeline
+- Questions created during review start as `curationStatus: "pending_review"` (invisible)
+- When reviewer clicks Submit Review & Next → promoted to `"draft"` (visible in admin queue)
+- Admin approves/rejects/marks-duplicate at `/admin` → Questions tab
+- Only `"approved"` questions visible to SM/client views
+- Schema: `curation_status`, `curated_by`, `curated_at`, `duplicate_of` on `question` table
+- Dedup: admin sees similar approved questions when reviewing drafts
+
+### Additional fixes in this batch
+- Submit Review marks mapping as `accepted` status
+- Source name→ID resolution in PATCH mapping route (AI proposals now persist correctly)
+- Pre-generated AI review injected into live chat context for continuity
+- Checkbox toggle (uncheck) working for source/transform
+- Transform shows "none" for unmapped fields instead of "direct"
+- Batch generation panel hidden from mapping page (admin-only TODO)
+
+---
+
+## Cumulative Branch Changes
+
+**Branch:** `rob/review-feedback-foundation` — 40 commits ahead of base
+**Stats:** 427 files changed, 69,230 insertions, 2,824 deletions
+
+### What this branch adds to Surveyor (cumulative)
+
+| Feature | Status |
+|---------|--------|
+| SOT accuracy calibration (eval vs ground truth) | Complete |
+| Full entity + context import (195 entities, 409 docs, 54 skills) | Complete |
+| Context delivery fix (workspace ID, skill matching, EK) | Complete |
+| Feedback interface (source/transform/question verdict cards) | Complete |
+| Feedback trail (pipeline event log with correlationId) | Complete |
+| Broader validation (7 entities, 13.5% → 59.4%) | Complete |
+| EK hardening (4-layer MANDATORY phrasing) | Complete |
+| SUBSET stopgap (skip toxic corrections) | Complete |
+| Pre-generated AI reviews (instant discuss page load) | Complete |
+| Checkbox-based review model (current/AI/specify) | Complete |
+| Review progress tracking (overall + per-entity) | Complete |
+| Validation gates (correction + question curation) | Complete |
+| Admin page (validate corrections, curate questions) | Complete |
+| Supabase migration | **Not started** — needs project access |
+| Vercel deployment | **Not started** — blocked by migration |
+| Client access (ServiceMac portal) | **Designed, not built** |
+| UNION entity support (multi-source) | **Designed, deferred** |
+
+---
+
+## What's Left Before Users Can Review
+
+### P0 — Must fix/test before handing to reviewers
+
+1. **End-to-end correction flow test** — submit a correction → admin validates → EK rebuilds → regenerate → verify model uses correction. We tested pieces but not the full admin-gated loop.
+2. **Supabase migration** — app runs on SQLite locally. Team needs hosted DB. ~8-12 hours of work.
+3. **Vercel deployment** — connect repo, env vars, build. Blocked by Supabase.
+4. **Seed production DB** — re-run import scripts against Supabase.
+5. **Create user accounts** — 5 reviewers + 1 admin.
+6. **Pre-generate mappings + AI reviews** — batch run on target entities so reviewers have work on day 1.
+
+### P1 — Should have for good experience
+
+7. **Batch generation on admin-only page** — currently hidden, needs proper page.
+8. **Review onboarding guide** — 1-page doc for reviewers.
+9. **API cost guardrails** — rate limiting or admin-only generation triggers.
+
+### P2 — After initial deployment
+
+10. **Client access (ServiceMac)** — question portal for SM team.
+11. **UNION entity support** — multi-source mapping format.
+12. **Slow-loop analytics** — confidence calibration, correction pattern extraction.
+13. **Full SUBSET correction strategy** — 8-12 hours, deferred.
+
+---
+
 ## Git History Reference
 
 ### Surveyor — unpushed commits (12)
