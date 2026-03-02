@@ -108,6 +108,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
       chatSessionId: input.chatSessionId,
       assigneeIds: input.assigneeIds,
       createdByUserId: userId,
+      curationStatus: "pending_review", // Hidden until reviewer submits review
     })
     .returning()
     .all();

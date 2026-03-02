@@ -481,9 +481,23 @@ export function DiscussClient() {
               </div>
               <Button
                 size="sm"
-                onClick={() => {
+                onClick={async () => {
                   setReviewSubmitted(true);
                   if (!activeMappingId) return;
+
+                  // Promote any pending_review questions for this field to draft (visible to admin)
+                  try {
+                    const { workspaceId: wsId } = mapping || {};
+                    if (wsId) {
+                      await fetch(`/api/workspaces/${wsId}/questions/promote`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ fieldMappingId }),
+                      });
+                    }
+                  } catch {
+                    // Non-critical — questions will stay pending_review
+                  }
 
                   // Build update payload: if reviewer accepted AI suggestion, include the proposed changes
                   const hasAiCorrection = effectiveUpdate && (sourceDecision === "wrong" || transformDecision === "wrong");
