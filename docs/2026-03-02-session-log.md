@@ -436,7 +436,7 @@ This can be done incrementally — start with the question view for SM, then add
 ### P0 — Must fix/test before handing to reviewers
 
 1. **End-to-end correction flow test** — submit a correction → admin validates → EK rebuilds → regenerate → verify model uses correction. We tested pieces but not the full admin-gated loop.
-2. **Supabase migration** — app runs on SQLite locally. Team needs hosted DB. ~8-12 hours of work.
+2. **Supabase migration** — app runs on SQLite locally. Team needs hosted DB. ~5-7 hours focused work (schema swap 1hr, driver 15min, sync→async codemod 2-3hrs, transactions 30min, seed scripts 1hr, test/fix 1-2hrs). Most is mechanical find-and-replace.
 3. **Vercel deployment** — connect repo, env vars, build. Blocked by Supabase.
 4. **Seed production DB** — re-run import scripts against Supabase.
 5. **Create user accounts** — 5 reviewers + 1 admin.
