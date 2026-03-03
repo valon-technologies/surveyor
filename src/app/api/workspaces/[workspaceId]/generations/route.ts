@@ -5,6 +5,7 @@ import { generation } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createGenerationSchema } from "@/lib/validators/generation";
 import { startGeneration, executeGeneration } from "@/lib/generation/runner";
+import { checkDailyTokenBudget } from "@/lib/generation/cost-guardrails";
 
 export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const searchParams = req.nextUrl.searchParams;
@@ -31,6 +32,15 @@ export const POST = withAuth(
       return NextResponse.json(
         { error: parsed.error.message },
         { status: 400 }
+      );
+    }
+
+    // Guard: check daily token budget
+    const budgetCheck = checkDailyTokenBudget(workspaceId);
+    if (!budgetCheck.allowed) {
+      return NextResponse.json(
+        { error: budgetCheck.message },
+        { status: 429 },
       );
     }
 

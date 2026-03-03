@@ -36,6 +36,91 @@ export interface TargetFieldMeta {
 // They must STILL be flagged as UNDEFINED_ALIAS in source: fields (pd.FieldName is always wrong there).
 const EXPRESSION_GLOBALS = new Set(["pd", "np", "df"]);
 
+// ── Expression syntax validation ──
+// The production pipeline (to_vds_polars.py) executes pandas/numpy expressions.
+// LLMs sometimes emit SQL or BigQuery syntax which will fail at runtime.
+
+interface InvalidExpressionPattern {
+  /** Regex to detect the invalid pattern */
+  pattern: RegExp;
+  /** Short code for the issue */
+  code: string;
+  /** What was detected */
+  label: string;
+  /** What the correct pandas equivalent is */
+  suggestion: string;
+}
+
+const INVALID_EXPRESSION_PATTERNS: InvalidExpressionPattern[] = [
+  {
+    pattern: /\bCAST\s*\(/i,
+    code: "SQL_CAST",
+    label: "CAST(...)",
+    suggestion: "Use .astype(...) for type casting",
+  },
+  {
+    pattern: /\bSAFE_CAST\s*\(/i,
+    code: "SQL_SAFE_CAST",
+    label: "SAFE_CAST(...)",
+    suggestion: "Use pd.to_numeric(..., errors='coerce') or .astype(...) for type casting",
+  },
+  {
+    pattern: /\bCASE\s+WHEN\b/i,
+    code: "SQL_CASE_WHEN",
+    label: "CASE WHEN ... THEN ... END",
+    suggestion: "Use np.select(condlist=[...], choicelist=[...], default=...) or np.where(...)",
+  },
+  {
+    pattern: /\bPARSE_DATE\s*\(/i,
+    code: "SQL_PARSE_DATE",
+    label: "PARSE_DATE(...)",
+    suggestion: "Use pd.to_datetime(...) or identity transform for date fields",
+  },
+  {
+    pattern: /\bCOALESCE\s*\(/i,
+    code: "SQL_COALESCE",
+    label: "COALESCE(...)",
+    suggestion: "Use .fillna(...) for null coalescing",
+  },
+  {
+    pattern: /(?<!\w)IF\s*\(/i,
+    code: "SQL_IF",
+    label: "IF(...)",
+    suggestion: "Use np.where(condition, true_val, false_val) for conditional logic",
+  },
+  {
+    pattern: /\bCAST\s*\(.*?\bAS\b/i,
+    code: "SQL_CAST_AS",
+    label: "CAST(... AS ...)",
+    suggestion: "Use .astype(...) for type casting",
+  },
+];
+
+/**
+ * Validate expression text for patterns that the production pipeline cannot execute.
+ * Returns warnings (not errors) since expressions may be partially valid or ambiguous.
+ */
+export function validateExpressionSyntax(
+  expression: string,
+  targetColumn: string,
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  for (const invalid of INVALID_EXPRESSION_PATTERNS) {
+    if (invalid.pattern.test(expression)) {
+      issues.push({
+        field: targetColumn,
+        severity: "warning",
+        code: "INVALID_EXPRESSION",
+        message: `Expression uses ${invalid.label} which is SQL syntax — the production pipeline expects pandas/numpy. ${invalid.suggestion}`,
+        detail: invalid.code,
+      });
+    }
+  }
+
+  return issues;
+}
+
 // ── Main validator ──
 
 export function validateYamlOutput(
@@ -212,6 +297,9 @@ export function validateYamlOutput(
           }
         }
       }
+
+      // INVALID_EXPRESSION — check for SQL/BigQuery syntax the pipeline can't execute
+      issues.push(...validateExpressionSyntax(col.expression, col.target_column));
     }
 
     // MISSING_DTYPE (error — renderer requires dtype on every column)
@@ -464,6 +552,8 @@ export function issueToQuestion(issue: ValidationIssue): string {
       return `Concat references alias "${issue.detail}" not defined in sources. What is the correct source alias?`;
     case "SOURCE_NO_TYPE":
       return `Source "${issue.detail}" has neither pipe_file nor staging. Is this a raw ACDC source (pipe_file) or a staging dependency (staging)?`;
+    case "INVALID_EXPRESSION":
+      return `"${issue.field}" expression uses SQL syntax (${issue.detail}) that the production pipeline cannot execute. Rewrite using pandas/numpy equivalents (np.select, np.where, .map, .fillna, .astype, etc.)`;
     default:
       return `Validation issue with "${issue.field}": ${issue.message}`;
   }

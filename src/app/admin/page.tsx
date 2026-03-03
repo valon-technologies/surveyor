@@ -7,8 +7,9 @@ import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { cn } from "@/lib/utils";
 import { Check, X, Copy, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BatchRunPanel } from "@/components/review/batch-run-panel";
 
-type Tab = "corrections" | "questions";
+type Tab = "corrections" | "questions" | "generation";
 
 interface PendingLearning {
   id: string;
@@ -106,6 +107,17 @@ export default function AdminPage() {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setTab("generation")}
+          className={cn(
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+            tab === "generation"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Generation
+        </button>
       </div>
 
       {/* Corrections tab */}
@@ -177,6 +189,13 @@ export default function AdminPage() {
               isPending={curateMutation.isPending}
             />
           ))}
+        </div>
+      )}
+
+      {/* Generation tab */}
+      {tab === "generation" && (
+        <div className="space-y-3">
+          <BatchRunPanel />
         </div>
       )}
     </div>

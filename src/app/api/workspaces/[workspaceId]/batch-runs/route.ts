@@ -10,6 +10,7 @@ import {
   executeBulkChatRun,
 } from "@/lib/generation/bulk-chat-runner";
 import { MAPPING_STATUSES } from "@/lib/constants";
+import { checkDailyTokenBudget } from "@/lib/generation/cost-guardrails";
 
 export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const runs = db
@@ -34,6 +35,15 @@ export const POST = withAuth(
     }
 
     const mode = parsed.data.mode || "single-shot";
+
+    // Guard: check daily token budget before spending on LLM calls
+    const budgetCheck = checkDailyTokenBudget(workspaceId);
+    if (!budgetCheck.allowed) {
+      return NextResponse.json(
+        { error: budgetCheck.message },
+        { status: 429 },
+      );
+    }
 
     // Guard: prevent concurrent batch runs (avoids duplicate LLM spend)
     const activeBatch = db
