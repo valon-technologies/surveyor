@@ -26,6 +26,8 @@ interface ChatMessageListProps {
   isStreaming: boolean;
   activeToolCall?: ToolExecution | null;
   forgeToolResults?: ToolExecution[];
+  openQuestion?: { id: string; question: string } | null;
+  onPromoteAnswer?: (messageContent: string) => void;
 }
 
 export function ChatMessageList({
@@ -34,6 +36,8 @@ export function ChatMessageList({
   isStreaming,
   activeToolCall,
   forgeToolResults,
+  openQuestion,
+  onPromoteAnswer,
 }: ChatMessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -54,7 +58,12 @@ export function ChatMessageList({
   return (
     <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
       {visibleMessages.map((msg) => (
-        <MessageBubble key={msg.id} message={msg} />
+        <MessageBubble
+          key={msg.id}
+          message={msg}
+          openQuestion={openQuestion}
+          onPromoteAnswer={onPromoteAnswer}
+        />
       ))}
 
       {/* Persistent forge tool result cards */}
@@ -191,7 +200,15 @@ function ToolCallIndicator({ toolCall }: { toolCall: ToolExecution }) {
   );
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({
+  message,
+  openQuestion,
+  onPromoteAnswer,
+}: {
+  message: ChatMessage;
+  openQuestion?: { id: string; question: string } | null;
+  onPromoteAnswer?: (messageContent: string) => void;
+}) {
   const isUser = message.role === "user";
 
   return (
@@ -208,6 +225,16 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           </CitationMarkdown>
         )}
       </div>
+      {!isUser && openQuestion && onPromoteAnswer && (
+        <button
+          onClick={() => onPromoteAnswer(message.content)}
+          className="mt-1 text-[10px] text-blue-500 hover:text-blue-700 dark:hover:text-blue-300 hover:underline"
+        >
+          Use as answer to: &ldquo;{openQuestion.question.length > 60
+            ? openQuestion.question.slice(0, 60) + "..."
+            : openQuestion.question}&rdquo;
+        </button>
+      )}
     </div>
   );
 }

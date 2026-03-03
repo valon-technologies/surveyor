@@ -17,7 +17,7 @@ import { SourceVerdictCard } from "@/components/review/source-verdict-card";
 import { TransformVerdictCard } from "@/components/review/transform-verdict-card";
 import { QuestionFeedbackCard } from "@/components/review/question-feedback-card";
 import { CreateQuestionCard } from "@/components/review/create-question-card";
-import { useFieldMappingQuestion } from "@/queries/question-queries";
+import { useFieldMappingQuestion, useResolveQuestion } from "@/queries/question-queries";
 import type { ReviewCardData } from "@/types/review";
 import { MAPPING_TYPES, CONFIDENCE_LEVELS, type MappingStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -255,6 +255,16 @@ export function DiscussClient() {
     );
   };
 
+  // Promote a chat answer to resolve the linked question
+  const resolveQuestion = useResolveQuestion();
+  const handlePromoteAnswer = useCallback((content: string) => {
+    if (!linkedQuestion?.id) return;
+    resolveQuestion.mutate(
+      { id: linkedQuestion.id, body: content },
+      { onSuccess: () => setQuestionDecision(true) },
+    );
+  }, [linkedQuestion?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Filter out the current active session from "prior" list
   const displayedPriorSessions = (priorSessions ?? []).filter(
     (s) => s.id !== activeSessionId
@@ -433,6 +443,10 @@ export function DiscussClient() {
               streamingContent={streamingContent}
               isStreaming={isStreaming}
               activeToolCall={activeToolCall}
+              openQuestion={linkedQuestion && linkedQuestion.status === "open"
+                ? { id: linkedQuestion.id, question: linkedQuestion.question }
+                : null}
+              onPromoteAnswer={handlePromoteAnswer}
             />
             <ChatInput
               onSend={sendMessage}

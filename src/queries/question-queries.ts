@@ -121,7 +121,7 @@ export function useFieldMappingQuestion(fieldMappingId: string | undefined) {
   return useQuery({
     queryKey: ["questions", "mapping", fieldMappingId],
     queryFn: () =>
-      api.get<Array<{ id: string; question: string; feedbackHelpful: boolean | null; feedbackWhyNot: string | null; feedbackBetterQuestion: string | null }>>(
+      api.get<Array<{ id: string; question: string; status: string; feedbackHelpful: boolean | null; feedbackWhyNot: string | null; feedbackBetterQuestion: string | null }>>(
         workspacePath(workspaceId, `questions?fieldMappingId=${fieldMappingId}`)
       ),
     enabled: !!fieldMappingId && !!workspaceId,
