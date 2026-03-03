@@ -394,6 +394,52 @@ export function listSotEntities(): SotEntitySummary[] {
       }
     }
 
+    // Also catch downstream pass-through variants: entities that read staging
+    // from a parent-like entity, have no pipe_file sources, AND only do identity
+    // pass-throughs (no real transformation). This catches loan_support_call_1
+    // but not foreclosure_bid (which does real joins/derivation from staging).
+    if (names) {
+      for (const entityName of names) {
+        if (allStagingComponents.has(`${milestone}:${entityName}`)) continue;
+        if (assemblyParentNames.has(`${milestone}:${entityName}`)) continue;
+
+        try {
+          const text = fs.readFileSync(path.join(dirPath, `${entityName}.yaml`), "utf-8");
+          const data = yaml.load(text) as Record<string, unknown>;
+          const sources = (data.sources || []) as { staging?: { table: string }; pipe_file?: unknown }[];
+          const columns = (data.columns || []) as { transform?: string; expression?: string }[];
+
+          const hasPipeFile = sources.some((s) => s.pipe_file);
+          if (hasPipeFile) continue;
+
+          // Check if this is a pass-through variant:
+          // - Single staging source (no joins with other tables)
+          // - May have minor expressions but no hash_id (no primary key derivation)
+          const hasMultipleSources = sources.length > 1;
+          const hasHashId = columns.some((c) => c.transform === "hash_id");
+          const hasJoins = !!(data.joins && (data.joins as unknown[]).length > 0);
+          if (hasMultipleSources || hasHashId || hasJoins) continue;
+
+          // Staging-only + all identity → check if name is a variant of a staging source
+          for (const s of sources) {
+            if (!s.staging?.table) continue;
+            const stagingName = tableToFile.get(`${milestone}:${s.staging.table}`) || s.staging.table;
+            const numberedPattern = new RegExp("^" + stagingName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\d+$");
+            if (entityName.startsWith(stagingName + "_") || numberedPattern.test(entityName)) {
+              allStagingComponents.add(`${milestone}:${entityName}`);
+              const parentKey = `${milestone}:${stagingName}`;
+              const components = parentComponents.get(parentKey) || [];
+              if (!components.includes(entityName)) {
+                components.push(entityName);
+                parentComponents.set(parentKey, components);
+              }
+              break;
+            }
+          }
+        } catch { /* skip */ }
+      }
+    }
+
     // Also scan for entities referenced as staging by concat parents
     // that we missed due to table name mismatches
     for (const [parentKey, components] of parentComponents) {
