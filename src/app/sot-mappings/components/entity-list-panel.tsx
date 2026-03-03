@@ -19,6 +19,9 @@ interface EntitySummary {
   sourceCount: number;
   structureType: "concat" | "join" | "simple";
   hasOnboardingConfig: boolean;
+  isAssemblyParent: boolean;
+  stagingComponents: string[];
+  isStagingComponent: boolean;
 }
 
 interface SotEntityListPanelProps {
@@ -53,13 +56,23 @@ export function SotEntityListPanel({
     const q = searchQuery.toLowerCase();
     const filtered = q
       ? entities.filter((e) => e.name.toLowerCase().includes(q))
-      : entities;
+      : // Hide staging components from top-level list (shown nested under parents)
+        entities.filter((e) => !e.isStagingComponent);
 
     return {
       m1Entities: filtered.filter((e) => e.milestone === "m1"),
       m2Entities: filtered.filter((e) => e.milestone === "m2"),
     };
   }, [entities, searchQuery]);
+
+  // Build lookup for staging component summaries (for nested display)
+  const componentLookup = useMemo(() => {
+    const map = new Map<string, EntitySummary>();
+    for (const e of entities) {
+      map.set(`${e.milestone}:${e.name}`, e);
+    }
+    return map;
+  }, [entities]);
 
   return (
     <div className="flex flex-col h-full">
@@ -86,14 +99,14 @@ export function SotEntityListPanel({
         />
         {!m1Collapsed &&
           m1Entities.map((entity) => (
-            <EntityRow
+            <EntityWithComponents
               key={`m1-${entity.name}`}
               entity={entity}
-              isSelected={
-                selectedEntity === entity.name &&
-                selectedMilestone === "m1"
-              }
-              onSelect={() => onSelect(entity.name, "m1")}
+              milestone="m1"
+              componentLookup={componentLookup}
+              selectedEntity={selectedEntity}
+              selectedMilestone={selectedMilestone}
+              onSelect={onSelect}
             />
           ))}
 
@@ -105,14 +118,14 @@ export function SotEntityListPanel({
         />
         {!m2Collapsed &&
           m2Entities.map((entity) => (
-            <EntityRow
+            <EntityWithComponents
               key={`m2-${entity.name}`}
               entity={entity}
-              isSelected={
-                selectedEntity === entity.name &&
-                selectedMilestone === "m2"
-              }
-              onSelect={() => onSelect(entity.name, "m2")}
+              milestone="m2"
+              componentLookup={componentLookup}
+              selectedEntity={selectedEntity}
+              selectedMilestone={selectedMilestone}
+              onSelect={onSelect}
             />
           ))}
       </div>
@@ -157,14 +170,80 @@ function SectionHeader({
   );
 }
 
+function EntityWithComponents({
+  entity,
+  milestone,
+  componentLookup,
+  selectedEntity,
+  selectedMilestone,
+  onSelect,
+}: {
+  entity: EntitySummary;
+  milestone: "m1" | "m2";
+  componentLookup: Map<string, EntitySummary>;
+  selectedEntity: string | null;
+  selectedMilestone: "m1" | "m2";
+  onSelect: (name: string, milestone: "m1" | "m2") => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isSelected = selectedEntity === entity.name && selectedMilestone === milestone;
+
+  return (
+    <div>
+      <div className="flex items-center">
+        {/* Expand toggle for assembly parents */}
+        {entity.isAssemblyParent && entity.stagingComponents.length > 0 ? (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="p-1 text-muted-foreground hover:text-foreground shrink-0"
+          >
+            {expanded ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+          </button>
+        ) : (
+          <span className="w-5 shrink-0" />
+        )}
+        <div className="flex-1 min-w-0">
+          <EntityRow
+            entity={entity}
+            isSelected={isSelected}
+            onSelect={() => onSelect(entity.name, milestone)}
+          />
+        </div>
+      </div>
+      {/* Nested staging components */}
+      {expanded && entity.stagingComponents.map((compName) => {
+        const comp = componentLookup.get(`${milestone}:${compName}`);
+        if (!comp) return null;
+        const compSelected = selectedEntity === compName && selectedMilestone === milestone;
+        return (
+          <div key={compName} className="pl-5">
+            <EntityRow
+              entity={comp}
+              isSelected={compSelected}
+              onSelect={() => onSelect(compName, milestone)}
+              isNested
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function EntityRow({
   entity,
   isSelected,
   onSelect,
+  isNested,
 }: {
   entity: EntitySummary;
   isSelected: boolean;
   onSelect: () => void;
+  isNested?: boolean;
 }) {
   const badge = structureBadge[entity.structureType];
 
@@ -187,8 +266,11 @@ function EntityRow({
       )}
 
       {/* Entity name */}
-      <span className="font-mono text-xs truncate flex-1">
-        {entity.name}
+      <span className={cn(
+        "font-mono text-xs truncate flex-1",
+        isNested && "text-muted-foreground"
+      )}>
+        {isNested ? `↳ ${entity.name}` : entity.name}
       </span>
 
       {/* Field count */}

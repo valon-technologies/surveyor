@@ -51,6 +51,12 @@ export interface SotEntitySummary {
   fieldCount: number;
   sourceCount: number;
   structureType: "concat" | "join" | "simple";
+  /** True if this entity is an assembly parent (has concat key) */
+  isAssemblyParent: boolean;
+  /** Names of staging components this parent assembles from */
+  stagingComponents: string[];
+  /** True if this entity is a staging component referenced by a parent's concat */
+  isStagingComponent: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -235,6 +241,46 @@ export function listSotEntities(): SotEntitySummary[] {
   const sotDir = getSotDir();
   const summaries: SotEntitySummary[] = [];
 
+  // First pass: collect all entities and identify assembly parents + their staging components
+  const allStagingComponents = new Set<string>(); // "milestone:componentName"
+  const parentComponents = new Map<string, string[]>(); // "milestone:parentName" → component names
+
+  for (const milestone of ["m1", "m2"] as const) {
+    const milestoneDir =
+      milestone === "m1" ? "m1_mappings" : "m2_mappings";
+    const dirPath = path.join(sotDir, milestoneDir);
+
+    if (!fs.existsSync(dirPath)) continue;
+
+    const files = fs.readdirSync(dirPath).filter((f) => f.endsWith(".yaml"));
+
+    for (const file of files) {
+      const entityName = file.replace(".yaml", "");
+      const filePath = path.join(dirPath, file);
+
+      try {
+        const yamlText = fs.readFileSync(filePath, "utf-8");
+        const data = yaml.load(yamlText) as Record<string, unknown>;
+
+        // Detect assembly parents (have concat key) and collect their staging components
+        if (data.concat) {
+          const sources = (data.sources || []) as { staging?: { table: string } }[];
+          const components: string[] = [];
+          for (const s of sources) {
+            if (s.staging?.table) {
+              components.push(s.staging.table);
+              allStagingComponents.add(`${milestone}:${s.staging.table}`);
+            }
+          }
+          parentComponents.set(`${milestone}:${entityName}`, components);
+        }
+      } catch {
+        // Skip — will be caught again in second pass
+      }
+    }
+  }
+
+  // Second pass: build summaries with staging info
   for (const milestone of ["m1", "m2"] as const) {
     const milestoneDir =
       milestone === "m1" ? "m1_mappings" : "m2_mappings";
@@ -256,12 +302,19 @@ export function listSotEntities(): SotEntitySummary[] {
         const rawSources = (data.sources as unknown[]) || [];
         const structureType = detectStructureType(data);
 
+        const key = `${milestone}:${entityName}`;
+        const isAssemblyParent = parentComponents.has(key);
+        const isStagingComponent = allStagingComponents.has(key);
+
         summaries.push({
           name: entityName,
           milestone,
           fieldCount: rawColumns.length,
           sourceCount: rawSources.length,
           structureType,
+          isAssemblyParent,
+          stagingComponents: parentComponents.get(key) || [],
+          isStagingComponent,
         });
       } catch {
         // Skip malformed YAML files
