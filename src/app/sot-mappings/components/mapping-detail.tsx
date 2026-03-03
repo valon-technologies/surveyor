@@ -80,10 +80,7 @@ export function SotMappingDetail({
               {structure.text}
             </span>
             {data.onboardingTasks && data.onboardingTasks.length > 0 && (
-              <span
-                className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                title={`Onboarding tasks: ${data.onboardingTasks.join(", ")}`}
-              >
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
                 Onboarded
               </span>
@@ -99,6 +96,37 @@ export function SotMappingDetail({
               </>
             )}
           </p>
+          {/* IO Config — onboarding task details */}
+          {data.onboardingTasks && data.onboardingTasks.length > 0 && (
+            <div className="mt-2 border border-green-200 dark:border-green-800 rounded-lg bg-green-50 dark:bg-green-950/20 px-3 py-2">
+              <p className="text-xs font-semibold text-green-800 dark:text-green-300 mb-1">
+                Onboarding Pipeline ({data.onboardingTasks.length} task{data.onboardingTasks.length !== 1 ? "s" : ""})
+              </p>
+              <p className="text-[11px] text-green-700 dark:text-green-400 mb-1.5">
+                This entity is consumed by the following front-porch onboarding tasks — meaning these mappings flow into cellar.
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {data.onboardingTasks.map((task: string) => (
+                  <span
+                    key={task}
+                    className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300"
+                  >
+                    {task}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {(!data.onboardingTasks || data.onboardingTasks.length === 0) && (
+            <div className="mt-2 border border-amber-200 dark:border-amber-800 rounded-lg bg-amber-50 dark:bg-amber-950/20 px-3 py-2">
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                No onboarding config
+              </p>
+              <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                This entity has no front-porch onboarding task. Mappings exist but may not flow into cellar yet.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Field Table — first, since this is what reviewers care about most */}
