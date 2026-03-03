@@ -31,7 +31,7 @@ const navItems = [
   { href: "/mapping/questions", label: "Questions", icon: HelpCircle, badge: true },
   { href: "/data", label: "Data", icon: Database },
   { href: "/context", label: "Context", icon: BookOpen },
-  { href: "/ground-truth", label: "Ground Truth", icon: Scale },
+  { href: "/ground-truth", label: "Verified Mappings", icon: Scale },
   { href: "/topology", label: "Topology", icon: Waypoints },
   { href: "/admin", label: "Admin", icon: Shield },
 ];
