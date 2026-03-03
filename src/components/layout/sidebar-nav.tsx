@@ -7,20 +7,16 @@ import { useSession, signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 import {
-  LayoutDashboard,
   Map,
   Database,
   BookOpen,
-  Waypoints,
   Compass,
   LogOut,
   Settings,
-  HelpCircle,
   Zap,
   Sun,
   Shield,
   Scale,
-  BookOpenCheck,
   ChevronDown,
   ChevronRight,
   type LucideIcon,
@@ -37,17 +33,17 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: "/", label: "Progress Summary", icon: LayoutDashboard },
   {
     href: "/mapping",
     label: "Mapping",
     icon: Map,
     children: [
+      { href: "/", label: "Progress Summary" },
       { href: "/mapping", label: "Review UI" },
+      { href: "/mapping/questions", label: "Questions from Mapping" },
       { href: "/docs", label: "Review Guide" },
     ],
   },
-  { href: "/mapping/questions", label: "Questions from Mapping", icon: HelpCircle, badge: true },
   { href: "/context", label: "Context", icon: BookOpen },
   {
     href: "/data",
@@ -78,7 +74,10 @@ function NavItemRenderer({
     // Auto-expand if current path matches this item or any child
     item.children
       ? pathname.startsWith(item.href.split("?")[0]) ||
-        item.children.some((c) => pathname.startsWith(c.href.split("?")[0]))
+        item.children.some((c) => {
+          const base = c.href.split("?")[0];
+          return base === "/" ? pathname === "/" : pathname.startsWith(base);
+        })
       : false
   );
 
@@ -128,9 +127,12 @@ function NavItemRenderer({
                 : null;
 
               let childActive: boolean;
-              if (childBase === item.href.split("?")[0] && !childTab) {
-                // Child links to same base as parent with no tab — active when on that path without a tab
-                childActive = pathname === childBase || (pathname.startsWith(childBase) && !currentTab);
+              if (childBase === "/") {
+                // Root path — exact match only
+                childActive = pathname === "/";
+              } else if (childBase === item.href.split("?")[0] && !childTab) {
+                // Child links to same base as parent with no tab — active when on that exact path
+                childActive = pathname === childBase;
               } else if (childTab) {
                 // Child has a tab param — active when path matches and tab matches
                 childActive = pathname.startsWith(childBase) && currentTab === childTab;
