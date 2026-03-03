@@ -271,3 +271,53 @@ export function listSotEntities(): SotEntitySummary[] {
 
   return summaries.sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/**
+ * Find SOT entities in the same domain as the given entity.
+ * Uses name-prefix matching: `loss_mitigation_loan_modification` shares
+ * the prefix `loss_mitigation` with `loss_mitigation_forbearance`, etc.
+ *
+ * Returns the richest (most fields) related entities, excluding the entity itself.
+ * Tries progressively shorter prefixes until a group with 2+ members is found.
+ */
+export function findRelatedSotEntities(
+  entityName: string,
+  limit: number = 3,
+): SotEntityMapping[] {
+  const allEntities = listSotEntities();
+  const segments = entityName.split("_");
+
+  // Try progressively shorter prefixes
+  // Start from full name (finds foreclosure_bid for "foreclosure"),
+  // then shorten (finds loss_mitigation_forbearance for "loss_mitigation_loan_modification")
+  let matchedNames: string[] = [];
+  for (let prefixLen = segments.length; prefixLen >= 1; prefixLen--) {
+    const prefix = segments.slice(0, prefixLen).join("_") + "_";
+    const matches = allEntities.filter(
+      (e) => e.name !== entityName && e.name.startsWith(prefix),
+    );
+    if (matches.length >= 1) {
+      // Sort by field count descending — richest mappings most useful
+      matches.sort((a, b) => b.fieldCount - a.fieldCount);
+      // Deduplicate by name (entity may appear in both M1 and M2 — prefer M2)
+      const seen = new Set<string>();
+      matchedNames = [];
+      for (const m of matches) {
+        if (!seen.has(m.name)) {
+          seen.add(m.name);
+          matchedNames.push(m.name);
+        }
+      }
+      break;
+    }
+  }
+
+  // Load the top N as full SotEntityMapping
+  const results: SotEntityMapping[] = [];
+  for (const name of matchedNames.slice(0, limit)) {
+    const sot = loadSotEntity(name, "m2") || loadSotEntity(name, "m1");
+    if (sot) results.push(sot);
+  }
+
+  return results;
+}

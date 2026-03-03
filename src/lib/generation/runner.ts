@@ -25,6 +25,8 @@ import {
   type SourceSchemaInput,
   type ReferenceDocsInput,
 } from "@/lib/rag";
+import { loadSotEntity, findRelatedSotEntities } from "@/lib/sot/yaml-parser";
+import { estimateTokens } from "@/lib/llm/token-counter";
 
 interface RunGenerationInput {
   workspaceId: string;
@@ -334,6 +336,37 @@ export function startGeneration(
       })),
   }));
 
+  // Load production SOT mapping as generation context
+  let sotMappingReference: string | undefined;
+  try {
+    const SOT_TOKEN_CAP = 8000;
+    const parts: string[] = [];
+
+    // Same-entity SOT (prefer M2, fall back to M1)
+    const sameSot = loadSotEntity(targetEntity.name, "m2") || loadSotEntity(targetEntity.name, "m1");
+    if (sameSot) {
+      parts.push(`### Production Mapping: ${targetEntity.name}\n\n\`\`\`yaml\n${sameSot.rawYaml}\n\`\`\``);
+    }
+
+    // Cross-entity SOT (related entities in same domain)
+    const relatedSots = findRelatedSotEntities(targetEntity.name, 2);
+    for (const related of relatedSots) {
+      parts.push(`### Related Entity: ${related.table}\n\n\`\`\`yaml\n${related.rawYaml}\n\`\`\``);
+    }
+
+    if (parts.length > 0) {
+      let combined = parts.join("\n\n");
+      // Trim cross-entity references if over token cap
+      while (parts.length > 1 && estimateTokens(combined) > SOT_TOKEN_CAP) {
+        parts.pop();
+        combined = parts.join("\n\n");
+      }
+      sotMappingReference = combined;
+    }
+  } catch (sotErr) {
+    console.warn("[runner] Failed to load SOT mapping reference:", sotErr);
+  }
+
   const { systemMessage, userMessage } = promptBuilder({
     entityName: targetEntity.displayName || targetEntity.name,
     entityDescription: targetEntity.description,
@@ -351,6 +384,7 @@ export function startGeneration(
     workspaceRules: workspaceRules.length > 0 ? workspaceRules : undefined,
     workspaceId,
     fkConstraints: input.fkConstraints,
+    sotMappingReference,
   });
 
   // 8. Optionally attach tool instructions to the system message when BQ is available

@@ -62,6 +62,7 @@ interface PromptInput {
   workspaceId?: string;
   scaffoldStrategy?: string;
   fkConstraints?: FKConstraint[];
+  sotMappingReference?: string;
 }
 
 const SYSTEM_MESSAGE = `You are a data mapping API that outputs ONLY valid JSON. No prose, no markdown, no explanations — just a JSON object.
@@ -164,7 +165,14 @@ SELF-REVIEW CHECKLIST (verify before outputting):
 7. Questions generated for genuine uncertainties that a human can resolve — NOT for values already documented in enum references
 8. All filter values use documented enum codes — cross-check every filter condition against enum references before asking about it
 
-ENTITY KNOWLEDGE RULE: Reference documents titled "Entity Knowledge" contain verified corrections from human reviewers. These corrections are MANDATORY — follow them exactly. If a correction says "REQUIRED: Use X" or "CORRECTION (MANDATORY)", you MUST use X. Do not argue against, reinterpret, or override these corrections under any circumstances. They take precedence over your own reasoning about which source table or field is "better."`;
+ENTITY KNOWLEDGE RULE: Reference documents titled "Entity Knowledge" contain verified corrections from human reviewers. These corrections are MANDATORY — follow them exactly. If a correction says "REQUIRED: Use X" or "CORRECTION (MANDATORY)", you MUST use X. Do not argue against, reinterpret, or override these corrections under any circumstances. They take precedence over your own reasoning about which source table or field is "better."
+
+PRODUCTION MAPPING REFERENCE: When a "Production Mapping Reference" section is provided, it contains verified production YAML for this entity or related entities in the same domain. Use as a guide for:
+- Which source tables to use (trust production table choices)
+- Join patterns and filter conditions
+- Expression conventions (np.select, .map, .fillna, etc.)
+- hash_id column choices for primary keys
+Do NOT blindly copy — target fields may differ. Learn the patterns and apply them to new fields. Entity Knowledge corrections take precedence over production mappings when they conflict.`;
 
 export function buildPrompt(input: PromptInput): { systemMessage: string; userMessage: string } {
   const { entityName, entityDescription, targetFields, assembledContext, sourceSchema, workspaceRules } = input;
@@ -204,6 +212,13 @@ export function buildPrompt(input: PromptInput): { systemMessage: string; userMe
 
   // Source schema (detailed for relevant tables, compact for the rest)
   parts.push(...renderSourceSchema(sourceSchema));
+
+  // Production mapping reference (SOT ground truth)
+  if (input.sotMappingReference) {
+    parts.push(`\n## Production Mapping Reference\n`);
+    parts.push(`These are verified production mappings for this entity or related entities in the same domain. Use them as a reference for source table selection, join patterns, expression conventions, and hash_id columns. Do NOT blindly copy — the target fields may differ. Learn the patterns and apply them.\n`);
+    parts.push(input.sotMappingReference);
+  }
 
   // Context sections — each doc tagged with [ref:ctx_ID] for citation traceability
   if (assembledContext.primaryContexts.length > 0) {
@@ -381,7 +396,14 @@ SELF-REVIEW CHECKLIST (verify before outputting):
 6. Questions generated for genuine uncertainties that a human can resolve — NOT for values already documented in enum references
 7. All filter values use documented enum codes — cross-check every filter condition against enum references before asking about it
 
-ENTITY KNOWLEDGE RULE: Reference documents titled "Entity Knowledge" contain verified corrections from human reviewers. These corrections are MANDATORY — follow them exactly. If a correction says "REQUIRED: Use X" or "CORRECTION (MANDATORY)", you MUST use X. Do not argue against, reinterpret, or override these corrections under any circumstances. They take precedence over your own reasoning about which source table or field is "better."`;
+ENTITY KNOWLEDGE RULE: Reference documents titled "Entity Knowledge" contain verified corrections from human reviewers. These corrections are MANDATORY — follow them exactly. If a correction says "REQUIRED: Use X" or "CORRECTION (MANDATORY)", you MUST use X. Do not argue against, reinterpret, or override these corrections under any circumstances. They take precedence over your own reasoning about which source table or field is "better."
+
+PRODUCTION MAPPING REFERENCE: When a "Production Mapping Reference" section is provided, it contains verified production YAML for this entity or related entities in the same domain. Use as a guide for:
+- Which source tables to use (trust production table choices)
+- Join patterns and filter conditions
+- Expression conventions (np.select, .map, .fillna, etc.)
+- hash_id column choices for primary keys
+Do NOT blindly copy — target fields may differ. Learn the patterns and apply them to new fields. Entity Knowledge corrections take precedence over production mappings when they conflict.`;
 
 export function buildYamlPrompt(input: PromptInput): { systemMessage: string; userMessage: string } {
   const { entityName, entityDescription, targetFields, assembledContext, sourceSchema, workspaceRules } = input;
@@ -421,6 +443,13 @@ export function buildYamlPrompt(input: PromptInput): { systemMessage: string; us
 
   // Source schema (detailed for relevant tables, compact for the rest)
   parts.push(...renderSourceSchema(sourceSchema));
+
+  // Production mapping reference (SOT ground truth)
+  if (input.sotMappingReference) {
+    parts.push(`\n## Production Mapping Reference\n`);
+    parts.push(`These are verified production mappings for this entity or related entities in the same domain. Use them as a reference for source table selection, join patterns, expression conventions, and hash_id columns. Do NOT blindly copy — the target fields may differ. Learn the patterns and apply them.\n`);
+    parts.push(input.sotMappingReference);
+  }
 
   // Context sections — each doc tagged with [ref:ctx_ID] for citation traceability
   if (assembledContext.primaryContexts.length > 0) {
