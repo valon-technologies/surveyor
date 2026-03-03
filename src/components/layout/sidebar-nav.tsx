@@ -39,7 +39,7 @@ const navItems: NavItem[] = [
     icon: Map,
     children: [
       { href: "/", label: "Progress Summary" },
-      { href: "/mapping", label: "Review UI" },
+      { href: "/mapping", label: "Human Review UI" },
       { href: "/mapping/questions", label: "Questions from Human Review" },
       { href: "/docs", label: "Review Guide" },
     ],
