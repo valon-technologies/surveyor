@@ -687,11 +687,74 @@ Commits: `53a290f`, `b923cea`, `4b49cac`, `0d11c8e`, `3cfb10e`, `8090268`, `67b3
 
 ~25 commits, ~10,000+ lines added across 80+ files.
 
-### Outstanding code work (no external blockers)
+### Chat answer → question promotion (implemented)
 
-| # | Task | Effort | Status |
-|---|------|--------|--------|
-| 14 | Chat answer → question promotion | Medium | Planning |
+AI assistant messages in the discuss page chat now show "Use as answer to: '...'" link when an open question exists for the current field. Clicking it calls the existing resolve API with the message content, triggering all side effects (learning record, cascade resolution, AI evaluation). Added to the Review Guide tips.
+
+Commit: `7415720`. Pushed.
+
+### Sidebar consolidation — final state
+
+After multiple iterations, sidebar reduced to 5 top-level items with 3 expandable groups:
+
+```
+▼ Mapping
+    Progress Summary
+    Human Review UI
+    Questions from Human Review
+    Review Guide
+▼ Context
+    Library
+    Skills
+▼ Data
+    Schemas
+    Preview
+    Topology
+Verified Mappings
+Admin
+```
+
+NavItemRenderer component supports expandable groups with children array, auto-expand when current path matches, and child active state detection (handles same-path children, tab params, and different-route children).
+
+### Final session totals (2026-03-03)
+
+~30 commits across the session. Major features:
+1. Context traceability (citations, inline viewer, deep links) — 6 phases
+2. SOT Mappings page with IO config visibility + staging nesting + ACDC source resolution
+3. M2 SOT integration (201 entities, up from 92)
+4. SOT as generation context (same-entity + cross-entity domain siblings)
+5. Admin generation tab + cost guardrails + YAML expression validation
+6. Production dependency graph import (212 entities, 437 edges)
+7. Structure classification seed script
+8. Duplicate learning idempotency fix
+9. Chat answer → question promotion
+10. Reviewer onboarding guide
+11. Sidebar consolidation (12 items → 5 top-level, 3 expandable groups)
+12. Data Preview rename (Atlas → Data Preview)
+13. SUBSET toxic learnings cleanup
+14. Notion plan overhaul (roadmap, flowcharts, nav guide, feedback tables, analytics integration, pipeline integration, milestone SOT blocker)
+
+### All code work items complete
+
+| # | Task | Status |
+|---|------|--------|
+| 7 | M2 SOT integration | Done |
+| 8 | Duplicate learning fix | Done |
+| 9 | Production dependency graph | Done |
+| 10 | Structure classification seed | Done |
+| 11 | YAML expression validation | Done |
+| 12 | Admin generation page | Done |
+| 13 | API cost guardrails | Done |
+| 14 | Chat answer → question promotion | Done |
+
+### Remaining (external blockers)
+
+| Task | Blocker |
+|------|---------|
+| Supabase migration | Need project access + connection string |
+| Vercel deployment | Blocked by Supabase |
+| VDS field milestone SOT | Need team to confirm M2/M2.5/M3 assignments |
+| End-to-end correction flow test | Need hosted instance |
 
 ---
 
