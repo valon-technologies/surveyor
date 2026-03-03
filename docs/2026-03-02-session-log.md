@@ -457,6 +457,109 @@ This can be done incrementally — start with the question view for SM, then add
 
 ---
 
+## 2026-03-03 Session Additions
+
+### Context Traceability (implemented)
+
+Full 6-phase implementation: citations, inline viewer, audit trail.
+
+1. **Persist context usage per generation** — `promptSnapshot.contextUsed` stores `{id, name, tokens}` for every context doc assembled. `mappingContext` junction table batch-populated after `saveMappingsAndQuestions()`.
+2. **AI review context tracking** — `ReviewResult.contextUsed` tracks Entity Knowledge + linked mapping contexts consulted during review.
+3. **Citation markers in prompts** — `[ref:ctx_ID]` tags on every context doc header in prompt-builder, chat-prompt-builder, and ai-review prompts. Citation instruction added to system prompts.
+4. **Parse citations in UI** — `CitationMarkdown` component splits text around `[ref:ctx_ID]` markers, renders as clickable `ContextLink` components with expandable inline preview.
+5. **Inline context panel** — `ContextUsedPanel` in discuss page below mapping summary. Shows all context docs grouped by type, expandable with content preview + link to context library.
+6. **Deep links** — `/context?id=X` auto-navigates context library tree, switches category if needed.
+
+Commit: `7362a97` — 16 files, +593 lines. Pushed.
+
+### Data Preview rename
+
+Atlas renamed to "Data Preview" in sidebar label and top bar. Internal route still `/atlas`. Icon changed from Globe to Database.
+
+### SUBSET cleanup (executed)
+
+Ran `scripts/delete-toxic-ek.ts` — deleted 7 toxic borrower learnings containing SUBSET corrections ("Expected sources: X, Y") that caused borrower to collapse from 41.7% → 0%. Auto-verdicts skip was already committed (`bb3e0cc`).
+
+### Analytics repo discovery
+
+Found production M2 mappings in `analytics/analytics/platform/sdt_mapping/m2_mappings/` — **202 M2 YAMLs** in the same format as M1. Currently Surveyor only evaluates against M1 ground truth. Importing M2 SOT would close the "no automated accuracy for M2" gap.
+
+Also found:
+- `sdt_mapping_config.yaml` — production dependency graph with exact parent-child relationships
+- `staging:` references in YAMLs definitively mark assembly vs flat entities
+- Expression patterns (`np.select`, `.map()`, `date_add()`) document what `to_vds_polars.py` supports — could tighten YAML validation
+
+### Planned improvements from analytics repo
+
+| # | Task | Effort | Impact |
+|---|------|--------|--------|
+| 1 | Import M2 SOT YAMLs into Surveyor evaluation | ~1 session | Enables automated accuracy measurement for 202 M2 fields (currently zero) |
+| 2 | Validate generated YAMLs against production expression patterns | ~half session | Reject expressions that would fail at runtime in to_vds_polars.py |
+| 3 | Import production dependency graph from sdt_mapping_config.yaml | ~1 hour | Replace/validate Surveyor's computed graph with production truth |
+| 4 | Seed structure classification from production staging references | ~1 hour | Definitively mark assembly vs flat from M2 YAMLs |
+
+### M2 SOT integration plan (designed, deferred)
+
+Full plan written at `.claude/plans/ancient-toasting-pond.md`. Approach: build a YAML SOT parser directly in `sot-loader.ts` that reads raw mapping YAMLs (no mapping-engine dependency). Key logic:
+- Build alias→table map from `sources:` section (pipe_file only, skip staging)
+- For identity: resolve `source: alias.Field` → `Table.Field`
+- For expression: regex extract `alias.Field` patterns, resolve against alias map, filter to known aliases only (excludes `np`, `pd`)
+- For hash_id/null/literal: skip
+- `loadSotForEntity()` checks eval JSON dir first (M1), then M2 YAML dir as fallback
+- `listAvailableSotEntities()` merges both dirs, deduplicated
+- Env var `SOT_M2_YAML_DIR` points to sdt_mapping/acdc_to_vds/m2_mappings
+- No changes needed to mapping-evaluator, source-matcher, evaluation UI, or DB schema
+
+Source paths confirmed:
+- M1 SOT: 196 YAMLs at `sdt_mapping/acdc_to_vds/m1_mappings/`
+- M2 SOT: 201 YAMLs at `sdt_mapping/acdc_to_vds/m2_mappings/`
+- Also available in analytics repo: `analytics/platform/sdt_mapping/m{1,2}_mappings/` (196 + 202)
+
+### End-to-end pipeline integration (SDT mapping + SDT tracing skills)
+
+The analytics repo has two Claude skills that together describe the full data pipeline: `sdt-mapping` (ACDC → VDS YAML transforms) and `sdt-tracing` (VDS intake → onboarding → cellar write). Surveyor covers the middle piece. Combining both opens four new capabilities:
+
+**1. Runtime validation via pre_cellar_vds (Phase 3+)**
+`raw_acdc_m1.pre_cellar_vds` in BigQuery contains the actual VDS intake output in EAV format (entity_type, entity_id, field_name, field_value). Surveyor could query this table and compare mapped values against actual output — not just "did we match the SOT spec" but "does the data actually arrive correctly." This is a stronger signal than SOT evaluation.
+
+**2. Onboarding coverage gaps (Phase 3)**
+The tracing skill documents that each VDS entity needs an onboarding task config in front-porch (`vds_*_onboarding_task_config.py`) to actually reach cellar. A mapped field with no task config is dead. Surveyor could surface: "this entity has 40 mapped fields but no onboarding config exists." Changes review priority — no point perfecting mappings for entities that can't onboard.
+
+**3. Discrepancy tracing (Phase 4+)**
+When a cellar value is wrong, trace each layer: ACDC source → pre_cellar_vds → cellar. If wrong in pre_cellar_vds, it's a mapping bug (Surveyor fixes this). If correct in pre_cellar_vds but wrong in cellar, it's an onboarding bug (front-porch). A "trace discrepancy" feature could take loan_number + field, query BigQuery at each layer, show where the value diverged.
+
+**4. Expression validation against production runtime (Phase 3)**
+`to_vds_polars.py` executes the YAML expressions. Surveyor could validate that generated expressions are actually runnable — not just syntactically valid YAML, but expressions the engine can execute. Check pre_cellar_vds output to verify correctness.
+
+Key BigQuery tables:
+- `raw_acdc_m1.{Table}` — raw ACDC source (Layer 1)
+- `raw_acdc_m1.pre_cellar_vds` — SDT mapping output in EAV format (Layer 2)
+- `raw_mysql_cellar.{table}` — final persisted state (Layer 3)
+- Idempotency tokens: `ACDC_*` (old converter) or `VDS_*` (current pipeline)
+
+front-porch paths:
+- Task configs: `front_porch/modules/{domain}/internals/vds_*_onboarding_task_config.py`
+- Domain services: `front_porch/modules/{domain}/**/*_service.py`
+- Task type enum: `front_porch/modules/data_dict/loan_onboarding_task_types.py`
+
+### SOT mapping viewer + IO config visibility (planned)
+
+Reviewers need to see the existing production SOT mapping for an entity alongside Surveyor's generated mapping — "what does production currently do for this field?" Currently SOT data is only used for accuracy scoring (a number), not displayed as a reference. Two needs:
+
+1. **SOT mapping viewer** — show the production YAML mapping for each field in the discuss page or a dedicated view. Source table, source field, transform expression, and any filters. Lets reviewers see what was already implemented and decide whether to match it or improve on it.
+
+2. **IO config visibility** — show whether a VDS entity has an onboarding task config in front-porch (from the sdt-tracing skill). Which fields from the mapping actually get consumed by the onboarding pipeline? Which are dead (mapped but never onboarded)? This changes review priority and helps the team focus on fields that matter for production.
+
+### Notion plan updated
+
+- Updated date, "What's Built" table (4 new rows), Phase 1 status
+- Added flowchart section (Mermaid diagrams matching feedback loop style)
+- Restructured roadmap into 5 phases (Deploy → Quality → Scale → Client → Multi-Source)
+- Added App Navigation Guide (all 10 sidebar items)
+- Added "How Reviewer Feedback Is Stored and Processed" with step-by-step DB examples
+
+---
+
 ## Git History Reference
 
 ### Surveyor — unpushed commits (12)

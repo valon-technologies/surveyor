@@ -20,6 +20,7 @@ import {
   Zap,
   Sun,
   Shield,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useQuestions } from "@/queries/question-queries";
 import { useTheme } from "./theme-provider";
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/context", label: "Context", icon: BookOpen },
   { href: "/skills", label: "Skills", icon: PenTool },
   { href: "/evaluation", label: "SOT Accuracy", icon: Target },
+  { href: "/sot-mappings", label: "SOT Mappings", icon: FileSpreadsheet },
   { href: "/topology", label: "Topology", icon: Waypoints },
   { href: "/atlas", label: "Data Preview", icon: Database },
   { href: "/admin", label: "Admin", icon: Shield },

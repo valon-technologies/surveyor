@@ -1,0 +1,212 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useSotMappingStore } from "@/stores/sot-mapping-store";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  ChevronDown,
+  ChevronRight,
+  PanelLeftClose,
+  Search,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface EntitySummary {
+  name: string;
+  milestone: "m1" | "m2";
+  fieldCount: number;
+  sourceCount: number;
+  structureType: "concat" | "join" | "simple";
+  hasOnboardingConfig: boolean;
+}
+
+interface SotEntityListPanelProps {
+  entities: EntitySummary[];
+  selectedEntity: string | null;
+  selectedMilestone: "m1" | "m2";
+  onSelect: (name: string, milestone: "m1" | "m2") => void;
+}
+
+const structureBadge: Record<
+  string,
+  { label: string; className: string }
+> = {
+  simple: { label: "simple", className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+  join: { label: "join", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+  concat: { label: "concat", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+};
+
+export function SotEntityListPanel({
+  entities,
+  selectedEntity,
+  selectedMilestone,
+  onSelect,
+}: SotEntityListPanelProps) {
+  const { searchQuery, setSearchQuery, toggleLeftPanel } =
+    useSotMappingStore();
+
+  const [m1Collapsed, setM1Collapsed] = useState(false);
+  const [m2Collapsed, setM2Collapsed] = useState(false);
+
+  const { m1Entities, m2Entities } = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    const filtered = q
+      ? entities.filter((e) => e.name.toLowerCase().includes(q))
+      : entities;
+
+    return {
+      m1Entities: filtered.filter((e) => e.milestone === "m1"),
+      m2Entities: filtered.filter((e) => e.milestone === "m2"),
+    };
+  }, [entities, searchQuery]);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Search */}
+      <div className="p-3 border-b">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search entities..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8 h-8 text-xs"
+          />
+        </div>
+      </div>
+
+      {/* Entity list */}
+      <div className="flex-1 overflow-y-auto p-1">
+        {/* M1 Section */}
+        <SectionHeader
+          label={`M1 Mappings (${m1Entities.length})`}
+          collapsed={m1Collapsed}
+          onToggle={() => setM1Collapsed(!m1Collapsed)}
+        />
+        {!m1Collapsed &&
+          m1Entities.map((entity) => (
+            <EntityRow
+              key={`m1-${entity.name}`}
+              entity={entity}
+              isSelected={
+                selectedEntity === entity.name &&
+                selectedMilestone === "m1"
+              }
+              onSelect={() => onSelect(entity.name, "m1")}
+            />
+          ))}
+
+        {/* M2 Section */}
+        <SectionHeader
+          label={`M2 Mappings (${m2Entities.length})`}
+          collapsed={m2Collapsed}
+          onToggle={() => setM2Collapsed(!m2Collapsed)}
+        />
+        {!m2Collapsed &&
+          m2Entities.map((entity) => (
+            <EntityRow
+              key={`m2-${entity.name}`}
+              entity={entity}
+              isSelected={
+                selectedEntity === entity.name &&
+                selectedMilestone === "m2"
+              }
+              onSelect={() => onSelect(entity.name, "m2")}
+            />
+          ))}
+      </div>
+
+      {/* Collapse button */}
+      <div className="border-t p-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleLeftPanel}
+          className="w-full text-xs text-muted-foreground"
+        >
+          <PanelLeftClose className="h-3.5 w-3.5 mr-1.5" />
+          Collapse
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({
+  label,
+  collapsed,
+  onToggle,
+}: {
+  label: string;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className="flex items-center gap-1.5 w-full px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+    >
+      {collapsed ? (
+        <ChevronRight className="h-3 w-3" />
+      ) : (
+        <ChevronDown className="h-3 w-3" />
+      )}
+      {label}
+    </button>
+  );
+}
+
+function EntityRow({
+  entity,
+  isSelected,
+  onSelect,
+}: {
+  entity: EntitySummary;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const badge = structureBadge[entity.structureType];
+
+  return (
+    <button
+      onClick={onSelect}
+      className={cn(
+        "flex items-center gap-2 w-full px-3 py-2 text-xs rounded-md transition-colors text-left",
+        isSelected
+          ? "bg-primary/10 text-primary font-medium"
+          : "hover:bg-muted text-foreground/80"
+      )}
+    >
+      {/* Onboarding indicator */}
+      {entity.hasOnboardingConfig && (
+        <span
+          className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0"
+          title="Has onboarding config"
+        />
+      )}
+
+      {/* Entity name */}
+      <span className="font-mono text-xs truncate flex-1">
+        {entity.name}
+      </span>
+
+      {/* Field count */}
+      <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+        {entity.fieldCount}
+      </span>
+
+      {/* Structure type badge */}
+      {badge && (
+        <span
+          className={cn(
+            "text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0",
+            badge.className
+          )}
+        >
+          {badge.label}
+        </span>
+      )}
+    </button>
+  );
+}

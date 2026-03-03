@@ -1,0 +1,970 @@
+{
+  "taskToEntities": {
+    "AUTO_PAY": [
+      "bank_account",
+      "loan",
+      "loan_payment_auto_pay_schedule"
+    ],
+    "TRANSFERRED_GLBA": [
+      "borrower",
+      "borrower_data_sharing_preference",
+      "borrower_to_loan",
+      "loan",
+      "loan_to_portfolio",
+      "portfolio"
+    ],
+    "BORROWERS": [
+      "address",
+      "borrower",
+      "borrower_active_service_period",
+      "borrower_cease_and_desist",
+      "borrower_credit_score",
+      "borrower_notification_preference",
+      "borrower_phone_number",
+      "borrower_to_loan",
+      "loan",
+      "loan_at_origination_info"
+    ],
+    "BANKRUPTCY_FILINGS": [
+      "bankruptcy_case",
+      "bankruptcy_case_filing",
+      "bankruptcy_case_loan_details",
+      "loan"
+    ],
+    "BANKRUPTCY_LOAN_DETAILS": [
+      "bankruptcy_case",
+      "bankruptcy_case_loan_details",
+      "loan"
+    ],
+    "BANKRUPTCY": [
+      "bankruptcy_case",
+      "bankruptcy_case_debtor",
+      "borrower",
+      "debtor_law_firm",
+      "loan"
+    ],
+    "COLLECTIONS_SUSPENSION": [
+      "collections_suspension"
+    ],
+    "LOSS_MITIGATION_DENIALS": [
+      "loss_mitigation_application",
+      "loss_mitigation_denial",
+      "loss_mitigation_hardship",
+      "loss_mitigation_plan_denial_reason"
+    ],
+    "LOSS_MITIGATION_PLANS": [
+      "loss_mitigation_application",
+      "loss_mitigation_forbearance",
+      "loss_mitigation_hardship",
+      "loss_mitigation_loan_modification",
+      "loss_mitigation_payment_deferral",
+      "loss_mitigation_plan",
+      "loss_mitigation_plan_denial_reason",
+      "loss_mitigation_plan_payment",
+      "loss_mitigation_repayment_plan"
+    ],
+    "BREACH_LETTERS": [
+      "breach_letter",
+      "notification"
+    ],
+    "PRE_FORECLOSURE_STATE_PROCESS": [
+      "address",
+      "loan_support_call",
+      "loan_to_property",
+      "notification",
+      "pre_foreclosure_state_process",
+      "pre_foreclosure_state_specific_call",
+      "pre_foreclosure_state_specific_letter",
+      "property",
+      "user"
+    ],
+    "PROMISE_TO_PAY": [
+      "promise_to_pay",
+      "promise_to_pay_onboarding_task_config"
+    ],
+    "QUALITY_RIGHT_PARTY_CONTACT_ATTEMPTS": [
+      "loan_support_call",
+      "loan_support_ticket",
+      "promise_to_pay",
+      "quality_right_party_contact_attempt",
+      "reason_for_delinquency",
+      "user"
+    ],
+    "SKIP_TRACING_PHONE_NUMBER": [
+      "borrower",
+      "skip_tracing_phone_number"
+    ],
+    "FORECLOSURE_BIDS": [
+      "foreclosure_bid",
+      "foreclosure_bid_onboarding_task_config"
+    ],
+    "FORECLOSURE_HOLDS": [
+      "foreclosure",
+      "foreclosure_hold",
+      "foreclosure_hold_onboarding_task_config"
+    ],
+    "FORECLOSURES": [
+      "foreclosure",
+      "foreclosure_onboarding_task_config"
+    ],
+    "FORECLOSURE_PAYOFFS": [
+      "foreclosure_payoff",
+      "foreclosure_payoff_onboarding_task_config"
+    ],
+    "FORECLOSURE_REINSTATEMENTS": [
+      "foreclosure_reinstatement",
+      "foreclosure_reinstatement_onboarding_task_config"
+    ],
+    "FORECLOSURE_SALES": [
+      "foreclosure",
+      "foreclosure_sale",
+      "foreclosure_onboarding_task_config",
+      "foreclosure_sale_onboarding_task_config",
+      "loan"
+    ],
+    "LITIGATION_CASES": [
+      "bankruptcy_case",
+      "foreclosure",
+      "litigation_case",
+      "loan"
+    ],
+    "REASON_FOR_DELINQUENCY": [
+      "reason_for_delinquency"
+    ],
+    "SINGLE_POINT_OF_CONTACT": [
+      "single_point_of_contact",
+      "user"
+    ],
+    "DOCUMENT_CUSTODIAN": [
+      "collateral_file_custodian",
+      "loan"
+    ],
+    "ESCROW_DISBURSEMENT_STOP": [
+      "escrow_disbursement_stop",
+      "loan"
+    ],
+    "ESCROW_ANALYSIS": [
+      "escrow_analysis",
+      "escrow_loan_info",
+      "escrow_analysis_onboarding_task_config"
+    ],
+    "ESCROW": [
+      "escrow_loan_info",
+      "escrow_schedule",
+      "loan",
+      "loan_payment_amortization_schedule",
+      "loan_tax_info",
+      "mortgage_insurance",
+      "property_insurance_coverage_type",
+      "property_insurance_period"
+    ],
+    "ESCROW_WAIVER": [
+      "escrow_waiver",
+      "loan",
+      "escrow_waiver_onboarding_task_config"
+    ],
+    "EXPENSES": [
+      "loan",
+      "loan_expense"
+    ],
+    "FANNIE_LOAN": [
+      "loan"
+    ],
+    "FNMA_POOL_INFO": [
+      "loan",
+      "mbs_pool"
+    ],
+    "GINNIE_POOL": [
+      "loan",
+      "loan_at_origination_info",
+      "mbs_pool"
+    ],
+    "INITIAL_GINNIE_POOL_VARIANCE": [
+      "initial_ginnie_pool_variance",
+      "mbs_pool"
+    ],
+    "INITIAL_FREDDIE_MAS_BALANCE": [
+      "initial_freddie_mas_balance",
+      "loan"
+    ],
+    "HELOC": [
+      "heloc_draw",
+      "heloc_loan_info",
+      "loan"
+    ],
+    "PROPERTY_INSURANCE": [
+      "address",
+      "loan",
+      "loss_draft_claim",
+      "property_insurance_company",
+      "property_insurance_coverage_type",
+      "property_insurance_installment",
+      "property_insurance_period",
+      "property_insurance_period_to_coverage_type",
+      "property_insurance_structure"
+    ],
+    "FLOOD_INFO": [
+      "flood_info",
+      "flood_info_onboarding_task_config"
+    ],
+    "MORTGAGE_INSURANCE": [
+      "address",
+      "loan",
+      "mortgage_insurance",
+      "mortgage_insurance_company",
+      "mortgage_insurance_installment"
+    ],
+    "INTEREST_RATE_BUYDOWN": [
+      "interest_rate_buydown_loan_info",
+      "loan",
+      "loan_accounting_balance",
+      "loan_at_origination_info",
+      "loan_payment_amortization_schedule",
+      "__o_n_b_o_a_r_d_i_n_g__c_o_n_f_i_g__s_n_a_p_s_h_o_t__v_a_l_i_d_a_t_i_o_n__r_u_l_e_s"
+    ],
+    "DEBTOR_LAW_FIRMS": [
+      "address",
+      "borrower",
+      "debtor_law_firm",
+      "debtor_law_firm_to_borrower"
+    ],
+    "SERVICER_ATTORNEYS": [
+      "servicer_attorney",
+      "servicer_law_firm"
+    ],
+    "SERVICER_LAW_FIRMS": [
+      "servicer_law_firm"
+    ],
+    "LOAN_ACCOUNTING": [
+      "arm_loan_info",
+      "arm_rate_period",
+      "interest_rate_buydown_loan_info",
+      "loan",
+      "loan_accounting_balance",
+      "loan_at_origination_info",
+      "loan_payment_amortization_schedule",
+      "loan_payment_interest_schedule",
+      "loan_payment_late_fee_schedule",
+      "recast"
+    ],
+    "LEDGER": [
+      "loan",
+      "loan_at_origination_info"
+    ],
+    "LOAN_TRANSFER_ACCOUNTING_STATE": [
+      "heloc_loan_info",
+      "loan",
+      "loan_accounting_balance",
+      "loan_payment_interest_schedule"
+    ],
+    "ONBOARD_FEES": [
+      "loan",
+      "loan_accounting_balance"
+    ],
+    "SERVICING_STRIP_RATE": [
+      "loan",
+      "loan_at_origination_info"
+    ],
+    "LOAN_COMMENTS": [
+      "loan_comment"
+    ],
+    "SERVICING_DISPUTE": [
+      "servicing_dispute",
+      "servicing_dispute_onboarding_task_config"
+    ],
+    "LOAN_PAYMENTS": [
+      "loan",
+      "loan_accounting_balance"
+    ],
+    "NON_BORROWERS": [
+      "address",
+      "loan",
+      "loan_to_property",
+      "non_borrower_loan_organization",
+      "non_borrower_loan_participant",
+      "non_borrower_loan_participant_role",
+      "property"
+    ],
+    "LOAN_BRAND": [
+      "loan"
+    ],
+    "LOAN": [
+      "address",
+      "loan",
+      "loan_accounting_balance",
+      "loan_at_origination_info",
+      "loan_payment_amortization_schedule",
+      "loan_to_portfolio",
+      "loan_to_property",
+      "mbs_pool",
+      "portfolio",
+      "property",
+      "property_occupancy_status",
+      "property_valuation",
+      "recast",
+      "servicer_company"
+    ],
+    "PROPERTY_MAINTENANCE_STATUS": [
+      "loan",
+      "property_maintenance_status",
+      "property_maintenance_status_onboarding_task_config"
+    ],
+    "PROPERTY_OCCUPANCY_STATUS": [
+      "loan",
+      "property_occupancy_status"
+    ],
+    "NOTIFICATIONS": [
+      "address",
+      "borrower",
+      "borrower_to_loan",
+      "loan",
+      "notification",
+      "notification_email_detail",
+      "notification_mail_detail",
+      "notification_sms_detail",
+      "notification_to_linked_entity",
+      "portfolio"
+    ],
+    "INTERACTION_HISTORY": [
+      "loan",
+      "loan_support_call",
+      "loan_support_chat",
+      "loan_support_email",
+      "loan_support_ticket_comment",
+      "user"
+    ],
+    "PROPERTY_INSPECTION": [
+      "loan",
+      "property_inspection",
+      "property_inspection_onboarding_task_config"
+    ],
+    "PROPERTY_PRESERVATION_CASE": [
+      "loan",
+      "property_preservation_case",
+      "property_preservation_case_onboarding_task_config"
+    ],
+    "PROPERTY_PRESERVATION_WORK_ORDER_ITEM": [
+      "loan",
+      "property_preservation_case",
+      "property_preservation_work_order",
+      "property_preservation_work_order_item",
+      "property_preservation_case_onboarding_task_config",
+      "property_preservation_work_order_item_onboarding_task_config",
+      "property_preservation_work_order_onboarding_task_config"
+    ],
+    "PROPERTY_PRESERVATION_WORK_ORDER": [
+      "loan",
+      "property_preservation_case",
+      "property_preservation_work_order",
+      "property_preservation_case_onboarding_task_config",
+      "property_preservation_work_order_onboarding_task_config"
+    ],
+    "PROPERTY_REGISTRATION": [
+      "loan",
+      "property_registration"
+    ],
+    "LOAN_TAX_INFO": [
+      "address",
+      "loan",
+      "loan_tax_info",
+      "loan_tax_installment",
+      "loan_tax_line",
+      "loan_tax_parcel",
+      "tax_authority",
+      "tax_option"
+    ],
+    "PROPERTY_VALUATION": [
+      "loan",
+      "property_valuation",
+      "property_valuation_onboarding_task_config"
+    ],
+    "PRE_SYSTEM_TRANSFER_TRANSACTIONS_INIT": [
+      "loan",
+      "loan_accounting_balance"
+    ],
+    "PRE_SYSTEM_TRANSFER_TRANSACTIONS": [
+      "loan"
+    ],
+    "BILLING_CONTRACT": [
+      "loan"
+    ],
+    "TASKS": [
+      "task",
+      "task_comment",
+      "user"
+    ]
+  },
+  "entityToTasks": {
+    "auto_pay_onboarding_task_config": [
+      "AUTO_PAY"
+    ],
+    "bank_account": [
+      "AUTO_PAY"
+    ],
+    "loan": [
+      "AUTO_PAY",
+      "TRANSFERRED_GLBA",
+      "BORROWERS",
+      "BANKRUPTCY_FILINGS",
+      "BANKRUPTCY_LOAN_DETAILS",
+      "BANKRUPTCY",
+      "PRE_FORECLOSURE_STATE_PROCESS",
+      "FORECLOSURE_HOLDS",
+      "FORECLOSURES",
+      "FORECLOSURE_SALES",
+      "LITIGATION_CASES",
+      "DOCUMENT_CUSTODIAN",
+      "ESCROW_DISBURSEMENT_STOP",
+      "ESCROW_ANALYSIS",
+      "ESCROW",
+      "ESCROW_WAIVER",
+      "EXPENSES",
+      "FANNIE_LOAN",
+      "FNMA_POOL_INFO",
+      "GINNIE_POOL",
+      "INITIAL_FREDDIE_MAS_BALANCE",
+      "HELOC",
+      "PROPERTY_INSURANCE",
+      "FLOOD_INFO",
+      "MORTGAGE_INSURANCE",
+      "INTEREST_RATE_BUYDOWN",
+      "LOAN_ACCOUNTING",
+      "LEDGER",
+      "LOAN_TRANSFER_ACCOUNTING_STATE",
+      "ONBOARD_FEES",
+      "SERVICING_STRIP_RATE",
+      "LOAN_PAYMENTS",
+      "NON_BORROWERS",
+      "LOAN_BRAND",
+      "LOAN",
+      "PROPERTY_MAINTENANCE_STATUS",
+      "PROPERTY_OCCUPANCY_STATUS",
+      "NOTIFICATIONS",
+      "INTERACTION_HISTORY",
+      "PROPERTY_INSPECTION",
+      "PROPERTY_PRESERVATION_CASE",
+      "PROPERTY_PRESERVATION_WORK_ORDER_ITEM",
+      "PROPERTY_PRESERVATION_WORK_ORDER",
+      "PROPERTY_REGISTRATION",
+      "LOAN_TAX_INFO",
+      "PROPERTY_VALUATION",
+      "PRE_SYSTEM_TRANSFER_TRANSACTIONS_INIT",
+      "PRE_SYSTEM_TRANSFER_TRANSACTIONS",
+      "BILLING_CONTRACT"
+    ],
+    "loan_accounting_balance": [
+      "AUTO_PAY",
+      "INTEREST_RATE_BUYDOWN",
+      "LOAN_ACCOUNTING",
+      "LOAN_TRANSFER_ACCOUNTING_STATE",
+      "ONBOARD_FEES",
+      "LOAN_PAYMENTS",
+      "LOAN",
+      "PRE_SYSTEM_TRANSFER_TRANSACTIONS_INIT"
+    ],
+    "loan_payment_auto_pay_schedule": [
+      "AUTO_PAY"
+    ],
+    "borrower": [
+      "TRANSFERRED_GLBA",
+      "BORROWERS",
+      "BANKRUPTCY",
+      "SKIP_TRACING_PHONE_NUMBER",
+      "DEBTOR_LAW_FIRMS",
+      "NOTIFICATIONS"
+    ],
+    "borrower_data_sharing_preference": [
+      "TRANSFERRED_GLBA"
+    ],
+    "borrower_to_loan": [
+      "TRANSFERRED_GLBA",
+      "BORROWERS",
+      "NOTIFICATIONS"
+    ],
+    "loan_to_portfolio": [
+      "TRANSFERRED_GLBA",
+      "LOAN"
+    ],
+    "portfolio": [
+      "TRANSFERRED_GLBA",
+      "LOAN",
+      "NOTIFICATIONS"
+    ],
+    "address": [
+      "BORROWERS",
+      "PRE_FORECLOSURE_STATE_PROCESS",
+      "PROPERTY_INSURANCE",
+      "MORTGAGE_INSURANCE",
+      "DEBTOR_LAW_FIRMS",
+      "NON_BORROWERS",
+      "LOAN",
+      "NOTIFICATIONS",
+      "LOAN_TAX_INFO"
+    ],
+    "borrower_active_service_period": [
+      "BORROWERS"
+    ],
+    "borrower_cease_and_desist": [
+      "BORROWERS"
+    ],
+    "borrower_credit_score": [
+      "BORROWERS"
+    ],
+    "borrower_notification_preference": [
+      "BORROWERS"
+    ],
+    "borrower_phone_number": [
+      "BORROWERS"
+    ],
+    "loan_at_origination_info": [
+      "BORROWERS",
+      "GINNIE_POOL",
+      "INTEREST_RATE_BUYDOWN",
+      "LOAN_ACCOUNTING",
+      "LEDGER",
+      "SERVICING_STRIP_RATE",
+      "LOAN"
+    ],
+    "bankruptcy_case": [
+      "BANKRUPTCY_FILINGS",
+      "BANKRUPTCY_LOAN_DETAILS",
+      "BANKRUPTCY",
+      "LITIGATION_CASES"
+    ],
+    "bankruptcy_case_filing": [
+      "BANKRUPTCY_FILINGS"
+    ],
+    "bankruptcy_case_loan_details": [
+      "BANKRUPTCY_FILINGS",
+      "BANKRUPTCY_LOAN_DETAILS"
+    ],
+    "bankruptcy_case_debtor": [
+      "BANKRUPTCY"
+    ],
+    "debtor_law_firm": [
+      "BANKRUPTCY",
+      "DEBTOR_LAW_FIRMS"
+    ],
+    "collections_suspension": [
+      "COLLECTIONS_SUSPENSION"
+    ],
+    "collections_suspension_onboarding_task_config": [
+      "COLLECTIONS_SUSPENSION"
+    ],
+    "loss_mitigation_application": [
+      "LOSS_MITIGATION_DENIALS",
+      "LOSS_MITIGATION_PLANS"
+    ],
+    "loss_mitigation_denial": [
+      "LOSS_MITIGATION_DENIALS"
+    ],
+    "loss_mitigation_hardship": [
+      "LOSS_MITIGATION_DENIALS",
+      "LOSS_MITIGATION_PLANS"
+    ],
+    "loss_mitigation_plan_denial_reason": [
+      "LOSS_MITIGATION_DENIALS",
+      "LOSS_MITIGATION_PLANS"
+    ],
+    "loss_mitigation_forbearance": [
+      "LOSS_MITIGATION_PLANS"
+    ],
+    "loss_mitigation_loan_modification": [
+      "LOSS_MITIGATION_PLANS"
+    ],
+    "loss_mitigation_payment_deferral": [
+      "LOSS_MITIGATION_PLANS"
+    ],
+    "loss_mitigation_plan": [
+      "LOSS_MITIGATION_PLANS"
+    ],
+    "loss_mitigation_plan_payment": [
+      "LOSS_MITIGATION_PLANS"
+    ],
+    "loss_mitigation_repayment_plan": [
+      "LOSS_MITIGATION_PLANS"
+    ],
+    "breach_letter": [
+      "BREACH_LETTERS"
+    ],
+    "breach_letter_onboarding_task_config": [
+      "BREACH_LETTERS"
+    ],
+    "notification": [
+      "BREACH_LETTERS",
+      "PRE_FORECLOSURE_STATE_PROCESS",
+      "NOTIFICATIONS"
+    ],
+    "loan_support_call": [
+      "PRE_FORECLOSURE_STATE_PROCESS",
+      "QUALITY_RIGHT_PARTY_CONTACT_ATTEMPTS",
+      "INTERACTION_HISTORY"
+    ],
+    "loan_to_property": [
+      "PRE_FORECLOSURE_STATE_PROCESS",
+      "NON_BORROWERS",
+      "LOAN"
+    ],
+    "pre_foreclosure_state_process": [
+      "PRE_FORECLOSURE_STATE_PROCESS"
+    ],
+    "pre_foreclosure_state_specific_call": [
+      "PRE_FORECLOSURE_STATE_PROCESS"
+    ],
+    "pre_foreclosure_state_specific_letter": [
+      "PRE_FORECLOSURE_STATE_PROCESS"
+    ],
+    "property": [
+      "PRE_FORECLOSURE_STATE_PROCESS",
+      "NON_BORROWERS",
+      "LOAN"
+    ],
+    "pre_foreclosure_state_process_onboarding_task_config": [
+      "PRE_FORECLOSURE_STATE_PROCESS"
+    ],
+    "user": [
+      "PRE_FORECLOSURE_STATE_PROCESS",
+      "QUALITY_RIGHT_PARTY_CONTACT_ATTEMPTS",
+      "SINGLE_POINT_OF_CONTACT",
+      "PROPERTY_MAINTENANCE_STATUS",
+      "INTERACTION_HISTORY",
+      "TASKS"
+    ],
+    "promise_to_pay": [
+      "PROMISE_TO_PAY",
+      "QUALITY_RIGHT_PARTY_CONTACT_ATTEMPTS"
+    ],
+    "promise_to_pay_onboarding_task_config": [
+      "PROMISE_TO_PAY"
+    ],
+    "loan_support_ticket": [
+      "QUALITY_RIGHT_PARTY_CONTACT_ATTEMPTS"
+    ],
+    "quality_right_party_contact_attempt": [
+      "QUALITY_RIGHT_PARTY_CONTACT_ATTEMPTS"
+    ],
+    "reason_for_delinquency": [
+      "QUALITY_RIGHT_PARTY_CONTACT_ATTEMPTS",
+      "REASON_FOR_DELINQUENCY"
+    ],
+    "quality_right_party_contact_attempt_onboarding_task_config": [
+      "QUALITY_RIGHT_PARTY_CONTACT_ATTEMPTS"
+    ],
+    "skip_tracing_phone_number": [
+      "SKIP_TRACING_PHONE_NUMBER"
+    ],
+    "skip_tracing_phone_number_onboarding_task_config": [
+      "SKIP_TRACING_PHONE_NUMBER"
+    ],
+    "foreclosure_bid": [
+      "FORECLOSURE_BIDS"
+    ],
+    "foreclosure": [
+      "FORECLOSURE_HOLDS",
+      "FORECLOSURES",
+      "FORECLOSURE_SALES",
+      "LITIGATION_CASES"
+    ],
+    "foreclosure_hold": [
+      "FORECLOSURE_HOLDS"
+    ],
+    "foreclosure_payoff": [
+      "FORECLOSURE_PAYOFFS"
+    ],
+    "foreclosure_reinstatement": [
+      "FORECLOSURE_REINSTATEMENTS"
+    ],
+    "foreclosure_sale": [
+      "FORECLOSURE_SALES"
+    ],
+    "foreclosure_bid_onboarding_task_config": [
+      "FORECLOSURE_BIDS"
+    ],
+    "foreclosure_hold_onboarding_task_config": [
+      "FORECLOSURE_HOLDS"
+    ],
+    "foreclosure_onboarding_task_config": [
+      "FORECLOSURES",
+      "FORECLOSURE_SALES"
+    ],
+    "foreclosure_payoff_onboarding_task_config": [
+      "FORECLOSURE_PAYOFFS"
+    ],
+    "foreclosure_reinstatement_onboarding_task_config": [
+      "FORECLOSURE_REINSTATEMENTS"
+    ],
+    "foreclosure_sale_onboarding_task_config": [
+      "FORECLOSURE_SALES"
+    ],
+    "litigation_case": [
+      "LITIGATION_CASES"
+    ],
+    "reason_for_delinquency_onboarding_task_config": [
+      "REASON_FOR_DELINQUENCY"
+    ],
+    "single_point_of_contact": [
+      "SINGLE_POINT_OF_CONTACT"
+    ],
+    "single_point_of_contact_onboarding_task_config": [
+      "SINGLE_POINT_OF_CONTACT"
+    ],
+    "collateral_file_custodian": [
+      "DOCUMENT_CUSTODIAN"
+    ],
+    "escrow_disbursement_stop": [
+      "ESCROW_DISBURSEMENT_STOP"
+    ],
+    "escrow_disbursement_stop_onboarding_task_config": [
+      "ESCROW_DISBURSEMENT_STOP"
+    ],
+    "escrow_analysis": [
+      "ESCROW_ANALYSIS"
+    ],
+    "escrow_loan_info": [
+      "ESCROW_ANALYSIS",
+      "ESCROW"
+    ],
+    "escrow_analysis_onboarding_task_config": [
+      "ESCROW_ANALYSIS"
+    ],
+    "escrow_schedule": [
+      "ESCROW"
+    ],
+    "loan_payment_amortization_schedule": [
+      "ESCROW",
+      "INTEREST_RATE_BUYDOWN",
+      "LOAN_ACCOUNTING",
+      "LOAN"
+    ],
+    "loan_tax_info": [
+      "ESCROW",
+      "LOAN_TAX_INFO"
+    ],
+    "mortgage_insurance": [
+      "ESCROW",
+      "MORTGAGE_INSURANCE"
+    ],
+    "property_insurance_coverage_type": [
+      "ESCROW",
+      "PROPERTY_INSURANCE"
+    ],
+    "property_insurance_period": [
+      "ESCROW",
+      "PROPERTY_INSURANCE"
+    ],
+    "escrow_waiver": [
+      "ESCROW_WAIVER"
+    ],
+    "escrow_waiver_onboarding_task_config": [
+      "ESCROW_WAIVER"
+    ],
+    "loan_expense": [
+      "EXPENSES"
+    ],
+    "mbs_pool": [
+      "FNMA_POOL_INFO",
+      "GINNIE_POOL",
+      "INITIAL_GINNIE_POOL_VARIANCE",
+      "LOAN"
+    ],
+    "initial_ginnie_pool_variance": [
+      "INITIAL_GINNIE_POOL_VARIANCE"
+    ],
+    "initial_freddie_mas_balance": [
+      "INITIAL_FREDDIE_MAS_BALANCE"
+    ],
+    "heloc_draw": [
+      "HELOC"
+    ],
+    "heloc_loan_info": [
+      "HELOC",
+      "LOAN_TRANSFER_ACCOUNTING_STATE"
+    ],
+    "loss_draft_claim": [
+      "PROPERTY_INSURANCE"
+    ],
+    "property_insurance_installment": [
+      "PROPERTY_INSURANCE"
+    ],
+    "property_insurance_period_to_coverage_type": [
+      "PROPERTY_INSURANCE"
+    ],
+    "property_insurance_structure": [
+      "PROPERTY_INSURANCE"
+    ],
+    "property_insurance_onboarding_task_config": [
+      "PROPERTY_INSURANCE"
+    ],
+    "property_insurance_company": [
+      "PROPERTY_INSURANCE"
+    ],
+    "flood_info": [
+      "FLOOD_INFO"
+    ],
+    "flood_info_onboarding_task_config": [
+      "FLOOD_INFO"
+    ],
+    "mortgage_insurance_company": [
+      "MORTGAGE_INSURANCE"
+    ],
+    "mortgage_insurance_installment": [
+      "MORTGAGE_INSURANCE"
+    ],
+    "mortgage_insurance_onboarding_task_config": [
+      "MORTGAGE_INSURANCE"
+    ],
+    "interest_rate_buydown_loan_info": [
+      "INTEREST_RATE_BUYDOWN",
+      "LOAN_ACCOUNTING"
+    ],
+    "__o_n_b_o_a_r_d_i_n_g__c_o_n_f_i_g__s_n_a_p_s_h_o_t__v_a_l_i_d_a_t_i_o_n__r_u_l_e_s": [
+      "INTEREST_RATE_BUYDOWN"
+    ],
+    "debtor_law_firm_to_borrower": [
+      "DEBTOR_LAW_FIRMS"
+    ],
+    "servicer_attorney": [
+      "SERVICER_ATTORNEYS"
+    ],
+    "servicer_law_firm": [
+      "SERVICER_ATTORNEYS",
+      "SERVICER_LAW_FIRMS"
+    ],
+    "arm_loan_info": [
+      "LOAN_ACCOUNTING"
+    ],
+    "arm_rate_period": [
+      "LOAN_ACCOUNTING"
+    ],
+    "loan_payment_interest_schedule": [
+      "LOAN_ACCOUNTING",
+      "LOAN_TRANSFER_ACCOUNTING_STATE"
+    ],
+    "loan_payment_late_fee_schedule": [
+      "LOAN_ACCOUNTING"
+    ],
+    "recast": [
+      "LOAN_ACCOUNTING",
+      "LOAN"
+    ],
+    "loan_comment": [
+      "LOAN_COMMENTS"
+    ],
+    "servicing_dispute": [
+      "SERVICING_DISPUTE"
+    ],
+    "servicing_dispute_onboarding_task_config": [
+      "SERVICING_DISPUTE"
+    ],
+    "non_borrower_loan_organization": [
+      "NON_BORROWERS"
+    ],
+    "non_borrower_loan_participant": [
+      "NON_BORROWERS"
+    ],
+    "non_borrower_loan_participant_role": [
+      "NON_BORROWERS"
+    ],
+    "loan_brand_onboarding_task_config": [
+      "LOAN_BRAND"
+    ],
+    "property_occupancy_status": [
+      "LOAN",
+      "PROPERTY_OCCUPANCY_STATUS"
+    ],
+    "property_valuation": [
+      "LOAN",
+      "PROPERTY_VALUATION"
+    ],
+    "servicer_company": [
+      "LOAN"
+    ],
+    "property_maintenance_status": [
+      "PROPERTY_MAINTENANCE_STATUS"
+    ],
+    "property_maintenance_status_onboarding_task_config": [
+      "PROPERTY_MAINTENANCE_STATUS"
+    ],
+    "notification_email_detail": [
+      "NOTIFICATIONS"
+    ],
+    "notification_mail_detail": [
+      "NOTIFICATIONS"
+    ],
+    "notification_sms_detail": [
+      "NOTIFICATIONS"
+    ],
+    "notification_to_linked_entity": [
+      "NOTIFICATIONS"
+    ],
+    "loan_support_chat": [
+      "INTERACTION_HISTORY"
+    ],
+    "loan_support_email": [
+      "INTERACTION_HISTORY"
+    ],
+    "loan_support_ticket_comment": [
+      "INTERACTION_HISTORY"
+    ],
+    "property_inspection": [
+      "PROPERTY_INSPECTION"
+    ],
+    "property_inspection_onboarding_task_config": [
+      "PROPERTY_INSPECTION"
+    ],
+    "property_preservation_case": [
+      "PROPERTY_PRESERVATION_CASE",
+      "PROPERTY_PRESERVATION_WORK_ORDER_ITEM",
+      "PROPERTY_PRESERVATION_WORK_ORDER"
+    ],
+    "property_preservation_work_order": [
+      "PROPERTY_PRESERVATION_WORK_ORDER_ITEM",
+      "PROPERTY_PRESERVATION_WORK_ORDER"
+    ],
+    "property_preservation_work_order_item": [
+      "PROPERTY_PRESERVATION_WORK_ORDER_ITEM"
+    ],
+    "property_preservation_case_onboarding_task_config": [
+      "PROPERTY_PRESERVATION_CASE",
+      "PROPERTY_PRESERVATION_WORK_ORDER_ITEM",
+      "PROPERTY_PRESERVATION_WORK_ORDER"
+    ],
+    "property_preservation_work_order_item_onboarding_task_config": [
+      "PROPERTY_PRESERVATION_WORK_ORDER_ITEM"
+    ],
+    "property_preservation_work_order_onboarding_task_config": [
+      "PROPERTY_PRESERVATION_WORK_ORDER_ITEM",
+      "PROPERTY_PRESERVATION_WORK_ORDER"
+    ],
+    "property_registration": [
+      "PROPERTY_REGISTRATION"
+    ],
+    "loan_tax_installment": [
+      "LOAN_TAX_INFO"
+    ],
+    "loan_tax_parcel": [
+      "LOAN_TAX_INFO"
+    ],
+    "tax_authority": [
+      "LOAN_TAX_INFO"
+    ],
+    "loan_tax_info_onboarding_task_config": [
+      "LOAN_TAX_INFO"
+    ],
+    "loan_tax_line": [
+      "LOAN_TAX_INFO"
+    ],
+    "tax_option": [
+      "LOAN_TAX_INFO"
+    ],
+    "property_valuation_onboarding_task_config": [
+      "PROPERTY_VALUATION"
+    ],
+    "task": [
+      "TASKS"
+    ],
+    "task_comment": [
+      "TASKS"
+    ]
+  }
+}
