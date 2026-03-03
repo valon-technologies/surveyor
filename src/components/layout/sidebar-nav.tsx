@@ -44,7 +44,15 @@ const navItems: NavItem[] = [
       { href: "/docs", label: "Review Guide" },
     ],
   },
-  { href: "/context", label: "Context", icon: BookOpen },
+  {
+    href: "/context",
+    label: "Context",
+    icon: BookOpen,
+    children: [
+      { href: "/context", label: "Library" },
+      { href: "/context?tab=skills", label: "Skills" },
+    ],
+  },
   {
     href: "/data",
     label: "Data",
