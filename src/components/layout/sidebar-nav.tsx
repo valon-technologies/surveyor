@@ -28,7 +28,7 @@ const navItems = [
   { href: "/docs", label: "Review Guide", icon: BookOpenCheck },
   { href: "/", label: "Progress Summary", icon: LayoutDashboard },
   { href: "/mapping", label: "Mapping", icon: Map },
-  { href: "/mapping/questions", label: "Questions", icon: HelpCircle, badge: true },
+  { href: "/mapping/questions", label: "Questions from Mapping", icon: HelpCircle, badge: true },
   { href: "/context", label: "Context", icon: BookOpen },
   { href: "/data", label: "Data", icon: Database },
   { href: "/ground-truth", label: "Verified Mappings", icon: Scale },
