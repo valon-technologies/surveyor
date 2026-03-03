@@ -542,6 +542,17 @@ front-porch paths:
 - Domain services: `front_porch/modules/{domain}/**/*_service.py`
 - Task type enum: `front_porch/modules/data_dict/loan_onboarding_task_types.py`
 
+### VDS field milestone source of truth (blocker for accurate dashboard)
+
+The dashboard shows milestone progress bars (M1/M2/M3/M4) but the underlying field→milestone assignments are unreliable. Specific issues:
+
+1. **M2.5 doesn't exist as a clean category** — some fields tagged "M2 - SDT" in the VDS schema spreadsheet were originally M2.5, which was later folded into M2. It's unclear which fields are "real M2" vs "M2.5 folded in."
+2. **M3 field list not confirmed** — `inputs/m3_input.xlsx` in mapping-engine has 137 fields, but this may be stale. Need a definitive source.
+3. **No single canonical field→milestone mapping** — the `field.milestone` column in Surveyor's DB was populated from the VDS schema CSV during import, but that CSV's milestone column has inconsistencies (some fields tagged "M1 - SDT", others just "M1", some blank).
+4. **Dashboard numbers depend on this** — the milestone progress bars, entity progress table, and coverage stats all filter by `field.milestone`. Garbage in, garbage out.
+
+Need: a definitive, human-reviewed field→milestone mapping that we can import into Surveyor. Could be a curated spreadsheet, a canonical CSV in the repo, or pulled from Linear (where the SDT team tracks field status). Until this exists, milestone-level dashboard numbers should be treated as approximate.
+
 ### SOT mapping viewer + IO config visibility (planned)
 
 Reviewers need to see the existing production SOT mapping for an entity alongside Surveyor's generated mapping — "what does production currently do for this field?" Currently SOT data is only used for accuracy scoring (a number), not displayed as a reference. Two needs:

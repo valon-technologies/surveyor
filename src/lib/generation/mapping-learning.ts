@@ -126,6 +126,22 @@ export function extractMappingLearning(
   const content = `For ${fieldLabel}: ${parts.join(" ")}`;
 
   try {
+    // Dedup: skip if an identical learning already exists for this entity+field+content
+    const existingLearning = db
+      .select({ id: learning.id })
+      .from(learning)
+      .where(
+        and(
+          eq(learning.workspaceId, ctx.workspaceId),
+          eq(learning.entityId, targetField.entityId),
+          eq(learning.fieldName, targetField.name),
+          eq(learning.content, content),
+        )
+      )
+      .get();
+
+    if (existingLearning) return;
+
     db.insert(learning)
       .values({
         workspaceId: ctx.workspaceId,
@@ -331,6 +347,24 @@ export function extractVerdictLearning(
   if (learningValues.length === 0) return;
 
   for (const lv of learningValues) {
+    // Dedup: skip if an identical learning already exists for this entity+field+content
+    const existing = db
+      .select({ id: learning.id })
+      .from(learning)
+      .where(
+        and(
+          eq(learning.workspaceId, workspaceId),
+          eq(learning.entityId, targetInfo.entityId),
+          eq(learning.fieldName, lv.fieldName),
+          eq(learning.content, lv.content),
+        )
+      )
+      .get();
+
+    if (existing) {
+      continue;
+    }
+
     const learningId = crypto.randomUUID();
     db.insert(learning).values({
       id: learningId,

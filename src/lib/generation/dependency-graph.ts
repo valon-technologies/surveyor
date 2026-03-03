@@ -3,13 +3,24 @@
  * topological order so that FK constraints from parent entities are
  * available when mapping child entities.
  *
- * Scans target fields for *_id suffix patterns and parentEntityId
- * relationships to build a DAG, then topological-sorts it.
+ * Two strategies (tried in order):
+ * 1. **Production dependencies** — loaded from production-dependencies.json,
+ *    imported from the analytics repo's sdt_mapping_config.yaml via
+ *    `npx tsx scripts/import-dependency-graph.ts`. This is the authoritative
+ *    source used in production Airflow DAGs.
+ * 2. **Heuristic fallback** — scans target fields for *_id suffix patterns
+ *    and parentEntityId relationships.
+ *
+ * Strategy 1 is preferred. Strategy 2 kicks in for entities not covered by
+ * the production config, or when the JSON file doesn't exist.
  */
 
 import { db } from "@/lib/db";
 import { entity, field } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { readFileSync, existsSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 
 export interface EntityDependency {
   entityId: string;
@@ -21,10 +32,55 @@ export interface DependencyGraph {
   entities: EntityDependency[];
   sorted: string[]; // entity IDs in topological order (roots first)
   cycles: string[][]; // any detected cycles (should be empty)
+  source: "production" | "heuristic" | "mixed"; // which strategy was used
+}
+
+interface ProductionDependencies {
+  version: number;
+  source: string;
+  importedAt: string;
+  entityCount: number;
+  dependencies: Record<string, string[]>;
 }
 
 /**
- * Build a dependency graph from target field FK patterns and entity relationships.
+ * Try to load production-dependencies.json from the same directory as this file.
+ * Returns null if the file doesn't exist or is malformed.
+ */
+function loadProductionDependencies(): ProductionDependencies | null {
+  try {
+    // Try multiple resolution strategies for the JSON file
+    const candidates: string[] = [];
+
+    // Strategy 1: relative to this file (works in dev with tsx/ts-node)
+    try {
+      const thisDir = dirname(fileURLToPath(import.meta.url));
+      candidates.push(resolve(thisDir, "production-dependencies.json"));
+    } catch {
+      // import.meta.url may not resolve in all environments
+    }
+
+    // Strategy 2: relative to cwd (common in Next.js)
+    candidates.push(resolve(process.cwd(), "src/lib/generation/production-dependencies.json"));
+
+    for (const candidate of candidates) {
+      if (existsSync(candidate)) {
+        const raw = readFileSync(candidate, "utf-8");
+        const parsed = JSON.parse(raw) as ProductionDependencies;
+        if (parsed?.dependencies && typeof parsed.dependencies === "object") {
+          return parsed;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[dep-graph] Failed to load production dependencies:", err);
+  }
+  return null;
+}
+
+/**
+ * Build a dependency graph. Prefers production dependencies from
+ * sdt_mapping_config.yaml when available, falls back to heuristic.
  */
 export function buildDependencyGraph(workspaceId: string): DependencyGraph {
   // Load all target entities
@@ -41,21 +97,41 @@ export function buildDependencyGraph(workspaceId: string): DependencyGraph {
     entityIdToName.set(e.id, e.name);
   }
 
-  // Build dependency set for each entity
+  // Build dependency set for each entity (keyed by entity ID)
   const deps = new Map<string, Set<string>>();
   for (const e of targetEntities) {
     deps.set(e.id, new Set());
   }
 
-  // Strategy 1: parentEntityId relationships
-  for (const e of targetEntities) {
-    if (e.parentEntityId && deps.has(e.parentEntityId)) {
-      deps.get(e.id)!.add(e.parentEntityId);
+  // ── Strategy 1: Production dependencies ───────────────────
+  const prodDeps = loadProductionDependencies();
+  const coveredByProd = new Set<string>(); // entity IDs covered by production config
+
+  if (prodDeps) {
+    for (const e of targetEntities) {
+      const prodEntry = prodDeps.dependencies[e.name];
+      if (prodEntry) {
+        coveredByProd.add(e.id);
+        for (const depName of prodEntry) {
+          const depId = entityNameToId.get(depName);
+          if (depId && depId !== e.id) {
+            deps.get(e.id)!.add(depId);
+          }
+        }
+      }
     }
   }
 
-  // Strategy 2: Scan target fields for *_id patterns that reference other entities
-  for (const e of targetEntities) {
+  // ── Strategy 2: Heuristic fallback for uncovered entities ─
+  const uncoveredEntities = targetEntities.filter((e) => !coveredByProd.has(e.id));
+
+  for (const e of uncoveredEntities) {
+    // parentEntityId relationships
+    if (e.parentEntityId && deps.has(e.parentEntityId)) {
+      deps.get(e.id)!.add(e.parentEntityId);
+    }
+
+    // Scan target fields for *_id patterns
     const fields = db
       .select()
       .from(field)
@@ -63,18 +139,32 @@ export function buildDependencyGraph(workspaceId: string): DependencyGraph {
       .all();
 
     for (const f of fields) {
-      // Match patterns like "loan_id", "borrower_id", "property_id"
       const match = f.name.match(/^(.+)_id$/);
       if (!match) continue;
 
-      const refEntityName = match[1]; // e.g., "loan", "borrower"
+      const refEntityName = match[1];
       const refEntityId = entityNameToId.get(refEntityName);
 
-      // Only add dependency if the referenced entity exists and isn't self
       if (refEntityId && refEntityId !== e.id) {
         deps.get(e.id)!.add(refEntityId);
       }
     }
+  }
+
+  // Determine source label
+  let source: DependencyGraph["source"];
+  if (!prodDeps || coveredByProd.size === 0) {
+    source = "heuristic";
+  } else if (uncoveredEntities.length === 0) {
+    source = "production";
+  } else {
+    source = "mixed";
+  }
+
+  if (prodDeps) {
+    console.log(
+      `[dep-graph] Production deps loaded (${coveredByProd.size}/${targetEntities.length} entities covered, source: ${source})`,
+    );
   }
 
   // Build EntityDependency list
@@ -87,7 +177,7 @@ export function buildDependencyGraph(workspaceId: string): DependencyGraph {
   // Topological sort (Kahn's algorithm)
   const { sorted, cycles } = topologicalSort(deps, entityIdToName);
 
-  return { entities, sorted, cycles };
+  return { entities, sorted, cycles, source };
 }
 
 /**

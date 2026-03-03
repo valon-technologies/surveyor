@@ -1,0 +1,867 @@
+{
+  "version": 1,
+  "source": "analytics/airflow/dags/sdt_mapping_config.yaml",
+  "importedAt": "2026-03-03T20:54:34.406Z",
+  "entityCount": 212,
+  "dependencies": {
+    "address": [
+      "address_billing",
+      "address_comrtgr",
+      "address_investor",
+      "address_lbro",
+      "address_mi",
+      "address_nb",
+      "address_nb_org",
+      "address_pi",
+      "address_property",
+      "address_sc",
+      "address_sii",
+      "address_sm",
+      "address_taxauth"
+    ],
+    "address_billing": [
+      "loan"
+    ],
+    "address_comrtgr": [
+      "loan"
+    ],
+    "address_investor": [
+      "loan"
+    ],
+    "address_lbro": [
+      "loan"
+    ],
+    "address_mi": [
+      "loan"
+    ],
+    "address_nb": [
+      "loan"
+    ],
+    "address_nb_org": [
+      "loan"
+    ],
+    "address_pi": [
+      "loan"
+    ],
+    "address_property": [
+      "loan"
+    ],
+    "address_sc": [
+      "loan1"
+    ],
+    "address_sii": [
+      "loan"
+    ],
+    "address_sm": [
+      "loan"
+    ],
+    "address_taxauth": [
+      "loan"
+    ],
+    "arm_loan_info": [
+      "loan"
+    ],
+    "arm_rate_period": [
+      "arm_loan_info",
+      "loan",
+      "loan_payment_interest_schedule"
+    ],
+    "bank_account": [
+      "loan"
+    ],
+    "bankruptcy_case": [
+      "loan",
+      "servicer_attorney_bank"
+    ],
+    "bankruptcy_case_debtor": [
+      "bankruptcy_case",
+      "borrower_to_loan",
+      "debtor_attorney",
+      "loan"
+    ],
+    "bankruptcy_case_filing": [
+      "bankruptcy_case",
+      "debtor_attorney",
+      "loan",
+      "servicer_attorney_bank"
+    ],
+    "bankruptcy_case_loan_details": [
+      "bankruptcy_case",
+      "debtor_attorney",
+      "escrow_analysis",
+      "loan",
+      "property",
+      "servicer_attorney_bank"
+    ],
+    "borrower": [
+      "borrower_comrtgr",
+      "borrower_primary",
+      "borrower_sii"
+    ],
+    "borrower_active_service_period": [
+      "address_property",
+      "borrower_active_service_period_1",
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_active_service_period_1": [],
+    "borrower_cease_and_desist": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_comrtgr": [
+      "address_billing",
+      "address_comrtgr",
+      "loan"
+    ],
+    "borrower_credit_score": [
+      "borrower_credit_score_borr_latest",
+      "borrower_credit_score_borr_original",
+      "borrower_credit_score_borr_prev",
+      "borrower_credit_score_coborr_latest",
+      "borrower_credit_score_coborr_original",
+      "borrower_credit_score_coborr_prev"
+    ],
+    "borrower_credit_score_borr_latest": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_credit_score_borr_original": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_credit_score_borr_prev": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_credit_score_coborr_latest": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_credit_score_coborr_original": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_credit_score_coborr_prev": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_data_sharing_preference": [
+      "borrower_to_loan",
+      "loan",
+      "servicing_client"
+    ],
+    "borrower_deceased": [
+      "loan"
+    ],
+    "borrower_notification_preference": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_phone_number": [
+      "borrower_phone_number_comrtgr",
+      "borrower_phone_number_primary",
+      "borrower_phone_number_secondary",
+      "borrower_phone_number_thirdparty"
+    ],
+    "borrower_phone_number_comrtgr": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_phone_number_primary": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_phone_number_secondary": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_phone_number_thirdparty": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "borrower_primary": [
+      "address_billing",
+      "loan"
+    ],
+    "borrower_sii": [
+      "address_sii",
+      "loan"
+    ],
+    "borrower_to_loan": [
+      "borrower_to_loan_comrtgr",
+      "borrower_to_loan_primary",
+      "borrower_to_loan_sii"
+    ],
+    "borrower_to_loan_assumption": [
+      "borrower_to_loan",
+      "loan",
+      "loan_assumption"
+    ],
+    "borrower_to_loan_comrtgr": [
+      "borrower_comrtgr"
+    ],
+    "borrower_to_loan_primary": [
+      "borrower_primary"
+    ],
+    "borrower_to_loan_sii": [
+      "borrower_sii",
+      "loan"
+    ],
+    "breach_letter": [
+      "address_property",
+      "notification_1"
+    ],
+    "collateral_file_custodian": [
+      "loan"
+    ],
+    "collections_suspension": [
+      "loan"
+    ],
+    "debtor_attorney": [
+      "loan"
+    ],
+    "escrow_analysis": [
+      "loan"
+    ],
+    "escrow_disbursement_stop": [
+      "escrow_disbursement_stop_pi",
+      "escrow_disbursement_stop_pmi",
+      "escrow_disbursement_stop_tax"
+    ],
+    "escrow_disbursement_stop_pi": [
+      "loan",
+      "property_insurance_coverage_type"
+    ],
+    "escrow_disbursement_stop_pmi": [
+      "loan",
+      "mortgage_insurance"
+    ],
+    "escrow_disbursement_stop_tax": [
+      "loan",
+      "loan_tax_info"
+    ],
+    "escrow_loan_info": [
+      "loan"
+    ],
+    "escrow_schedule": [
+      "escrow_loan_info",
+      "loan"
+    ],
+    "escrow_waiver": [
+      "loan"
+    ],
+    "flood_info": [
+      "loan"
+    ],
+    "foreclosure": [
+      "debtor_attorney",
+      "loan",
+      "property",
+      "property_valuation",
+      "servicer_attorney_fore"
+    ],
+    "foreclosure_bid": [
+      "foreclosure",
+      "foreclosure_sale",
+      "loan"
+    ],
+    "foreclosure_hold": [
+      "foreclosure",
+      "loan"
+    ],
+    "foreclosure_payoff": [
+      "foreclosure"
+    ],
+    "foreclosure_reinstatement": [
+      "foreclosure"
+    ],
+    "foreclosure_sale": [
+      "foreclosure",
+      "loan"
+    ],
+    "initial_freddie_mas_balance": [
+      "loan",
+      "portfolio"
+    ],
+    "interest_rate_buydown_loan_info": [
+      "interest_rate_buydown_loan_info_curr",
+      "interest_rate_buydown_loan_info_hist"
+    ],
+    "interest_rate_buydown_loan_info_curr": [
+      "loan"
+    ],
+    "interest_rate_buydown_loan_info_hist": [
+      "loan"
+    ],
+    "litigation_case": [
+      "litigation_case_bk",
+      "litigation_case_fc"
+    ],
+    "litigation_case_bk": [
+      "bankruptcy_case",
+      "loan"
+    ],
+    "litigation_case_fc": [
+      "foreclosure",
+      "loan"
+    ],
+    "loan": [
+      "loan1",
+      "mbs_pool",
+      "servicer_company"
+    ],
+    "loan1": [],
+    "loan_accounting_balance": [
+      "loan_accounting_balance_li",
+      "loan_accounting_balance_ts"
+    ],
+    "loan_accounting_balance_li": [
+      "loan",
+      "loan_accounting_balance_ts"
+    ],
+    "loan_accounting_balance_ts": [
+      "loan"
+    ],
+    "loan_assumption": [
+      "loan"
+    ],
+    "loan_at_data_transfer_info": [
+      "loan"
+    ],
+    "loan_at_origination_info": [
+      "loan",
+      "property_valuation"
+    ],
+    "loan_expense": [
+      "loan_expense_nonrecov",
+      "loan_expense_recov",
+      "loan_expense_thirdp"
+    ],
+    "loan_expense_nonrecov": [
+      "loan"
+    ],
+    "loan_expense_recov": [
+      "loan"
+    ],
+    "loan_expense_thirdp": [
+      "loan"
+    ],
+    "loan_payment_amortization_schedule": [
+      "loan"
+    ],
+    "loan_payment_auto_pay_schedule": [
+      "bank_account",
+      "loan"
+    ],
+    "loan_payment_deduction_schedule": [
+      "loan_payment_deduction_schedule_1",
+      "loan_payment_deduction_schedule_2",
+      "loan_payment_deduction_schedule_3",
+      "loan_payment_deduction_schedule_4",
+      "loan_payment_deduction_schedule_5"
+    ],
+    "loan_payment_deduction_schedule_1": [
+      "loan"
+    ],
+    "loan_payment_deduction_schedule_2": [
+      "loan",
+      "loan_payment_deduction_schedule_1"
+    ],
+    "loan_payment_deduction_schedule_3": [
+      "loan",
+      "loan_payment_deduction_schedule_2"
+    ],
+    "loan_payment_deduction_schedule_4": [
+      "loan",
+      "loan_payment_deduction_schedule_3"
+    ],
+    "loan_payment_deduction_schedule_5": [
+      "loan",
+      "loan_payment_deduction_schedule_4"
+    ],
+    "loan_payment_interest_schedule": [
+      "loan"
+    ],
+    "loan_payment_late_fee_schedule": [
+      "loan"
+    ],
+    "loan_support_call": [
+      "loan",
+      "user_call"
+    ],
+    "loan_support_call_1": [
+      "loan_support_call"
+    ],
+    "loan_support_ticket": [
+      "loan_support_ticket_1"
+    ],
+    "loan_support_ticket_1": [
+      "loan",
+      "user_note"
+    ],
+    "loan_support_ticket_comment": [
+      "loan_support_ticket_1"
+    ],
+    "loan_tax_info": [
+      "loan"
+    ],
+    "loan_tax_installment": [
+      "loan_tax_installment_12_1",
+      "loan_tax_installment_12_2",
+      "loan_tax_installment_3_1",
+      "loan_tax_installment_3_2",
+      "loan_tax_installment_6_1",
+      "loan_tax_installment_6_2"
+    ],
+    "loan_tax_installment_12": [
+      "loan",
+      "loan_tax_line_12",
+      "loan_tax_parcel",
+      "tax_authority"
+    ],
+    "loan_tax_installment_12_1": [
+      "loan",
+      "loan_tax_installment_12"
+    ],
+    "loan_tax_installment_12_2": [
+      "loan",
+      "loan_tax_installment_12"
+    ],
+    "loan_tax_installment_3": [
+      "loan",
+      "loan_tax_line_3",
+      "loan_tax_parcel",
+      "tax_authority"
+    ],
+    "loan_tax_installment_3_1": [
+      "loan",
+      "loan_tax_installment_3"
+    ],
+    "loan_tax_installment_3_2": [
+      "loan",
+      "loan_tax_installment_3"
+    ],
+    "loan_tax_installment_6": [
+      "loan",
+      "loan_tax_line_6",
+      "loan_tax_parcel",
+      "tax_authority"
+    ],
+    "loan_tax_installment_6_1": [
+      "loan",
+      "loan_tax_installment_6"
+    ],
+    "loan_tax_installment_6_2": [
+      "loan",
+      "loan_tax_installment_6"
+    ],
+    "loan_tax_line": [
+      "loan_tax_line_12",
+      "loan_tax_line_3",
+      "loan_tax_line_6"
+    ],
+    "loan_tax_line_12": [
+      "loan",
+      "loan_tax_parcel",
+      "tax_authority"
+    ],
+    "loan_tax_line_3": [
+      "loan",
+      "loan_tax_parcel",
+      "tax_authority"
+    ],
+    "loan_tax_line_6": [
+      "loan",
+      "loan_tax_parcel",
+      "tax_authority"
+    ],
+    "loan_tax_parcel": [
+      "loan"
+    ],
+    "loan_to_portfolio": [
+      "loan",
+      "portfolio"
+    ],
+    "loan_to_property": [
+      "loan",
+      "property"
+    ],
+    "loss_draft_claim": [
+      "loan",
+      "property_insurance_period"
+    ],
+    "loss_mitigation_application": [
+      "loan"
+    ],
+    "loss_mitigation_application_document": [
+      "loan"
+    ],
+    "loss_mitigation_application_individual": [
+      "borrower",
+      "borrower_to_loan",
+      "loan"
+    ],
+    "loss_mitigation_denial": [
+      "loan",
+      "loss_mitigation_application"
+    ],
+    "loss_mitigation_forbearance": [
+      "loan",
+      "loss_mitigation_plan"
+    ],
+    "loss_mitigation_loan_modification": [
+      "loan",
+      "loss_mitigation_plan",
+      "property_valuation"
+    ],
+    "loss_mitigation_payment_deferral": [
+      "loan",
+      "loss_mitigation_plan"
+    ],
+    "loss_mitigation_plan": [
+      "loan",
+      "loss_mitigation_application"
+    ],
+    "loss_mitigation_plan_denial_reason": [
+      "loan",
+      "loss_mitigation_denial",
+      "loss_mitigation_plan"
+    ],
+    "loss_mitigation_plan_payment": [
+      "loan",
+      "loss_mitigation_plan"
+    ],
+    "loss_mitigation_repayment_plan": [
+      "loan",
+      "loss_mitigation_plan"
+    ],
+    "mbs_pool": [
+      "loan1"
+    ],
+    "mortgage_beneficial_owner": [
+      "loan"
+    ],
+    "mortgage_insurance": [
+      "loan",
+      "mortgage_insurance_company"
+    ],
+    "mortgage_insurance_company": [
+      "address_mi",
+      "loan"
+    ],
+    "mortgage_insurance_installment": [
+      "loan",
+      "mortgage_insurance"
+    ],
+    "non_borrower_loan_organization": [
+      "non_borrower_loan_organization_comrtgr",
+      "non_borrower_loan_organization_nonborrower",
+      "non_borrower_loan_organization_primary"
+    ],
+    "non_borrower_loan_organization_comrtgr": [
+      "address_billing",
+      "address_comrtgr",
+      "borrower_phone_number",
+      "loan"
+    ],
+    "non_borrower_loan_organization_nonborrower": [
+      "address_nb_org",
+      "loan"
+    ],
+    "non_borrower_loan_organization_primary": [
+      "address_billing",
+      "borrower_phone_number",
+      "loan"
+    ],
+    "non_borrower_loan_participant": [
+      "non_borrower_loan_participant_borrower",
+      "non_borrower_loan_participant_noborrower"
+    ],
+    "non_borrower_loan_participant_borrower": [
+      "address_nb",
+      "borrower_to_loan_primary",
+      "loan"
+    ],
+    "non_borrower_loan_participant_noborrower": [
+      "address_nb",
+      "loan"
+    ],
+    "non_borrower_loan_participant_role": [
+      "non_borrower_loan_participant_role_estate_comrtgr",
+      "non_borrower_loan_participant_role_estate_primary",
+      "non_borrower_loan_participant_role_nonestate"
+    ],
+    "non_borrower_loan_participant_role_estate_comrtgr": [
+      "loan",
+      "non_borrower_loan_organization_comrtgr",
+      "non_borrower_loan_participant"
+    ],
+    "non_borrower_loan_participant_role_estate_primary": [
+      "loan",
+      "non_borrower_loan_organization_primary",
+      "non_borrower_loan_participant"
+    ],
+    "non_borrower_loan_participant_role_nonestate": [
+      "loan",
+      "non_borrower_loan_participant"
+    ],
+    "notification": [
+      "notification_1"
+    ],
+    "notification_1": [
+      "address_property",
+      "loan"
+    ],
+    "notification_email_detail": [
+      "loan",
+      "notification_1"
+    ],
+    "notification_mail_detail": [
+      "address_billing",
+      "address_sm",
+      "loan",
+      "notification_1"
+    ],
+    "notification_sms_detail": [
+      "borrower_phone_number",
+      "borrower_to_loan",
+      "loan",
+      "notification_1"
+    ],
+    "notification_to_linked_entity": [
+      "loan",
+      "notification_1"
+    ],
+    "portfolio": [
+      "loan",
+      "servicing_client"
+    ],
+    "portfolio_pool": [
+      "loan",
+      "mbs_pool",
+      "portfolio"
+    ],
+    "portfolio_to_bank_account": [
+      "portfolio"
+    ],
+    "pre_foreclosure_state_process": [
+      "pre_foreclosure_state_process_1"
+    ],
+    "pre_foreclosure_state_process_1": [
+      "loan",
+      "notification_1"
+    ],
+    "pre_foreclosure_state_specific_letter": [
+      "pre_foreclosure_state_process_1"
+    ],
+    "promise_to_pay": [
+      "loan"
+    ],
+    "property": [
+      "address_property",
+      "loan"
+    ],
+    "property_inspection": [
+      "loan",
+      "property"
+    ],
+    "property_insurance_company": [
+      "address_pi",
+      "loan"
+    ],
+    "property_insurance_coverage_type": [
+      "property_insurance_coverage_type_1"
+    ],
+    "property_insurance_coverage_type_1": [
+      "escrow_loan_info",
+      "loan",
+      "property",
+      "property_insurance_structure"
+    ],
+    "property_insurance_installment": [
+      "escrow_loan_info",
+      "loan",
+      "property_insurance_period_2"
+    ],
+    "property_insurance_period": [
+      "property_insurance_period_2"
+    ],
+    "property_insurance_period_1": [
+      "escrow_loan_info",
+      "loan",
+      "property_insurance_company"
+    ],
+    "property_insurance_period_2": [
+      "property_insurance_period_1"
+    ],
+    "property_insurance_period_to_coverage_type": [
+      "property_insurance_coverage_type_1",
+      "property_insurance_period_2"
+    ],
+    "property_insurance_structure": [
+      "escrow_loan_info",
+      "loan"
+    ],
+    "property_maintenance_status": [
+      "loan",
+      "property"
+    ],
+    "property_occupancy_status": [
+      "loan",
+      "property"
+    ],
+    "property_preservation_case": [
+      "loan"
+    ],
+    "property_registration": [
+      "property_registration_deregis",
+      "property_registration_regis",
+      "property_registration_renew"
+    ],
+    "property_registration_deregis": [
+      "loan"
+    ],
+    "property_registration_regis": [
+      "loan"
+    ],
+    "property_registration_renew": [
+      "loan"
+    ],
+    "property_valuation": [
+      "property_valuation_current",
+      "property_valuation_loan_mod",
+      "property_valuation_origination"
+    ],
+    "property_valuation_current": [
+      "loan"
+    ],
+    "property_valuation_loan_mod": [
+      "loan"
+    ],
+    "property_valuation_origination": [
+      "loan"
+    ],
+    "quality_right_party_contact_attempt": [
+      "quality_right_party_contact_attempt_no",
+      "quality_right_party_contact_attempt_yes"
+    ],
+    "quality_right_party_contact_attempt_no": [
+      "loan",
+      "loan_payment_auto_pay_schedule",
+      "loan_support_call",
+      "loss_mitigation_application"
+    ],
+    "quality_right_party_contact_attempt_yes": [
+      "loan",
+      "loan_payment_auto_pay_schedule",
+      "loan_support_call",
+      "loss_mitigation_application"
+    ],
+    "reason_for_delinquency": [
+      "loan"
+    ],
+    "servicer_attorney": [
+      "servicer_attorney_bank",
+      "servicer_attorney_fore"
+    ],
+    "servicer_attorney_bank": [
+      "loan",
+      "servicer_law_firm_bank"
+    ],
+    "servicer_attorney_fore": [
+      "loan",
+      "servicer_law_firm_fore"
+    ],
+    "servicer_company": [
+      "address_sc",
+      "loan1"
+    ],
+    "servicer_law_firm": [
+      "servicer_law_firm_bank",
+      "servicer_law_firm_fore"
+    ],
+    "servicer_law_firm_bank": [
+      "loan"
+    ],
+    "servicer_law_firm_fore": [
+      "loan"
+    ],
+    "servicing_client": [
+      "loan"
+    ],
+    "single_point_of_contact": [
+      "bankruptcy_case",
+      "foreclosure",
+      "loan",
+      "loss_mitigation_plan",
+      "user_call"
+    ],
+    "skip_tracing_phone_number": [
+      "borrower_to_loan",
+      "loan"
+    ],
+    "task": [
+      "loan",
+      "user_taskcontact",
+      "user_taskresponsible"
+    ],
+    "task_comment": [
+      "loan",
+      "task",
+      "user_note"
+    ],
+    "task_inbox_thread": [
+      "task"
+    ],
+    "task_team": [
+      "task_team_contact",
+      "task_team_responsible"
+    ],
+    "task_team_contact": [
+      "loan"
+    ],
+    "task_team_member": [
+      "task_team_member_contact",
+      "task_team_member_responsible"
+    ],
+    "task_team_member_contact": [
+      "loan",
+      "task_team_contact",
+      "user_taskcontact"
+    ],
+    "task_team_member_responsible": [
+      "loan",
+      "task_team_responsible",
+      "user_taskresponsible"
+    ],
+    "task_team_responsible": [
+      "loan"
+    ],
+    "tax_authority": [
+      "address_taxauth",
+      "loan"
+    ],
+    "tax_option": [
+      "loan"
+    ],
+    "user": [
+      "user_call",
+      "user_note",
+      "user_taskcontact",
+      "user_taskresponsible"
+    ],
+    "user_call": [
+      "loan"
+    ],
+    "user_note": [
+      "loan"
+    ],
+    "user_taskcontact": [
+      "loan"
+    ],
+    "user_taskresponsible": [
+      "loan"
+    ]
+  }
+}

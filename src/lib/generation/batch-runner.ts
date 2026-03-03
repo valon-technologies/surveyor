@@ -996,7 +996,7 @@ export async function executeBatchRun(
 
       orderedEntities = ordered;
       console.log(
-        `[batch] Entity order (topological): ${orderedEntities.map((e) => e.entityName).join(" → ")}`,
+        `[batch] Entity order (topological, ${depGraph.source}): ${orderedEntities.map((e) => e.entityName).join(" → ")}`,
       );
     } catch (depErr) {
       console.warn(`[batch] Dependency graph failed, using original order:`, depErr);
