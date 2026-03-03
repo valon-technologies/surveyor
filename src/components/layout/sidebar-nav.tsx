@@ -21,6 +21,7 @@ import {
   Sun,
   Shield,
   FileSpreadsheet,
+  BookOpenCheck,
 } from "lucide-react";
 import { useQuestions } from "@/queries/question-queries";
 import { useTheme } from "./theme-provider";
@@ -107,6 +108,18 @@ export function SidebarNav() {
       {/* User section */}
       {session?.user && (
         <div className="border-t p-3 space-y-1">
+          <Link
+            href="/docs"
+            className={cn(
+              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
+              pathname.startsWith("/docs")
+                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}
+          >
+            <BookOpenCheck className="h-4 w-4" />
+            Review Guide
+          </Link>
           <Link
             href="/settings"
             className={cn(
