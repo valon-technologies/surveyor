@@ -628,15 +628,70 @@ a639428 fix: learning dedup + production dependency graph + structure classifica
 
 5 commits, ~4,700 lines added across 42 files.
 
+### SOT as generation context (implemented)
+
+Generation prompts now include production YAML mappings as context:
+- **Same-entity SOT**: if a production YAML exists for the target entity (prefer M2, fallback M1), full YAML included
+- **Cross-entity SOT**: up to 2 related entities from same domain via name-prefix matching, sorted by field count
+- New `findRelatedSotEntities()` in yaml-parser.ts for domain-sibling lookup
+- Capped at 8K tokens, drops cross-entity first if over budget
+- System prompt: "learn patterns, don't blindly copy; Entity Knowledge corrections take precedence"
+- Placed between source schema and context docs in prompt
+
+Commit: `07c5acd`. Pushed.
+
+### Admin generation tab + cost guardrails + YAML expression validation (implemented)
+
+Three features in one commit:
+1. **Admin generation tab**: "Generation" tab added to `/admin` page with BatchRunPanel
+2. **Cost guardrails**: daily token budget check (default 2M tokens/day, configurable via `DAILY_TOKEN_BUDGET`). HTTP 429 when exceeded. Applied to both batch runs and single generations.
+3. **YAML expression validation**: detects SQL/BigQuery syntax in generated expressions (CAST, CASE WHEN, COALESCE, PARSE_DATE, IF, SAFE_CAST). Flags as warnings with pandas equivalents suggested. Integrated into existing yaml-validator.ts validation pipeline.
+
+Commit: `edc5560`. Pushed.
+
+### SOT Mappings staging improvements (implemented)
+
+- **Staging component nesting**: assembly parents show expandable list of their staging components. 70 components hidden from top-level list (~127 shown per milestone instead of ~197)
+- **Reliable staging detection**: two-pass approach resolves YAML `table:` field → filename mismatches (e.g., `borrower_comortgr` vs `borrower_comrtgr`)
+- **ACDC source resolution**: assembly entities show "Staging Components (ACDC Sources)" section with each component expandable to show field mappings traced to actual ACDC tables
+- **Field Mappings moved above Sources & Joins** in detail view
+
+Commits: `915fdbd`, `b2437e7`, `9b344ac`, `3351368`. Pushed.
+
+### Sidebar consolidation (implemented)
+
+Sidebar reduced from 12 items to 5 top-level with 3 expandable groups:
+
+```
+▼ Mapping
+    Progress Summary
+    Human Review UI
+    Questions from Human Review
+    Review Guide
+▼ Context
+    Library
+    Skills
+▼ Data
+    Schemas
+    Preview
+    Topology
+Verified Mappings
+Admin
+```
+
+Expandable groups use NavItemRenderer with children array, auto-expand when current path matches. Tab state via URL params for sidebar-driven navigation. Old routes preserved for backward compatibility.
+
+Commits: `53a290f`, `b923cea`, `4b49cac`, `0d11c8e`, `3cfb10e`, `8090268`, `67b3db8`, `cc1935c`, `03ddd4c`, `124ffa7`, `4d9c05e`, `7b3df15`. Pushed.
+
+### Cumulative 2026-03-03 session totals
+
+~25 commits, ~10,000+ lines added across 80+ files.
+
 ### Outstanding code work (no external blockers)
 
 | # | Task | Effort | Status |
 |---|------|--------|--------|
-| 7 | M2 SOT integration (extend sot-loader for raw YAMLs) | ~1 session | Plan written |
-| 11 | YAML expression validation (reject unrunnable expressions) | ~half session | Not started |
-| 12 | Admin-only generation page | Small-medium | Not started |
-| 13 | API cost guardrails | Small | Not started |
-| 14 | Chat answer → question promotion | Medium | Not started |
+| 14 | Chat answer → question promotion | Medium | Planning |
 
 ---
 
