@@ -131,6 +131,12 @@ export default function DocsPage() {
             <strong>Confidence is a signal, not a guarantee</strong> — high confidence mappings can still be wrong.
             Low confidence mappings sometimes just need the AI to see more context.
           </li>
+          <li>
+            <strong>Promote chat answers to questions</strong> — if there's an open question for the field
+            you're reviewing and the AI gives a useful answer in the chat, you'll see a
+            "Use as answer to: '...'" link below the AI's message. Click it to resolve the question
+            directly with that answer — no need to copy-paste to the Questions page.
+          </li>
         </ul>
 
         <h2>Sidebar Navigation</h2>
