@@ -308,24 +308,30 @@ export function listSotEntities(): SotEntitySummary[] {
     }
   }
 
-  // Pass 1b: identify assembly parents and resolve their staging component file names
+  // Pass 1b: identify assembly parents and their staging components.
+  // Also scan for staging references that are suffix-variants of an assembly parent
+  // (e.g., loan1 is a variant of loan, borrower_comrtgr of borrower).
+  // Entities like foreclosure/loan that are standalone but consumed as staging
+  // dependencies by other entities should NOT be hidden.
+  const assemblyParentNames = new Set<string>(); // milestone:name
+
   for (const milestone of ["m1", "m2"] as const) {
     const milestoneDir = milestone === "m1" ? "m1_mappings" : "m2_mappings";
     const dirPath = path.join(sotDir, milestoneDir);
     if (!fs.existsSync(dirPath)) continue;
 
+    // First identify all assembly parents (have concat:)
     for (const file of fs.readdirSync(dirPath).filter((f) => f.endsWith(".yaml"))) {
       const entityName = file.replace(".yaml", "");
       try {
         const text = fs.readFileSync(path.join(dirPath, file), "utf-8");
         const data = yaml.load(text) as Record<string, unknown>;
-
         if (data.concat) {
+          assemblyParentNames.add(`${milestone}:${entityName}`);
           const sources = (data.sources || []) as { staging?: { table: string } }[];
           const components: string[] = [];
           for (const s of sources) {
             if (s.staging?.table) {
-              // Resolve via tableToFile map — handles spelling mismatches
               const resolvedFile = tableToFile.get(`${milestone}:${s.staging.table}`) || s.staging.table;
               if (!components.includes(resolvedFile)) {
                 components.push(resolvedFile);
@@ -334,6 +340,77 @@ export function listSotEntities(): SotEntitySummary[] {
             }
           }
           parentComponents.set(`${milestone}:${entityName}`, components);
+        }
+      } catch { /* skip */ }
+    }
+
+    // Now find staging components that are suffix-variants or numbered variants
+    // of entities that consume them. Two patterns:
+    // 1. Assembly parent (concat) variants: loan_tax_installment_3 under loan_tax_installment
+    // 2. Non-concat staging: loan1 under loan (loan reads staging:{table:"loan1"})
+
+    // Build map: which entities consume which staging tables (all consumers, not just last)
+    const consumedBy = new Map<string, string[]>(); // resolvedFileName → consumer entityNames
+    for (const file of fs.readdirSync(dirPath).filter((f) => f.endsWith(".yaml"))) {
+      const entityName = file.replace(".yaml", "");
+      try {
+        const text = fs.readFileSync(path.join(dirPath, file), "utf-8");
+        const data = yaml.load(text) as Record<string, unknown>;
+        const sources = (data.sources || []) as { staging?: { table: string } }[];
+        for (const s of sources) {
+          if (s.staging?.table) {
+            const resolvedFile = tableToFile.get(`${milestone}:${s.staging.table}`) || s.staging.table;
+            if (!consumedBy.has(resolvedFile)) consumedBy.set(resolvedFile, []);
+            consumedBy.get(resolvedFile)!.push(entityName);
+          }
+        }
+      } catch { /* skip */ }
+    }
+
+    // Mark suffix/numbered variants as staging when consumed by their parent-like entity
+    const names = allEntityNames.get(milestone);
+    if (names) {
+      for (const entityName of names) {
+        if (allStagingComponents.has(`${milestone}:${entityName}`)) continue;
+        if (assemblyParentNames.has(`${milestone}:${entityName}`)) continue;
+
+        const consumers = consumedBy.get(entityName);
+        if (!consumers) continue;
+
+        // Check if entityName is a variant of ANY consumer: consumer_suffix or consumerN
+        for (const consumer of consumers) {
+          const numberedPattern = new RegExp("^" + consumer.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\d+$");
+          if (entityName.startsWith(consumer + "_") || numberedPattern.test(entityName)) {
+            allStagingComponents.add(`${milestone}:${entityName}`);
+            const parentKey = `${milestone}:${consumer}`;
+            const components = parentComponents.get(parentKey) || [];
+            if (!components.includes(entityName)) {
+              components.push(entityName);
+              parentComponents.set(parentKey, components);
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // Also scan for entities referenced as staging by concat parents
+    // that we missed due to table name mismatches
+    for (const [parentKey, components] of parentComponents) {
+      if (!parentKey.startsWith(`${milestone}:`)) continue;
+      const parentName = parentKey.slice(milestone.length + 1);
+      const parentPath = path.join(dirPath, `${parentName}.yaml`);
+      try {
+        const parentText = fs.readFileSync(parentPath, "utf-8");
+        const names = allEntityNames.get(milestone);
+        if (!names) continue;
+        for (const name of names) {
+          if (allStagingComponents.has(`${milestone}:${name}`)) continue;
+          // Check if parent YAML text mentions this entity name
+          if (name.startsWith(parentName + "_") && parentText.includes(name)) {
+            allStagingComponents.add(`${milestone}:${name}`);
+            if (!components.includes(name)) components.push(name);
+          }
         }
       } catch { /* skip */ }
     }
