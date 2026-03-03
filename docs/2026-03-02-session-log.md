@@ -747,6 +747,18 @@ NavItemRenderer component supports expandable groups with children array, auto-e
 | 13 | API cost guardrails | Done |
 | 14 | Chat answer → question promotion | Done |
 
+### Rich IO config for SOT Mappings (implemented)
+
+Replaced generic task type badges with actionable onboarding detail:
+- **Task roles**: "Primary entity" vs "Dependency" — tells reviewer whether this entity is the main target or just referenced
+- **Consumed fields**: extracted from front-porch `.onboard()` methods (65/71 tasks have field-level data). Cross-referenced against entity's actual field mappings.
+- **Expandable per-task**: click to see fields consumed from this entity (green checkmarks) vs fields from other entities in the same task (muted)
+- Entities without onboarding show amber "No onboarding config" warning
+
+Also: Notion plan updated — marked analytics items as DONE, updated Phase 2 roadmap, rewrote App Navigation Guide for new sidebar structure, added What's Built rows.
+
+Commits: `03ed962` (prominent IO config), `a8e35cb` (rich IO config with roles + fields). Pushed.
+
 ### Remaining (external blockers)
 
 | Task | Blocker |
