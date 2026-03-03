@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useProgress SummaryStats } from "@/queries/dashboard-queries";
+import { useDashboardStats } from "@/queries/dashboard-queries";
 import { CompactStatsRow } from "@/components/dashboard/compact-stats-row";
 import { Leaderboard } from "@/components/dashboard/leaderboard";
 import { EntityProgressTable } from "@/components/dashboard/entity-progress-table";
@@ -12,9 +12,9 @@ import { cn } from "@/lib/utils";
 
 type Tab = "overview" | "my-work";
 
-export default function Progress SummaryPage() {
+export default function DashboardPage() {
   const [tab, setTab] = useState<Tab>("overview");
-  const { data: stats, isLoading } = useProgress SummaryStats();
+  const { data: stats, isLoading } = useDashboardStats();
 
   if (isLoading) {
     return (
