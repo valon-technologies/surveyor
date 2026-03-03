@@ -10,7 +10,11 @@ import { SotMappingsEmpty } from "./components/empty-state";
 import { Button } from "@/components/ui/button";
 import { FileSpreadsheet, PanelLeftOpen, ChevronRight } from "lucide-react";
 
-export function SotMappingsClient() {
+export function SotMappingsClient({
+  basePath = "/sot-mappings",
+}: {
+  basePath?: string;
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { leftPanelCollapsed, toggleLeftPanel, collapseAllFields } =
@@ -24,11 +28,17 @@ export function SotMappingsClient() {
   const selectEntity = useCallback(
     (name: string, ms: "m1" | "m2") => {
       collapseAllFields();
-      router.replace(`/sot-mappings?entity=${name}&milestone=${ms}`, {
+      // Preserve existing query params (e.g. ?tab=mappings from ground-truth)
+      // by parsing basePath which may include a query string
+      const [pathname, existingQuery] = basePath.split("?");
+      const params = new URLSearchParams(existingQuery || "");
+      params.set("entity", name);
+      params.set("milestone", ms);
+      router.replace(`${pathname}?${params.toString()}`, {
         scroll: false,
       });
     },
-    [router, collapseAllFields]
+    [router, collapseAllFields, basePath]
   );
 
   return (

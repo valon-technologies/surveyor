@@ -20,7 +20,7 @@ export function AtlasClient() {
 
   const selectEntity = useCallback(
     (id: string) => {
-      router.replace(`/atlas?entityId=${id}`, { scroll: false });
+      router.replace(`/data?entityId=${id}`, { scroll: false });
     },
     [router]
   );

@@ -108,11 +108,11 @@ export function TopologyClient() {
         <div className="flex-1" />
         {selectedMappingId && selectedEntityId && selectedFieldId && (
           <Link
-            href={`/atlas?entityId=${selectedEntityId}&fieldId=${selectedFieldId}&mappingId=${selectedMappingId}`}
+            href={`/data?entityId=${selectedEntityId}&fieldId=${selectedFieldId}&mappingId=${selectedMappingId}`}
             className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             <Globe className="h-3.5 w-3.5" />
-            View in Atlas
+            View in Data Preview
           </Link>
         )}
       </div>

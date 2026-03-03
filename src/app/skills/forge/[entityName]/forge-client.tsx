@@ -134,7 +134,7 @@ export function ForgeClient() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => router.push("/skills")}
+            onClick={() => router.push("/context?tab=skills")}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>

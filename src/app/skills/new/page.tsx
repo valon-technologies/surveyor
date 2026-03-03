@@ -9,7 +9,7 @@ export default function NewSkillPage() {
     <div className="p-8 space-y-6">
       <div className="flex items-center gap-3">
         <Link
-          href="/skills"
+          href="/context?tab=skills"
           className="p-1.5 rounded hover:bg-muted transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />

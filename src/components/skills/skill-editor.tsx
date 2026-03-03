@@ -93,7 +93,7 @@ export function SkillEditor({ skill: existing }: SkillEditorProps) {
           applicability: applicability || null,
           tags: parsedTags.length > 0 ? parsedTags : undefined,
         },
-        { onSuccess: () => router.push("/skills") }
+        { onSuccess: () => router.push("/context?tab=skills") }
       );
     } else {
       createSkill.mutate(
@@ -112,7 +112,7 @@ export function SkillEditor({ skill: existing }: SkillEditorProps) {
   const handleDelete = () => {
     if (!existing) return;
     deleteSkill.mutate(existing.id, {
-      onSuccess: () => router.push("/skills"),
+      onSuccess: () => router.push("/context?tab=skills"),
     });
   };
 
@@ -249,7 +249,7 @@ export function SkillEditor({ skill: existing }: SkillEditorProps) {
               ? "Update Skill"
               : "Create Skill"}
         </Button>
-        <Button variant="outline" onClick={() => router.push("/skills")}>
+        <Button variant="outline" onClick={() => router.push("/context?tab=skills")}>
           Cancel
         </Button>
         {existing && (

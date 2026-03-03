@@ -22,7 +22,7 @@ export default function SkillDetailPage({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
-            href="/skills"
+            href="/context?tab=skills"
             className="p-1.5 rounded hover:bg-muted transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
