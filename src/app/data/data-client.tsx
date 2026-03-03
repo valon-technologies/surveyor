@@ -1,18 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import SchemasPage from "@/app/schemas/page";
 import { AtlasClient } from "@/app/atlas/atlas-client";
+import { TopologyClient } from "@/app/topology/topology-client";
 
-type Tab = "schemas" | "preview";
+type Tab = "schemas" | "preview" | "topology";
 
 export function DataClient() {
   const searchParams = useSearchParams();
-  // If the URL has an entityId param, default to preview tab
+  const tabParam = searchParams.get("tab") as Tab | null;
   const hasEntity = searchParams.has("entityId");
-  const [tab, setTab] = useState<Tab>(hasEntity ? "preview" : "schemas");
+
+  const initialTab: Tab = tabParam && ["schemas", "preview", "topology"].includes(tabParam)
+    ? tabParam
+    : hasEntity ? "preview" : "schemas";
+  const [tab, setTab] = useState<Tab>(initialTab);
+
+  // Sync tab when URL params change (e.g., sidebar click)
+  useEffect(() => {
+    if (tabParam && ["schemas", "preview", "topology"].includes(tabParam)) {
+      setTab(tabParam);
+    }
+  }, [tabParam]);
 
   return (
     <div className="h-full flex flex-col">
@@ -23,6 +35,9 @@ export function DataClient() {
         </TabButton>
         <TabButton active={tab === "preview"} onClick={() => setTab("preview")}>
           Preview
+        </TabButton>
+        <TabButton active={tab === "topology"} onClick={() => setTab("topology")}>
+          Topology
         </TabButton>
       </div>
 
@@ -36,6 +51,11 @@ export function DataClient() {
         {tab === "preview" && (
           <div className="h-full">
             <AtlasClient />
+          </div>
+        )}
+        {tab === "topology" && (
+          <div className="h-full overflow-auto">
+            <TopologyClient />
           </div>
         )}
       </div>

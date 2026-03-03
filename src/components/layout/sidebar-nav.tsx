@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -20,21 +21,147 @@ import {
   Shield,
   Scale,
   BookOpenCheck,
+  ChevronDown,
+  ChevronRight,
+  type LucideIcon,
 } from "lucide-react";
 import { useQuestions } from "@/queries/question-queries";
 import { useTheme } from "./theme-provider";
 
-const navItems = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  badge?: boolean;
+  children?: { href: string; label: string }[];
+}
+
+const navItems: NavItem[] = [
   { href: "/docs", label: "Review Guide", icon: BookOpenCheck },
   { href: "/", label: "Progress Summary", icon: LayoutDashboard },
   { href: "/mapping", label: "Mapping", icon: Map },
   { href: "/mapping/questions", label: "Questions from Mapping", icon: HelpCircle, badge: true },
   { href: "/context", label: "Context", icon: BookOpen },
-  { href: "/data", label: "Data", icon: Database },
+  {
+    href: "/data",
+    label: "Data",
+    icon: Database,
+    children: [
+      { href: "/data?tab=schemas", label: "Schemas" },
+      { href: "/data?tab=preview", label: "Preview" },
+      { href: "/data?tab=topology", label: "Topology" },
+    ],
+  },
   { href: "/ground-truth", label: "Verified Mappings", icon: Scale },
-  { href: "/topology", label: "Topology", icon: Waypoints },
   { href: "/admin", label: "Admin", icon: Shield },
 ];
+
+function NavItemRenderer({
+  item,
+  pathname,
+  navItems: allItems,
+  badgeCount,
+}: {
+  item: NavItem;
+  pathname: string;
+  navItems: NavItem[];
+  badgeCount: number;
+}) {
+  const [expanded, setExpanded] = useState(
+    // Auto-expand if current path matches this item or any child
+    item.children
+      ? pathname.startsWith(item.href.split("?")[0])
+      : false
+  );
+
+  const isActive =
+    item.href === "/"
+      ? pathname === "/"
+      : pathname.startsWith(item.href.split("?")[0]) &&
+        !allItems.some(
+          (other) =>
+            other.href !== item.href &&
+            other.href.startsWith(item.href.split("?")[0]) &&
+            pathname.startsWith(other.href.split("?")[0])
+        );
+
+  const Icon = item.icon;
+
+  if (item.children) {
+    return (
+      <div>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className={cn(
+            "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors w-full",
+            isActive
+              ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+              : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+          )}
+        >
+          <Icon className="h-4 w-4" />
+          {item.label}
+          <span className="ml-auto">
+            {expanded ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5" />
+            )}
+          </span>
+        </button>
+        {expanded && (
+          <div className="ml-4 mt-0.5 space-y-0.5">
+            {item.children.map((child) => {
+              const childBase = child.href.split("?")[0];
+              const childTab = new URL(child.href, "http://x").searchParams.get("tab");
+              const currentTab = typeof window !== "undefined"
+                ? new URLSearchParams(window.location.search).get("tab")
+                : null;
+              const childActive =
+                pathname.startsWith(childBase) &&
+                (childTab ? currentTab === childTab : !currentTab);
+
+              return (
+                <Link
+                  key={child.href}
+                  href={child.href}
+                  className={cn(
+                    "flex items-center gap-2.5 pl-5 pr-3 py-1.5 rounded-lg text-sm transition-colors",
+                    childActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  {child.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
+        isActive
+          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+          : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      {item.label}
+      {badgeCount > 0 && (
+        <span className="ml-auto inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold">
+          {badgeCount}
+        </span>
+      )}
+    </Link>
+  );
+}
 
 export function SidebarNav() {
   const pathname = usePathname();
@@ -62,43 +189,15 @@ export function SidebarNav() {
 
       {/* Nav items */}
       <nav className="flex-1 p-2 space-y-0.5">
-        {navItems.map((item) => {
-          // Check if another nav item is a more specific match (longer prefix)
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href) &&
-                !navItems.some(
-                  (other) =>
-                    other.href !== item.href &&
-                    other.href.startsWith(item.href) &&
-                    pathname.startsWith(other.href)
-                );
-          const Icon = item.icon;
-
-          const badgeCount = item.badge ? (openQuestions?.length || 0) : 0;
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                  : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {item.label}
-              {badgeCount > 0 && (
-                <span className="ml-auto inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold">
-                  {badgeCount}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+        {navItems.map((item) => (
+          <NavItemRenderer
+            key={item.href}
+            item={item}
+            pathname={pathname}
+            navItems={navItems}
+            badgeCount={item.badge ? (openQuestions?.length || 0) : 0}
+          />
+        ))}
       </nav>
 
       {/* User section */}
