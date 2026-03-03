@@ -27,6 +27,7 @@ import { useQuestions } from "@/queries/question-queries";
 import { useTheme } from "./theme-provider";
 
 const navItems = [
+  { href: "/docs", label: "Review Guide", icon: BookOpenCheck },
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/mapping", label: "Mapping", icon: Map },
   { href: "/mapping/questions", label: "Questions", icon: HelpCircle, badge: true },
@@ -108,18 +109,6 @@ export function SidebarNav() {
       {/* User section */}
       {session?.user && (
         <div className="border-t p-3 space-y-1">
-          <Link
-            href="/docs"
-            className={cn(
-              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
-              pathname.startsWith("/docs")
-                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
-            )}
-          >
-            <BookOpenCheck className="h-4 w-4" />
-            Review Guide
-          </Link>
           <Link
             href="/settings"
             className={cn(
