@@ -561,13 +561,82 @@ Reviewers need to see the existing production SOT mapping for an entity alongsid
 
 2. **IO config visibility** — show whether a VDS entity has an onboarding task config in front-porch (from the sdt-tracing skill). Which fields from the mapping actually get consumed by the onboarding pipeline? Which are dead (mapped but never onboarded)? This changes review priority and helps the team focus on fields that matter for production.
 
+### SOT Mappings page (implemented)
+
+New sidebar section at `/sot-mappings` — dedicated page for browsing production YAML mappings.
+
+- **YAML parser** (`src/lib/sot/yaml-parser.ts`): reads 389 production YAMLs (192 M1 + 197 M2), resolves alias→Table.Field references, extracts sources from expressions
+- **Onboarding config** (`src/data/onboarding-task-configs.json`): 147 entities across 68 task types, extracted from front-porch VDS task configs
+- **Two-panel UI**: entity list grouped by M1/M2 with search + onboarding badges (left), mapping detail with sources/joins/field table/raw YAML (right)
+- **Field table**: expandable rows showing full expression text, transform type badges (green=identity, amber=expression, blue=hash_id, gray=null), staging source indicators
+- **API routes**: list + detail endpoints reading YAMLs from filesystem via `SOT_MAPPING_DIR` env var
+
+Commit: `915fdbd` — 17 files, +2,283 lines. Pushed.
+
+### Reviewer onboarding guide (implemented)
+
+In-app guide at `/docs`, accessible as "Review Guide" (top item in sidebar nav). Covers:
+- The review flow (entity → field → discuss → submit)
+- Each discuss page section with verdict options
+- How corrections feed back into the AI
+- Tips (check SOT, use citations, be specific)
+- Sidebar navigation reference
+
+Commits: `6b80526` + `0dc08c4`. Pushed.
+
+### Duplicate learning idempotency (fixed)
+
+Both `extractVerdictLearning` and `extractMappingLearning` now check for existing learning with same `(workspaceId, entityId, fieldName, content)` before inserting. Multiple clicks on same verdict no longer create duplicate records.
+
+### Production dependency graph (imported)
+
+New script `scripts/import-dependency-graph.ts` reads `sdt_mapping_config.yaml` from analytics repo. Produces `src/lib/generation/production-dependencies.json` (212 entities, 437 dependency edges). `dependency-graph.ts` now uses production ordering first, heuristic `*_id` fallback for entities not in the config. Batch runner logs which strategy was used (`production` / `heuristic` / `mixed`).
+
+### Structure classification seed (script ready)
+
+New script `scripts/seed-structure-classification.ts` reads M2 YAMLs and classifies entities:
+- Has `concat:` key → assembly parent
+- Has `staging:` sources → assembly component
+- All `pipe_file:` → flat (single_source or multi_source_same_type)
+
+Seeds `entity_scaffold` table so batch runner skips LLM-based classification for known entities. Run: `npx tsx scripts/seed-structure-classification.ts`
+
+Commit for all three: `a639428` — 7 files, +1,608 lines. Pushed.
+
 ### Notion plan updated
 
 - Updated date, "What's Built" table (4 new rows), Phase 1 status
 - Added flowchart section (Mermaid diagrams matching feedback loop style)
 - Restructured roadmap into 5 phases (Deploy → Quality → Scale → Client → Multi-Source)
-- Added App Navigation Guide (all 10 sidebar items)
+- Added App Navigation Guide (all 10+ sidebar items)
 - Added "How Reviewer Feedback Is Stored and Processed" with step-by-step DB examples
+- Added "Analytics Repo Integration" section (M2 SOT, expression validation, dep graph, structure classification)
+- Added "End-to-End Pipeline Integration" section (runtime validation, onboarding gaps, discrepancy tracing)
+- Added "SOT Mapping Viewer + IO Config Visibility" (now implemented)
+- Added "VDS Field Milestone Source of Truth" blocker
+- Added "M2 SOT Integration" (planned, plan written)
+
+### Cumulative 2026-03-03 commits
+
+```
+7362a97 feat: context traceability, citations, and SUBSET cleanup
+915fdbd feat: SOT Mappings page — browse production YAML mappings with IO config visibility
+6b80526 feat: add reviewer onboarding guide at /docs
+0dc08c4 move Review Guide to top of sidebar nav
+a639428 fix: learning dedup + production dependency graph + structure classification
+```
+
+5 commits, ~4,700 lines added across 42 files.
+
+### Outstanding code work (no external blockers)
+
+| # | Task | Effort | Status |
+|---|------|--------|--------|
+| 7 | M2 SOT integration (extend sot-loader for raw YAMLs) | ~1 session | Plan written |
+| 11 | YAML expression validation (reject unrunnable expressions) | ~half session | Not started |
+| 12 | Admin-only generation page | Small-medium | Not started |
+| 13 | API cost guardrails | Small | Not started |
+| 14 | Chat answer → question promotion | Medium | Not started |
 
 ---
 
