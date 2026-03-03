@@ -37,9 +37,16 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: "/docs", label: "Review Guide", icon: BookOpenCheck },
   { href: "/", label: "Progress Summary", icon: LayoutDashboard },
-  { href: "/mapping", label: "Mapping", icon: Map },
+  {
+    href: "/mapping",
+    label: "Mapping",
+    icon: Map,
+    children: [
+      { href: "/mapping", label: "Review UI" },
+      { href: "/docs", label: "Review Guide" },
+    ],
+  },
   { href: "/mapping/questions", label: "Questions from Mapping", icon: HelpCircle, badge: true },
   { href: "/context", label: "Context", icon: BookOpen },
   {
@@ -70,7 +77,8 @@ function NavItemRenderer({
   const [expanded, setExpanded] = useState(
     // Auto-expand if current path matches this item or any child
     item.children
-      ? pathname.startsWith(item.href.split("?")[0])
+      ? pathname.startsWith(item.href.split("?")[0]) ||
+        item.children.some((c) => pathname.startsWith(c.href.split("?")[0]))
       : false
   );
 
@@ -113,13 +121,23 @@ function NavItemRenderer({
           <div className="ml-4 mt-0.5 space-y-0.5">
             {item.children.map((child) => {
               const childBase = child.href.split("?")[0];
-              const childTab = new URL(child.href, "http://x").searchParams.get("tab");
+              const childParams = new URL(child.href, "http://x").searchParams;
+              const childTab = childParams.get("tab");
               const currentTab = typeof window !== "undefined"
                 ? new URLSearchParams(window.location.search).get("tab")
                 : null;
-              const childActive =
-                pathname.startsWith(childBase) &&
-                (childTab ? currentTab === childTab : !currentTab);
+
+              let childActive: boolean;
+              if (childBase === item.href.split("?")[0] && !childTab) {
+                // Child links to same base as parent with no tab — active when on that path without a tab
+                childActive = pathname === childBase || (pathname.startsWith(childBase) && !currentTab);
+              } else if (childTab) {
+                // Child has a tab param — active when path matches and tab matches
+                childActive = pathname.startsWith(childBase) && currentTab === childTab;
+              } else {
+                // Child links to a completely different route
+                childActive = pathname.startsWith(childBase);
+              }
 
               return (
                 <Link
