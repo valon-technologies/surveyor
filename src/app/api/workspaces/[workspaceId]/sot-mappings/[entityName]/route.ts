@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { loadSotEntity } from "@/lib/sot/yaml-parser";
-import { getOnboardingTasksForEntity } from "@/lib/sot/onboarding-config";
+import { getOnboardingDetailForEntity } from "@/lib/sot/onboarding-config";
 
 // GET — Get detailed SOT mapping for a specific entity
 export const GET = withAuth(async (req, ctx) => {
@@ -35,10 +35,11 @@ export const GET = withAuth(async (req, ctx) => {
     );
   }
 
-  const onboardingTasks = getOnboardingTasksForEntity(entityName);
+  const onboardingDetail = getOnboardingDetailForEntity(entityName);
 
   return NextResponse.json({
     ...mapping,
-    onboardingTasks,
+    onboardingTasks: onboardingDetail.map((t) => t.taskType),
+    onboardingDetail,
   });
 });

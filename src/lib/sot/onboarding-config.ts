@@ -1,8 +1,18 @@
 import configData from "@/data/onboarding-task-configs.json";
 
+export interface OnboardingTaskInfo {
+  taskType: string;
+  role: "primary" | "dependency";
+  consumedFields: string[];
+}
+
 const data = configData as {
-  taskToEntities: Record<string, string[]>;
-  entityToTasks: Record<string, string[]>;
+  taskDetails: Record<string, {
+    entities: string[];
+    entityRoles: Record<string, string>;
+    consumedFields: string[];
+  }>;
+  entityToTasks: Record<string, OnboardingTaskInfo[]>;
 };
 
 export function hasOnboardingConfig(entityName: string): boolean {
@@ -10,6 +20,10 @@ export function hasOnboardingConfig(entityName: string): boolean {
 }
 
 export function getOnboardingTasksForEntity(entityName: string): string[] {
+  return (data.entityToTasks[entityName] || []).map((t) => t.taskType);
+}
+
+export function getOnboardingDetailForEntity(entityName: string): OnboardingTaskInfo[] {
   return data.entityToTasks[entityName] || [];
 }
 

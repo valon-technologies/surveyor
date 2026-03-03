@@ -23,6 +23,11 @@ interface SotMappingListResponse {
 
 interface SotMappingDetailResponse extends SotEntityMapping {
   onboardingTasks: string[];
+  onboardingDetail?: {
+    taskType: string;
+    role: "primary" | "dependency";
+    consumedFields: string[];
+  }[];
 }
 
 export function useSotMappingList() {
