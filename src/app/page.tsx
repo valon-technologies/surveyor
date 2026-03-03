@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useDashboardStats } from "@/queries/dashboard-queries";
+import { useProgress SummaryStats } from "@/queries/dashboard-queries";
 import { CompactStatsRow } from "@/components/dashboard/compact-stats-row";
 import { Leaderboard } from "@/components/dashboard/leaderboard";
 import { EntityProgressTable } from "@/components/dashboard/entity-progress-table";
@@ -12,9 +12,9 @@ import { cn } from "@/lib/utils";
 
 type Tab = "overview" | "my-work";
 
-export default function DashboardPage() {
+export default function Progress SummaryPage() {
   const [tab, setTab] = useState<Tab>("overview");
-  const { data: stats, isLoading } = useDashboardStats();
+  const { data: stats, isLoading } = useProgress SummaryStats();
 
   if (isLoading) {
     return (
@@ -35,7 +35,7 @@ export default function DashboardPage() {
   if (!stats) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Progress Summary</h1>
         <p className="text-sm text-muted-foreground mt-4">
           No data yet. Import a schema to get started.
         </p>
@@ -46,7 +46,7 @@ export default function DashboardPage() {
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Progress Summary</h1>
       </div>
 
       {/* Tab Bar */}

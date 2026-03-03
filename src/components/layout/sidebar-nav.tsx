@@ -26,7 +26,7 @@ import { useTheme } from "./theme-provider";
 
 const navItems = [
   { href: "/docs", label: "Review Guide", icon: BookOpenCheck },
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/", label: "Progress Summary", icon: LayoutDashboard },
   { href: "/mapping", label: "Mapping", icon: Map },
   { href: "/mapping/questions", label: "Questions", icon: HelpCircle, badge: true },
   { href: "/data", label: "Data", icon: Database },
