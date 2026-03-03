@@ -8,6 +8,7 @@ import type { ChatMessage } from "@/types/chat";
 import type { ToolExecution } from "@/lib/hooks/use-chat-stream";
 import { Database, Loader2, CheckCircle2, XCircle, Hammer } from "lucide-react";
 import { ForgeToolResultCard } from "@/components/forge/forge-tool-result-card";
+import { CitationMarkdown } from "@/components/context/citation-markdown";
 
 const FORGE_TOOL_NAMES = new Set([
   "search_contexts",
@@ -69,11 +70,9 @@ export function ChatMessageList({
         <div className="text-xs py-1">
           <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">AI</span>
           <div className="mt-0.5">
-            <article className="prose prose-sm prose-neutral text-xs max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {streamingContent}
-              </ReactMarkdown>
-            </article>
+            <CitationMarkdown>
+              {streamingContent}
+            </CitationMarkdown>
             <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-text-bottom" />
           </div>
         </div>
@@ -204,11 +203,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
-          <article className="prose prose-sm prose-neutral text-xs max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {message.content}
-            </ReactMarkdown>
-          </article>
+          <CitationMarkdown>
+            {message.content}
+          </CitationMarkdown>
         )}
       </div>
     </div>

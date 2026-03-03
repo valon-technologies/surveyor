@@ -9,7 +9,7 @@ import { EntityTreePanel } from "./components/entity-tree-panel";
 import { DataPreview } from "./components/data-preview";
 import { AtlasEmptySelection } from "./components/atlas-empty";
 import { Button } from "@/components/ui/button";
-import { Globe, PanelLeftOpen, ChevronRight, ExternalLink } from "lucide-react";
+import { Database, PanelLeftOpen, ChevronRight, ExternalLink } from "lucide-react";
 
 export function AtlasClient() {
   const searchParams = useSearchParams();
@@ -29,8 +29,8 @@ export function AtlasClient() {
     <div className="h-full flex flex-col">
       {/* Top bar */}
       <div className="border-b px-4 py-2 flex items-center gap-3 shrink-0">
-        <Globe className="h-4 w-4 text-primary" />
-        <span className="font-semibold text-sm">Atlas</span>
+        <Database className="h-4 w-4 text-primary" />
+        <span className="font-semibold text-sm">Data Preview</span>
         <Breadcrumb entityId={entityId} />
         <div className="flex-1" />
         {entityId && (

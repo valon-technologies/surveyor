@@ -32,6 +32,8 @@ import {
   Ban,
   Zap,
 } from "lucide-react";
+import { CitationMarkdown } from "@/components/context/citation-markdown";
+import { ContextUsedPanel } from "@/components/review/context-used-panel";
 
 export function DiscussClient() {
   const params = useParams<{ fieldMappingId: string }>();
@@ -316,6 +318,11 @@ export function DiscussClient() {
           )}
         </div>
 
+        {/* Context used panel — collapsible, shows docs that informed this mapping */}
+        <div className="shrink-0">
+          <ContextUsedPanel mappingId={activeMappingId} />
+        </div>
+
         {/* Row 2: Source | Transform | Question — with layered AI proposals */}
         <div className="flex-1 overflow-y-auto">
           <div className="grid grid-cols-3 divide-x divide-blue-200 dark:divide-blue-800 bg-blue-50 dark:bg-blue-950/40 min-h-full">
@@ -414,7 +421,11 @@ export function DiscussClient() {
             {aiReview?.reviewText && messages.length === 0 && !isStreaming && (
               <div className="px-3 py-2 text-xs border-b bg-muted/10">
                 <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">AI Review</span>
-                <div className="mt-0.5 whitespace-pre-wrap text-foreground leading-relaxed">{aiReview.reviewText}</div>
+                <div className="mt-0.5 text-foreground leading-relaxed">
+                  <CitationMarkdown className="prose prose-sm prose-neutral text-xs max-w-none">
+                    {aiReview.reviewText}
+                  </CitationMarkdown>
+                </div>
               </div>
             )}
             <ChatMessageList

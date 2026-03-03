@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { entity, field, fieldMapping, batchRun, generation, question, workspace } from "@/lib/db/schema";
+import { entity, field, fieldMapping, batchRun, generation, question, workspace, mappingContext } from "@/lib/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { startGeneration, executeGeneration, persistEntityPipeline } from "./runner";
 import { classifyStructure, generateAssemblyYaml, scopeSourceSchema } from "./structure-classifier";
@@ -294,6 +294,27 @@ async function generateFlatEntity(
     prepared.generationId,
     batchRunId,
   );
+
+  // Populate mappingContext junction table — link each new mapping to the
+  // context docs that were included in the generation prompt.
+  const promptSnap = gen.promptSnapshot as Record<string, unknown> | null;
+  const contextUsed = (promptSnap?.contextUsed ?? []) as { id: string; name: string; tokens: number }[];
+  if (contextUsed.length > 0) {
+    const rows: { fieldMappingId: string; contextId: string; contextType: string }[] = [];
+    for (const [, info] of mappingLookup) {
+      for (const ctx of contextUsed) {
+        rows.push({
+          fieldMappingId: info.mappingId,
+          contextId: ctx.id,
+          contextType: "context_reference",
+        });
+      }
+    }
+    // Batch insert in chunks of 500 (SQLite variable limit)
+    for (let i = 0; i < rows.length; i += 500) {
+      db.insert(mappingContext).values(rows.slice(i, i + 500)).run();
+    }
+  }
 
   // Create questions from validation issues (YAML path)
   if (outputFormat === "yaml") {

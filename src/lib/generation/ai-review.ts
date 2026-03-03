@@ -9,9 +9,8 @@
  * - Live chat (discuss page): Opus (via chat-sessions API) — highest quality for interactive dialogue
  */
 import { db } from "@/lib/db";
-import { fieldMapping, field, entity, context } from "@/lib/db/schema";
+import { fieldMapping, field, entity, context, mappingContext } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { assembleContext } from "./context-assembler";
 import Anthropic from "@anthropic-ai/sdk";
 
 // Opus for reviews — highest quality, ensures source/transform consistency
@@ -55,12 +54,15 @@ The "question" field should contain a structured follow-up question for the clie
 
 3. If the current mapping looks correct, say so briefly and do NOT include a mapping-update block.
 
+CITATIONS: When referencing a document, include its [ref:...] tag so reviewers can trace your reasoning. Example: "Per [ref:ctx_abc123], the source should be DefaultWorkstations."
+
 Be concise and decisive. Focus on source correctness first, then transform logic.`;
 
 interface ReviewResult {
   proposedUpdate: Record<string, unknown> | null;
   reviewText: string;
   generatedAt: string;
+  contextUsed: { id: string; name: string }[];
 }
 
 export async function generateAiReview(
@@ -121,7 +123,7 @@ export async function generateAiReview(
     .join("\n");
 
   // Get entity knowledge
-  const ek = db.select({ content: context.content })
+  const ek = db.select({ id: context.id, name: context.name, content: context.content })
     .from(context)
     .where(and(
       eq(context.workspaceId, workspaceId),
@@ -129,6 +131,28 @@ export async function generateAiReview(
       eq(context.entityId, targetField.entityId),
     ))
     .get();
+
+  // Collect context references used for this review
+  const reviewContextUsed: { id: string; name: string }[] = [];
+  if (ek) {
+    reviewContextUsed.push({ id: ek.id, name: ek.name });
+  }
+
+  // Include contexts linked to this mapping from generation
+  const linkedContexts = db.select({
+    contextId: mappingContext.contextId,
+    contextName: context.name,
+  })
+    .from(mappingContext)
+    .leftJoin(context, eq(context.id, mappingContext.contextId))
+    .where(eq(mappingContext.fieldMappingId, mappingId))
+    .all();
+
+  for (const lc of linkedContexts) {
+    if (lc.contextId && lc.contextName && !reviewContextUsed.some((c) => c.id === lc.contextId)) {
+      reviewContextUsed.push({ id: lc.contextId, name: lc.contextName });
+    }
+  }
 
   // Build the review prompt
   const userMessage = `Review this mapping:
@@ -147,7 +171,7 @@ export async function generateAiReview(
 **Sibling Mappings (same entity):**
 ${siblingLines || "  (none)"}
 
-${ek?.content ? `**Entity Knowledge (corrections from prior reviews):**\n${ek.content}` : ""}
+${ek?.content ? `[ref:ctx_${ek.id}] **Entity Knowledge (corrections from prior reviews):**\n${ek.content}` : ""}
 
 Analyze and propose corrections if needed.`;
 
@@ -181,6 +205,7 @@ Analyze and propose corrections if needed.`;
     proposedUpdate,
     reviewText: reviewText.replace(/```mapping-update[\s\S]*?```/, "").trim(),
     generatedAt: new Date().toISOString(),
+    contextUsed: reviewContextUsed,
   };
 
   // Store on the mapping

@@ -205,25 +205,25 @@ export function buildPrompt(input: PromptInput): { systemMessage: string; userMe
   // Source schema (detailed for relevant tables, compact for the rest)
   parts.push(...renderSourceSchema(sourceSchema));
 
-  // Context sections
+  // Context sections — each doc tagged with [ref:ctx_ID] for citation traceability
   if (assembledContext.primaryContexts.length > 0) {
     parts.push(`\n## Primary Reference Documents\n`);
     for (const c of assembledContext.primaryContexts) {
-      parts.push(`### ${c.name}\n\n${c.content}`);
+      parts.push(`### [ref:ctx_${c.id}] ${c.name}\n\n${c.content}`);
     }
   }
 
   if (assembledContext.referenceContexts.length > 0) {
     parts.push(`\n## Reference Materials\n`);
     for (const c of assembledContext.referenceContexts) {
-      parts.push(`### ${c.name}\n\n${c.content}`);
+      parts.push(`### [ref:ctx_${c.id}] ${c.name}\n\n${c.content}`);
     }
   }
 
   if (assembledContext.supplementaryContexts.length > 0) {
     parts.push(`\n## Supplementary Context\n`);
     for (const c of assembledContext.supplementaryContexts) {
-      parts.push(`### ${c.name}\n\n${c.content}`);
+      parts.push(`### [ref:ctx_${c.id}] ${c.name}\n\n${c.content}`);
     }
   }
 
@@ -422,25 +422,25 @@ export function buildYamlPrompt(input: PromptInput): { systemMessage: string; us
   // Source schema (detailed for relevant tables, compact for the rest)
   parts.push(...renderSourceSchema(sourceSchema));
 
-  // Context sections
+  // Context sections — each doc tagged with [ref:ctx_ID] for citation traceability
   if (assembledContext.primaryContexts.length > 0) {
     parts.push(`\n## Primary Reference Documents\n`);
     for (const c of assembledContext.primaryContexts) {
-      parts.push(`### ${c.name}\n\n${c.content}`);
+      parts.push(`### [ref:ctx_${c.id}] ${c.name}\n\n${c.content}`);
     }
   }
 
   if (assembledContext.referenceContexts.length > 0) {
     parts.push(`\n## Reference Materials\n`);
     for (const c of assembledContext.referenceContexts) {
-      parts.push(`### ${c.name}\n\n${c.content}`);
+      parts.push(`### [ref:ctx_${c.id}] ${c.name}\n\n${c.content}`);
     }
   }
 
   if (assembledContext.supplementaryContexts.length > 0) {
     parts.push(`\n## Supplementary Context\n`);
     for (const c of assembledContext.supplementaryContexts) {
-      parts.push(`### ${c.name}\n\n${c.content}`);
+      parts.push(`### [ref:ctx_${c.id}] ${c.name}\n\n${c.content}`);
     }
   }
 

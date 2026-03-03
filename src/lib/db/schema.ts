@@ -293,6 +293,7 @@ export const fieldMapping = sqliteTable(
       proposedUpdate: Record<string, unknown> | null;
       reviewText: string;
       generatedAt: string;
+      contextUsed?: { id: string; name: string }[];
     }>(),
     batchRunId: text("batch_run_id"),
     createdAt: text("created_at").notNull().default(nowDefault),
@@ -492,6 +493,7 @@ export const generation = sqliteTable(
       systemMessage: string;
       userMessage: string;
       skillsUsed: string[];
+      contextUsed?: { id: string; name: string; tokens: number }[];
     }>(),
     output: text("output"),
     outputParsed: text("output_parsed", { mode: "json" }).$type<Record<string, unknown>>(),

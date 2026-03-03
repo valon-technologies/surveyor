@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { useContexts } from "@/queries/context-queries";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useContexts, useContext as useContextDoc } from "@/queries/context-queries";
 import { ContextTreePanel } from "./context-tree-panel";
 import { ContextContentPanel } from "./context-content-panel";
 import { cn } from "@/lib/utils";
@@ -17,11 +17,31 @@ import {
   type ContextCategory,
 } from "@/lib/constants";
 
-export function ContextLibrary() {
+interface ContextLibraryProps {
+  highlightContextId?: string;
+}
+
+export function ContextLibrary({ highlightContextId }: ContextLibraryProps = {}) {
   const [activeCategory, setActiveCategory] = useState<ContextCategory>("foundational");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [highlightApplied, setHighlightApplied] = useState(false);
+
+  // When deep-linking, fetch the target context to know its category
+  const { data: highlightContext } = useContextDoc(
+    highlightContextId && !highlightApplied ? highlightContextId : undefined
+  );
+
+  // Switch category if the highlighted context is in a different one
+  useEffect(() => {
+    if (highlightContext && !highlightApplied) {
+      const cat = highlightContext.category as ContextCategory;
+      if (cat && cat !== activeCategory) {
+        setActiveCategory(cat);
+      }
+    }
+  }, [highlightContext, highlightApplied]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: contexts, isLoading } = useContexts({ category: activeCategory });
 
@@ -29,6 +49,30 @@ export function ContextLibrary() {
     () => buildContextTree(contexts || []),
     [contexts]
   );
+
+  // Auto-expand and select the highlighted context when tree is ready
+  useEffect(() => {
+    if (highlightApplied || !highlightContextId || !contexts?.length || !fullTree.length) return;
+    if (highlightContext && highlightContext.category !== activeCategory) return; // waiting for category switch
+
+    // Find the context in current data
+    const targetCtx = contexts.find((c) => c.id === highlightContextId);
+    if (!targetCtx) return;
+
+    // Build the fullPath for this context (same logic as buildContextTree)
+    const segments = targetCtx.name.split(" > ").map((s) => s.trim());
+    const fullPath = segments.join(" > ");
+
+    // Expand all ancestor paths
+    const pathsToExpand = new Set<string>();
+    for (let i = 1; i < segments.length; i++) {
+      pathsToExpand.add(segments.slice(0, i).join(" > "));
+    }
+
+    setExpandedPaths(pathsToExpand);
+    setSelectedPath(fullPath);
+    setHighlightApplied(true);
+  }, [highlightContextId, contexts, fullTree, highlightApplied, highlightContext, activeCategory]);
 
   const filteredTree = useMemo(() => {
     if (!searchQuery.trim()) return fullTree;

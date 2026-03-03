@@ -8,7 +8,6 @@ import { WorkspaceSwitcher } from "./workspace-switcher";
 import {
   LayoutDashboard,
   Map,
-  Globe,
   Database,
   BookOpen,
   PenTool,
@@ -34,7 +33,7 @@ const navItems = [
   { href: "/skills", label: "Skills", icon: PenTool },
   { href: "/evaluation", label: "SOT Accuracy", icon: Target },
   { href: "/topology", label: "Topology", icon: Waypoints },
-  { href: "/atlas", label: "Atlas", icon: Globe },
+  { href: "/atlas", label: "Data Preview", icon: Database },
   { href: "/admin", label: "Admin", icon: Shield },
 ];
 

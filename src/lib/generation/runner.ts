@@ -405,6 +405,13 @@ WHEN TO USE TOOLS:
       );
     }
 
+    // Collect all context doc references for traceability
+    const allContextsUsed = [
+      ...assembledCtx.primaryContexts,
+      ...assembledCtx.referenceContexts,
+      ...assembledCtx.supplementaryContexts,
+    ];
+
     db.insert(generation)
       .values({
         id: generationId,
@@ -418,6 +425,7 @@ WHEN TO USE TOOLS:
           systemMessage: finalSystemMessage,
           userMessage,
           skillsUsed: assembledCtx.skillsUsed.map((s) => s.name),
+          contextUsed: allContextsUsed.map((c) => ({ id: c.id, name: c.name, tokens: c.tokenCount })),
         },
         createdAt: now,
         updatedAt: now,

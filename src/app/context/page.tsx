@@ -1,6 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ContextLibrary } from "@/components/context/context-library";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -24,8 +26,17 @@ export default function ContextPage() {
       </div>
 
       <div className="flex-1 overflow-hidden px-8">
-        <ContextLibrary />
+        <Suspense>
+          <ContextPageContent />
+        </Suspense>
       </div>
     </div>
   );
+}
+
+function ContextPageContent() {
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("id") ?? undefined;
+
+  return <ContextLibrary highlightContextId={highlightId} />;
 }

@@ -166,6 +166,8 @@ When the conversation begins:
 4. Never ask questions you can answer from the context (source schema, sibling mappings, reference docs). Be opinionated — propose first, adjust if the user disagrees.
 5. Keep the opening short and action-oriented. Lead with your recommendation, not a list of questions.
 
+CITATIONS: When referencing a document from the context, include its [ref:...] tag so reviewers can trace your reasoning back to the source material. Example: "Per [ref:ctx_abc123], the source should be DefaultWorkstations."
+
 FORMATTING:
 - Do NOT use emojis in your responses. Use plain text markers instead:
   - For corrections/changes: use "(!)" prefix (e.g. "(!) Corrected source table: X")
@@ -675,25 +677,26 @@ export function buildChatPrompt(input: ChatPromptInput): {
   }
 
   // Reference materials — skip in RAG mode (agent uses get_reference_docs)
+  // Each doc tagged with [ref:ctx_ID] for citation traceability
   if (!ragEnabled) {
     if (assembledContext.primaryContexts.length > 0) {
       parts.push(`\n## Primary Reference Documents\n`);
       for (const c of assembledContext.primaryContexts) {
-        parts.push(`### ${c.name}\n\n${c.content}`);
+        parts.push(`### [ref:ctx_${c.id}] ${c.name}\n\n${c.content}`);
       }
     }
 
     if (assembledContext.referenceContexts.length > 0) {
       parts.push(`\n## Reference Materials\n`);
       for (const c of assembledContext.referenceContexts) {
-        parts.push(`### ${c.name}\n\n${c.content}`);
+        parts.push(`### [ref:ctx_${c.id}] ${c.name}\n\n${c.content}`);
       }
     }
 
     if (assembledContext.supplementaryContexts.length > 0) {
       parts.push(`\n## Supplementary Context\n`);
       for (const c of assembledContext.supplementaryContexts) {
-        parts.push(`### ${c.name}\n\n${c.content}`);
+        parts.push(`### [ref:ctx_${c.id}] ${c.name}\n\n${c.content}`);
       }
     }
   } else {
