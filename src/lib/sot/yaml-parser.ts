@@ -279,42 +279,63 @@ export function listSotEntities(): SotEntitySummary[] {
   const sotDir = getSotDir();
   const summaries: SotEntitySummary[] = [];
 
-  // First pass: collect all entities and identify assembly parents + their staging components
-  const allStagingComponents = new Set<string>(); // "milestone:componentName"
-  const parentComponents = new Map<string, string[]>(); // "milestone:parentName" → component names
+  // Pass 1: build table→filename map (handles mismatches like borrower_comortgr file vs borrower_comrtgr table)
+  const allStagingComponents = new Set<string>();
+  const parentComponents = new Map<string, string[]>();
+  const allEntityNames = new Map<string, Set<string>>();
+  const tableToFile = new Map<string, string>(); // "milestone:tableName" → fileName
 
   for (const milestone of ["m1", "m2"] as const) {
-    const milestoneDir =
-      milestone === "m1" ? "m1_mappings" : "m2_mappings";
+    const milestoneDir = milestone === "m1" ? "m1_mappings" : "m2_mappings";
     const dirPath = path.join(sotDir, milestoneDir);
-
     if (!fs.existsSync(dirPath)) continue;
 
     const files = fs.readdirSync(dirPath).filter((f) => f.endsWith(".yaml"));
+    allEntityNames.set(milestone, new Set(files.map((f) => f.replace(".yaml", ""))));
 
     for (const file of files) {
-      const entityName = file.replace(".yaml", "");
-      const filePath = path.join(dirPath, file);
-
+      const fileName = file.replace(".yaml", "");
       try {
-        const yamlText = fs.readFileSync(filePath, "utf-8");
-        const data = yaml.load(yamlText) as Record<string, unknown>;
+        const text = fs.readFileSync(path.join(dirPath, file), "utf-8");
+        const data = yaml.load(text) as Record<string, unknown>;
+        const tableName = data.table as string | undefined;
+        // Always map both directions: table→file and file→file
+        tableToFile.set(`${milestone}:${fileName}`, fileName);
+        if (tableName) {
+          tableToFile.set(`${milestone}:${tableName}`, fileName);
+        }
+      } catch { /* skip */ }
+    }
+  }
 
-        // Detect assembly parents (have concat key) and collect their staging components
+  // Pass 1b: identify assembly parents and resolve their staging component file names
+  for (const milestone of ["m1", "m2"] as const) {
+    const milestoneDir = milestone === "m1" ? "m1_mappings" : "m2_mappings";
+    const dirPath = path.join(sotDir, milestoneDir);
+    if (!fs.existsSync(dirPath)) continue;
+
+    for (const file of fs.readdirSync(dirPath).filter((f) => f.endsWith(".yaml"))) {
+      const entityName = file.replace(".yaml", "");
+      try {
+        const text = fs.readFileSync(path.join(dirPath, file), "utf-8");
+        const data = yaml.load(text) as Record<string, unknown>;
+
         if (data.concat) {
           const sources = (data.sources || []) as { staging?: { table: string } }[];
           const components: string[] = [];
           for (const s of sources) {
             if (s.staging?.table) {
-              components.push(s.staging.table);
-              allStagingComponents.add(`${milestone}:${s.staging.table}`);
+              // Resolve via tableToFile map — handles spelling mismatches
+              const resolvedFile = tableToFile.get(`${milestone}:${s.staging.table}`) || s.staging.table;
+              if (!components.includes(resolvedFile)) {
+                components.push(resolvedFile);
+              }
+              allStagingComponents.add(`${milestone}:${resolvedFile}`);
             }
           }
           parentComponents.set(`${milestone}:${entityName}`, components);
         }
-      } catch {
-        // Skip — will be caught again in second pass
-      }
+      } catch { /* skip */ }
     }
   }
 
