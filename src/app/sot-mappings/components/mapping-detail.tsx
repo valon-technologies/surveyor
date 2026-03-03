@@ -5,8 +5,9 @@ import { useSotMappingDetail } from "@/queries/sot-mapping-queries";
 import { SotFieldTable } from "./field-table";
 import { SotSourceSummary } from "./source-summary";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { StagingComponentDetail, SotColumn } from "@/lib/sot/yaml-parser";
 
 interface SotMappingDetailProps {
   entityName: string;
@@ -100,14 +101,19 @@ export function SotMappingDetail({
           </p>
         </div>
 
-        {/* Source Summary */}
-        <SotSourceSummary sources={data.sources} joins={data.joins} />
-
-        {/* Field Table */}
+        {/* Field Table — first, since this is what reviewers care about most */}
         <div>
           <h2 className="text-sm font-semibold mb-3">Field Mappings</h2>
           <SotFieldTable columns={data.columns} />
         </div>
+
+        {/* Staging Component Detail — for assembly parents, show ACDC sources */}
+        {data.stagingDetail && data.stagingDetail.length > 0 && (
+          <StagingComponentsSection components={data.stagingDetail} />
+        )}
+
+        {/* Source Summary */}
+        <SotSourceSummary sources={data.sources} joins={data.joins} />
 
         {/* Raw YAML */}
         <div className="border rounded-lg">
@@ -130,6 +136,70 @@ export function SotMappingDetail({
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function StagingComponentsSection({
+  components,
+}: {
+  components: StagingComponentDetail[];
+}) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggle = (name: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  return (
+    <div>
+      <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+        <Layers className="h-4 w-4 text-blue-500" />
+        Staging Components (ACDC Sources)
+      </h2>
+      <p className="text-xs text-muted-foreground mb-3">
+        This entity assembles from staging components. Expand each to see the
+        actual ACDC source fields.
+      </p>
+      <div className="space-y-1">
+        {components.map((comp) => {
+          const isOpen = expanded.has(comp.componentName);
+          return (
+            <div key={comp.componentName} className="border rounded-lg overflow-hidden">
+              <button
+                onClick={() => toggle(comp.componentName)}
+                className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors"
+              >
+                {isOpen ? (
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                )}
+                <span className="font-mono text-xs font-medium">
+                  {comp.componentName}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  {comp.columns.length} fields
+                </span>
+                <span className="flex-1" />
+                <span className="text-[10px] text-muted-foreground">
+                  ACDC: {comp.acdcSources.join(", ")}
+                </span>
+              </button>
+              {isOpen && (
+                <div className="border-t px-3 py-2">
+                  <SotFieldTable columns={comp.columns} />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

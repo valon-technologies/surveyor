@@ -35,6 +35,13 @@ export interface SotColumn {
   hashColumns: string[] | null;
 }
 
+/** Resolved ACDC sources for a staging component used by an assembly parent */
+export interface StagingComponentDetail {
+  componentName: string;
+  acdcSources: string[]; // pipe_file table names used by the component
+  columns: SotColumn[];  // the component's field mappings (with ACDC-resolved sources)
+}
+
 export interface SotEntityMapping {
   table: string;
   version: number;
@@ -43,6 +50,8 @@ export interface SotEntityMapping {
   joins: SotJoin[];
   columns: SotColumn[];
   rawYaml: string;
+  /** For assembly parents: resolved ACDC sources from each staging component */
+  stagingDetail?: StagingComponentDetail[];
 }
 
 export interface SotEntitySummary {
@@ -234,7 +243,36 @@ export function loadSotEntity(
   }
 
   const yamlText = fs.readFileSync(filePath, "utf-8");
-  return parseSotYaml(yamlText);
+  const mapping = parseSotYaml(yamlText);
+
+  // For assembly parents: resolve staging component details to show ACDC sources
+  const stagingSources = mapping.sources.filter((s) => s.sourceType === "staging");
+  if (stagingSources.length > 0) {
+    const stagingDetail: StagingComponentDetail[] = [];
+    for (const staging of stagingSources) {
+      const componentPath = path.join(sotDir, milestoneDir, `${staging.table}.yaml`);
+      if (!fs.existsSync(componentPath)) continue;
+      try {
+        const compYaml = fs.readFileSync(componentPath, "utf-8");
+        const comp = parseSotYaml(compYaml);
+        const acdcSources = comp.sources
+          .filter((s) => s.sourceType === "pipe_file")
+          .map((s) => s.table);
+        stagingDetail.push({
+          componentName: staging.table,
+          acdcSources,
+          columns: comp.columns,
+        });
+      } catch {
+        // Skip malformed component YAMLs
+      }
+    }
+    if (stagingDetail.length > 0) {
+      mapping.stagingDetail = stagingDetail;
+    }
+  }
+
+  return mapping;
 }
 
 export function listSotEntities(): SotEntitySummary[] {
