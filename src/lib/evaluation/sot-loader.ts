@@ -1,12 +1,16 @@
 /**
- * Loads pre-parsed SOT (Source of Truth) data from mapping-engine eval JSONs.
+ * Loads SOT (Source of Truth) data for evaluation.
  *
- * The eval JSONs already have staging chains resolved — each field has a
- * `sot_sources` array of fully-resolved `Table.Field` references.
+ * Two sources, checked in order:
+ * 1. Pre-parsed eval JSONs from mapping-engine (M1 — staging chains already resolved)
+ * 2. Raw YAML files from sdt_mapping repo (M1 + M2 — parsed via yaml-parser)
+ *
+ * The eval JSONs take priority when both exist for the same entity.
  */
 
 import fs from "fs";
 import path from "path";
+import { loadSotEntity as loadSotYaml, listSotEntities as listYamlEntities } from "@/lib/sot/yaml-parser";
 
 const DEFAULT_EVAL_DIR = "/Users/rob/code/mapping-engine/evaluations/yaml-v7-full-v3";
 
@@ -46,48 +50,75 @@ interface EvalJson {
 }
 
 /**
- * Load SOT data for a specific entity from the eval JSON.
- * Returns null if no eval JSON exists for the entity.
+ * Load SOT data for a specific entity.
+ * Checks eval JSON first (M1, pre-parsed), then raw YAMLs (M1 + M2).
+ * Returns null if no SOT data exists for the entity.
  */
 export function loadSotForEntity(entityName: string): SotEntityData | null {
+  // Strategy 1: Pre-parsed eval JSON (M1 — most accurate, has staging chains resolved)
   const evalDir = getEvalDir();
   const filePath = path.join(evalDir, `${entityName}.json`);
 
-  if (!fs.existsSync(filePath)) {
-    return null;
+  if (fs.existsSync(filePath)) {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    const data = JSON.parse(raw) as EvalJson;
+
+    const fields: Record<string, SotFieldData> = {};
+    for (const [fieldName, evalField] of Object.entries(data.field_evaluations)) {
+      fields[fieldName] = {
+        field: evalField.field,
+        sotSources: evalField.sot_sources || [],
+        sotSummary: evalField.sot_summary || null,
+      };
+    }
+
+    return { entityName: data.entity, fields };
   }
 
-  const raw = fs.readFileSync(filePath, "utf-8");
-  const data = JSON.parse(raw) as EvalJson;
-
-  const fields: Record<string, SotFieldData> = {};
-  for (const [fieldName, evalField] of Object.entries(data.field_evaluations)) {
-    fields[fieldName] = {
-      field: evalField.field,
-      sotSources: evalField.sot_sources || [],
-      sotSummary: evalField.sot_summary || null,
-    };
+  // Strategy 2: Raw YAML files (M1 + M2 — parsed via yaml-parser)
+  // Try M2 first (more likely to have new entities), then M1
+  for (const milestone of ["m2", "m1"] as const) {
+    const yamlData = loadSotYaml(entityName, milestone);
+    if (yamlData) {
+      const fields: Record<string, SotFieldData> = {};
+      for (const col of yamlData.columns) {
+        fields[col.targetColumn] = {
+          field: col.targetColumn,
+          sotSources: col.resolvedSources,
+          sotSummary: col.expression
+            ? `transform: ${col.transform} | expression: ${col.expression.slice(0, 200)}`
+            : col.transform
+              ? `transform: ${col.transform}`
+              : null,
+        };
+      }
+      return { entityName: yamlData.table, fields };
+    }
   }
 
-  return {
-    entityName: data.entity,
-    fields,
-  };
+  return null;
 }
 
 /**
- * List all entities that have SOT eval data available.
+ * List all entities that have SOT eval data available (eval JSONs + raw YAMLs).
  */
 export function listAvailableSotEntities(): string[] {
-  const evalDir = getEvalDir();
+  const names = new Set<string>();
 
-  if (!fs.existsSync(evalDir)) {
-    return [];
+  // From eval JSON dir (M1)
+  const evalDir = getEvalDir();
+  if (fs.existsSync(evalDir)) {
+    for (const f of fs.readdirSync(evalDir)) {
+      if (f.endsWith(".json")) {
+        names.add(f.replace(".json", ""));
+      }
+    }
   }
 
-  return fs
-    .readdirSync(evalDir)
-    .filter((f) => f.endsWith(".json"))
-    .map((f) => f.replace(".json", ""))
-    .sort();
+  // From YAML dirs (M1 + M2)
+  for (const summary of listYamlEntities()) {
+    names.add(summary.name);
+  }
+
+  return [...names].sort();
 }
