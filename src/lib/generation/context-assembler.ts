@@ -154,6 +154,9 @@ export function assembleContext(
       // Exclude the current entity's SOT to prevent cheating during eval
       if (excludeEntityName && ctx.name === `SOT > ${excludeEntityName} (M1)`) continue;
 
+      // EXCLUDE_SOT=1 suppresses all SOT contexts from generation
+      if (process.env.EXCLUDE_SOT === "1" && ctx.name.startsWith("SOT > ")) continue;
+
       const tokenCount = ctx.tokenCount || estimateTokens(ctx.content);
       const entry = { id: ctx.id, name: ctx.name, content: ctx.content, tokenCount };
 
@@ -183,7 +186,8 @@ export function assembleContext(
       if (seenContextIds.has(doc.id) || !doc.content) continue;
       seenContextIds.add(doc.id);
       const tokenCount = doc.tokenCount || estimateTokens(doc.content);
-      referenceContexts.push({ id: doc.id, name: doc.name, content: doc.content, tokenCount });
+      // EK is mandatory — promote to primary so it's never dropped under token budget
+      primaryContexts.push({ id: doc.id, name: doc.name, content: doc.content, tokenCount });
     }
   }
 

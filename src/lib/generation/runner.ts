@@ -337,34 +337,39 @@ export function startGeneration(
   }));
 
   // Load production SOT mapping as generation context
+  // Set EXCLUDE_SOT=1 to suppress SOT from generation context (for unbiased eval)
   let sotMappingReference: string | undefined;
-  try {
-    const SOT_TOKEN_CAP = 8000;
-    const parts: string[] = [];
+  if (process.env.EXCLUDE_SOT === "1") {
+    console.log("[runner] SOT mapping reference excluded (EXCLUDE_SOT=1)");
+  } else {
+    try {
+      const SOT_TOKEN_CAP = 8000;
+      const parts: string[] = [];
 
-    // Same-entity SOT (prefer M2, fall back to M1)
-    const sameSot = loadSotEntity(targetEntity.name, "m2") || loadSotEntity(targetEntity.name, "m1");
-    if (sameSot) {
-      parts.push(`### Production Mapping: ${targetEntity.name}\n\n\`\`\`yaml\n${sameSot.rawYaml}\n\`\`\``);
-    }
-
-    // Cross-entity SOT (related entities in same domain)
-    const relatedSots = findRelatedSotEntities(targetEntity.name, 2);
-    for (const related of relatedSots) {
-      parts.push(`### Related Entity: ${related.table}\n\n\`\`\`yaml\n${related.rawYaml}\n\`\`\``);
-    }
-
-    if (parts.length > 0) {
-      let combined = parts.join("\n\n");
-      // Trim cross-entity references if over token cap
-      while (parts.length > 1 && estimateTokens(combined) > SOT_TOKEN_CAP) {
-        parts.pop();
-        combined = parts.join("\n\n");
+      // Same-entity SOT (prefer M2, fall back to M1)
+      const sameSot = loadSotEntity(targetEntity.name, "m2") || loadSotEntity(targetEntity.name, "m1");
+      if (sameSot) {
+        parts.push(`### Production Mapping: ${targetEntity.name}\n\n\`\`\`yaml\n${sameSot.rawYaml}\n\`\`\``);
       }
-      sotMappingReference = combined;
+
+      // Cross-entity SOT (related entities in same domain)
+      const relatedSots = findRelatedSotEntities(targetEntity.name, 2);
+      for (const related of relatedSots) {
+        parts.push(`### Related Entity: ${related.table}\n\n\`\`\`yaml\n${related.rawYaml}\n\`\`\``);
+      }
+
+      if (parts.length > 0) {
+        let combined = parts.join("\n\n");
+        // Trim cross-entity references if over token cap
+        while (parts.length > 1 && estimateTokens(combined) > SOT_TOKEN_CAP) {
+          parts.pop();
+          combined = parts.join("\n\n");
+        }
+        sotMappingReference = combined;
+      }
+    } catch (sotErr) {
+      console.warn("[runner] Failed to load SOT mapping reference:", sotErr);
     }
-  } catch (sotErr) {
-    console.warn("[runner] Failed to load SOT mapping reference:", sotErr);
   }
 
   const { systemMessage, userMessage } = promptBuilder({

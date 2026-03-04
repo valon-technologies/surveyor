@@ -299,6 +299,12 @@ export function DiscussClient() {
                 {mapping.targetField.dataType}
               </span>
             )}
+            {mapping?.targetField?.description && (
+              <span className="text-xs text-muted-foreground truncate max-w-[400px]"
+                    title={mapping.targetField.description}>
+                — {mapping.targetField.description}
+              </span>
+            )}
           </div>
         </div>
         <Button

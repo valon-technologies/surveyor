@@ -10,6 +10,7 @@ import { CONFIDENCE_COLORS, MAPPING_TYPE_LABELS, MAPPING_STATUS_LABELS, MAPPING_
 import type { ReviewCardData } from "@/types/review";
 import type { ConfidenceLevel, MappingType, MappingStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { stripCitations } from "@/lib/generation/citation-parser";
 import { MessageSquare, Check, ArrowRight, Ban, Undo2, ChevronRight, ChevronDown, UserCircle } from "lucide-react";
 
 interface ReviewCardProps {
@@ -294,7 +295,7 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple }: Revi
           )}
           {card.reasoning && (
             <p className="text-xs text-muted-foreground line-clamp-2">
-              {card.reasoning}
+              {stripCitations(card.reasoning)}
             </p>
           )}
           {card.notes && card.confidence !== "high" && (

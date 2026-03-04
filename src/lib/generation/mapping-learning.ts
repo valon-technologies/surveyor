@@ -312,17 +312,17 @@ export function extractVerdictLearning(
 
   // Source verdict → learning content
   if (mapping.sourceVerdict && mapping.sourceVerdict !== "correct") {
-    const notes = mapping.sourceVerdictNotes ? ` Notes: ${mapping.sourceVerdictNotes}` : "";
+    const notesText = mapping.sourceVerdictNotes || "";
     const currentSrc =
       mapping.sourceEntityName && mapping.sourceFieldName
         ? `${mapping.sourceEntityName}.${mapping.sourceFieldName}`
         : mapping.sourceEntityName || "unknown";
 
     const contentMap: Record<string, string> = {
-      wrong_table: `${prefix}: CORRECTION (MANDATORY): Wrong source table. Do NOT use ${currentSrc}.${notes}`,
-      wrong_field: `${prefix}: CORRECTION (MANDATORY): Wrong source field within ${mapping.sourceEntityName || "the entity"}.${notes}`,
-      should_be_unmapped: `${prefix}: This field has no source. Do NOT attempt to map it — leave unmapped.`,
-      missing_source: `${prefix}: CORRECTION (MANDATORY): This field MUST be mapped — do not leave unmapped.${notes}`,
+      wrong_table: `CORRECTION (MANDATORY) ${prefix}: MUST use source from ${notesText} — do NOT use ${currentSrc}.`,
+      wrong_field: `CORRECTION (MANDATORY) ${prefix}: Wrong field within ${mapping.sourceEntityName || "the entity"}. ${notesText}`,
+      should_be_unmapped: `CORRECTION (MANDATORY) ${prefix}: This field has NO source — set transform: null, source: []. Do NOT map it.`,
+      missing_source: `CORRECTION (MANDATORY) ${prefix}: This field MUST be mapped. ${notesText}`,
     };
 
     const content = contentMap[mapping.sourceVerdict];
@@ -331,13 +331,13 @@ export function extractVerdictLearning(
 
   // Transform verdict → learning content
   if (mapping.transformVerdict && mapping.transformVerdict !== "correct") {
-    const notes = mapping.transformVerdictNotes ? ` Notes: ${mapping.transformVerdictNotes}` : "";
+    const notesText = mapping.transformVerdictNotes || "";
 
     const contentMap: Record<string, string> = {
-      not_needed: `${prefix}: No transform required — map directly.`,
-      needed_but_missing: `${prefix}: A transform is required.${notes}`,
-      wrong_enum: `${prefix}: Enum mapping is incorrect.${notes}`,
-      wrong_logic: `${prefix}: Transform logic is wrong.${notes}`,
+      not_needed: `CORRECTION (MANDATORY) ${prefix}: No transform required — use identity mapping directly.`,
+      needed_but_missing: `CORRECTION (MANDATORY) ${prefix}: A transform is REQUIRED. ${notesText}`,
+      wrong_enum: `CORRECTION (MANDATORY) ${prefix}: Enum mapping is incorrect. ${notesText}`,
+      wrong_logic: `CORRECTION (MANDATORY) ${prefix}: Transform logic is wrong. ${notesText}`,
     };
 
     const content = contentMap[mapping.transformVerdict];

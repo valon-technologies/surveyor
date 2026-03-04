@@ -8,6 +8,7 @@ import {
 } from "@/lib/constants";
 import type { ConfidenceLevel, MappingType } from "@/lib/constants";
 import { ArrowRight, Check } from "lucide-react";
+import { stripCitations } from "@/lib/generation/citation-parser";
 
 export interface MappingState {
   mappingType: string | null;
@@ -87,7 +88,7 @@ export function MappingSummary({ targetFieldName, mapping }: MappingSummaryProps
           {mapping.reasoning && (
             <div>
               <span className="text-muted-foreground font-medium">Reasoning: </span>
-              <span className="text-muted-foreground break-words">{mapping.reasoning}</span>
+              <span className="text-muted-foreground break-words">{stripCitations(mapping.reasoning)}</span>
             </div>
           )}
         </div>
@@ -130,16 +131,21 @@ export function ProposedUpdateCard({ pendingUpdate, onApplyUpdate, applied }: Pr
   const questionKeys = ["question"];
   const metaKeys = ["reasoning", "confidence", "notes"];
 
-  const renderField = (key: string, val: unknown) => (
-    <div key={key}>
-      <span className="text-muted-foreground text-[11px] font-medium">
-        {UPDATE_KEY_LABELS[key] || key}:
-      </span>{" "}
-      <span className={`break-words whitespace-pre-wrap ${colorClass}`}>
-        {String(val)}
-      </span>
-    </div>
-  );
+  const renderField = (key: string, val: unknown) => {
+    const display = key === "reasoning" || key === "notes"
+      ? stripCitations(String(val))
+      : String(val);
+    return (
+      <div key={key}>
+        <span className="text-muted-foreground text-[11px] font-medium">
+          {UPDATE_KEY_LABELS[key] || key}:
+        </span>{" "}
+        <span className={`break-words whitespace-pre-wrap ${colorClass}`}>
+          {display}
+        </span>
+      </div>
+    );
+  };
 
   const entries = Object.entries(pendingUpdate)
     .filter(([key]) => !HIDDEN_UPDATE_KEYS.has(key))

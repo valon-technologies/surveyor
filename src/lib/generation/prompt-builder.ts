@@ -69,6 +69,8 @@ const SYSTEM_MESSAGE = `You are a data mapping API that outputs ONLY valid JSON.
 
 Your task: given target fields and reference documents, produce a mapping specification for each target field, plus any questions about uncertainties.
 
+ENTITY KNOWLEDGE RULE (HIGHEST PRIORITY): Reference documents titled "Entity Knowledge" contain verified corrections from production ground truth and human reviewers. These corrections are MANDATORY — follow them exactly. If a correction says "CORRECTION (MANDATORY)", you MUST apply it. Do not argue against, reinterpret, or override these corrections under any circumstances. They take precedence over your own reasoning, other context documents, and all rules below.
+
 OUTPUT FORMAT: A single JSON object with "mappings" and "questions" arrays. No text before or after. No code fences. Example:
 
 {"mappings":[{"targetFieldName":"field_name","status":"unreviewed","mappingType":"direct","sourceEntityName":"src_table","sourceFieldName":"src_col","transform":null,"defaultValue":null,"enumMapping":null,"reasoning":"Direct 1:1 match on name and type","confidence":"high","uncertaintyType":null,"notes":null,"reviewComment":null}],"questions":[{"targetFieldName":"other_field","questionText":"Which source table contains the delinquency status?","questionType":"no_source_match","priority":"high"}]}
@@ -82,7 +84,7 @@ MAPPING SCHEMA (every object in "mappings" must have these keys):
 - transform (string|null): SQL expression if transformation needed
 - defaultValue (string|null): default if no source exists
 - enumMapping (object|null): {"source_val": "target_val"} for enum mappings
-- reasoning (string): 1-2 sentence explanation
+- reasoning (string): 1-2 sentence explanation. When a transform or expression is used, describe what it does in plain english (e.g., "Maps mortgagor first name from LoanInfo, using the expanded name variant"). For enum mappings, briefly describe the code-to-value translation. For unmapped fields, explain why no source exists. CITE your sources: include [ref:ctx_ID] tags from the reference documents that informed this mapping (e.g., "Based on [ref:ctx_abc123] field description...").
 - confidence (string): "high" | "medium" | "low"
 - uncertaintyType (string|null): REQUIRED when confidence is "medium" or "low". One of: "no_source_match" | "multiple_candidates" | "unclear_transform" | "incomplete_enum" | "domain_ambiguity" | "missing_context"
 - notes (string|null): caveats or open questions
@@ -164,8 +166,6 @@ SELF-REVIEW CHECKLIST (verify before outputting):
 6. Every medium/low mapping has both uncertaintyType and reviewComment
 7. Questions generated for genuine uncertainties that a human can resolve — NOT for values already documented in enum references
 8. All filter values use documented enum codes — cross-check every filter condition against enum references before asking about it
-
-ENTITY KNOWLEDGE RULE: Reference documents titled "Entity Knowledge" contain verified corrections from human reviewers. These corrections are MANDATORY — follow them exactly. If a correction says "REQUIRED: Use X" or "CORRECTION (MANDATORY)", you MUST use X. Do not argue against, reinterpret, or override these corrections under any circumstances. They take precedence over your own reasoning about which source table or field is "better."
 
 PRODUCTION MAPPING REFERENCE: When a "Production Mapping Reference" section is provided, it contains verified production YAML for this entity or related entities in the same domain. Use as a guide for:
 - Which source tables to use (trust production table choices)
@@ -267,6 +267,8 @@ const YAML_SYSTEM_MESSAGE = `You are a data mapping API that outputs ONLY valid 
 
 Your task: given target fields and source schema, produce a mapping specification in YAML format that fully describes the ETL pipeline: sources, joins, and per-column transforms.
 
+ENTITY KNOWLEDGE RULE (HIGHEST PRIORITY): Reference documents titled "Entity Knowledge" contain verified corrections from production ground truth and human reviewers. These corrections are MANDATORY — follow them exactly. If a correction says "CORRECTION (MANDATORY)", you MUST apply it. Do not argue against, reinterpret, or override these corrections under any circumstances. They take precedence over your own reasoning, other context documents, and all rules below.
+
 OUTPUT FORMAT: A single YAML document. No text before or after. No code fences.
 
 SCHEMA:
@@ -300,9 +302,13 @@ columns:
       <pandas expression>
     transform: identity|expression|null|literal|hash_id
     dtype: string|int|float|date|datetime|boolean
-    note: |                        # REQUIRED — 1-2 sentence explanation of why this mapping was chosen,
-                                   # what context informed it, and any caveats. For unmapped fields,
-                                   # explain why no source exists. Be specific and human-readable.
+    note: |                        # REQUIRED — 1-2 sentence explanation. When a transform or expression
+                                   # is used, describe what it does in plain english (e.g., "Maps
+                                   # mortgagor first name from LoanInfo, using the expanded name
+                                   # variant"). For enum mappings, briefly describe the code-to-value
+                                   # translation. For unmapped fields, explain why no source exists.
+                                   # CITE your sources: include [ref:ctx_ID] tags from the reference
+                                   # documents that informed this mapping.
     confidence: high|medium|low    # REQUIRED — how confident you are in this mapping
     review_comment: |              # REQUIRED when confidence is medium or low — explain specifically
                                    # what additional info is needed to make this 100% certain.
@@ -395,8 +401,6 @@ SELF-REVIEW CHECKLIST (verify before outputting):
 5. Prefer identity transforms — don't over-engineer simple 1:1 matches
 6. Questions generated for genuine uncertainties that a human can resolve — NOT for values already documented in enum references
 7. All filter values use documented enum codes — cross-check every filter condition against enum references before asking about it
-
-ENTITY KNOWLEDGE RULE: Reference documents titled "Entity Knowledge" contain verified corrections from human reviewers. These corrections are MANDATORY — follow them exactly. If a correction says "REQUIRED: Use X" or "CORRECTION (MANDATORY)", you MUST use X. Do not argue against, reinterpret, or override these corrections under any circumstances. They take precedence over your own reasoning about which source table or field is "better."
 
 PRODUCTION MAPPING REFERENCE: When a "Production Mapping Reference" section is provided, it contains verified production YAML for this entity or related entities in the same domain. Use as a guide for:
 - Which source tables to use (trust production table choices)

@@ -25,6 +25,9 @@ export interface MappingEvaluation {
 /**
  * Evaluate all latest field mappings for an entity against SOT.
  * Returns null if no SOT data exists for the entity.
+ *
+ * For assembly entities (those with component children in the DB),
+ * aggregates genSources from all component mappings before scoring.
  */
 export function evaluateEntityMappings(
   workspaceId: string,
@@ -41,7 +44,7 @@ export function evaluateEntityMappings(
     throw new Error(`Entity ${entityId} not found`);
   }
 
-  // 2. Load SOT data
+  // 2. Load SOT data (now includes merged staging component sources for assembly parents)
   const sotData = loadSotForEntity(targetEntity.name);
   if (!sotData) {
     return null; // no SOT available
@@ -54,7 +57,20 @@ export function evaluateEntityMappings(
     .where(eq(field.entityId, entityId))
     .all();
 
-  // 4. Load latest field mappings with source entity/field names resolved
+  // 4. Check if this is an assembly entity with component children
+  const componentEntities = db
+    .select()
+    .from(entity)
+    .where(and(eq(entity.parentEntityId, entityId), eq(entity.workspaceId, workspaceId)))
+    .all();
+
+  if (componentEntities.length > 0) {
+    return evaluateAssemblyEntity(
+      workspaceId, entityId, targetEntity, sotData, targetFields, componentEntities,
+    );
+  }
+
+  // 5. Load latest field mappings with source entity/field names resolved (flat entity path)
   const latestMappings = db
     .select({
       targetFieldId: fieldMapping.targetFieldId,
@@ -152,6 +168,138 @@ export function evaluateEntityMappings(
   }
 
   // 6. Compute aggregate scores
+  const scorableResults = fieldResults.filter((r) => isScorable(r.matchType));
+  const scoredFields = scorableResults.length;
+  const sourceExactCount = scorableResults.filter(
+    (r) => r.matchType === "EXACT" || r.matchType === "BOTH_NULL"
+  ).length;
+  const sourceLenientCount = scorableResults.filter(
+    (r) =>
+      r.matchType === "EXACT" ||
+      r.matchType === "BOTH_NULL" ||
+      r.matchType === "SUBSET" ||
+      r.matchType === "SUPERSET" ||
+      r.matchType === "OVERLAP"
+  ).length;
+
+  const sourceExactPct = scoredFields > 0
+    ? Math.round((sourceExactCount / scoredFields) * 1000) / 10
+    : 0;
+  const sourceLenientPct = scoredFields > 0
+    ? Math.round((sourceLenientCount / scoredFields) * 1000) / 10
+    : 0;
+
+  return {
+    entityId,
+    entityName: targetEntity.name,
+    generationId,
+    totalFields: targetFields.length,
+    scoredFields,
+    sourceExactCount,
+    sourceLenientCount,
+    sourceExactPct,
+    sourceLenientPct,
+    fieldResults,
+  };
+}
+
+/**
+ * Evaluate an assembly entity by aggregating genSources from all component
+ * entity mappings, then comparing against the merged SOT (which includes
+ * ACDC sources from all staging components).
+ */
+function evaluateAssemblyEntity(
+  workspaceId: string,
+  entityId: string,
+  targetEntity: { id: string; name: string },
+  sotData: import("./sot-loader").SotEntityData,
+  targetFields: { id: string; name: string }[],
+  componentEntities: { id: string; name: string }[],
+): MappingEvaluation {
+  // Load all entities and fields for name resolution (batch)
+  const allEntities = db.select().from(entity).all();
+  const entityNameById = new Map(allEntities.map((e) => [e.id, e.name]));
+  const allFields = db.select().from(field).all();
+  const fieldNameById = new Map(allFields.map((f) => [f.id, f.name]));
+
+  // For each parent field, aggregate genSources from all component mappings
+  const aggregatedGenSources = new Map<string, string[]>();
+  let generationId: string | null = null;
+
+  for (const compEntity of componentEntities) {
+    const compFields = db
+      .select()
+      .from(field)
+      .where(eq(field.entityId, compEntity.id))
+      .all();
+
+    const compMappings = db
+      .select({
+        targetFieldId: fieldMapping.targetFieldId,
+        sourceEntityId: fieldMapping.sourceEntityId,
+        sourceFieldId: fieldMapping.sourceFieldId,
+        transform: fieldMapping.transform,
+        generationId: fieldMapping.generationId,
+      })
+      .from(fieldMapping)
+      .where(
+        and(
+          eq(fieldMapping.workspaceId, workspaceId),
+          eq(fieldMapping.isLatest, true),
+        )
+      )
+      .all()
+      .filter((m) => compFields.some((cf) => cf.id === m.targetFieldId));
+
+    const compMappingByFieldId = new Map(
+      compMappings.map((m) => [m.targetFieldId, m])
+    );
+
+    for (const cf of compFields) {
+      const mapping = compMappingByFieldId.get(cf.id);
+      if (!mapping) continue;
+
+      if (mapping.generationId && !generationId) {
+        generationId = mapping.generationId;
+      }
+
+      // Build genSources for this component's mapping
+      const genSources: string[] = [];
+      if (mapping.sourceEntityId && mapping.sourceFieldId) {
+        const seName = entityNameById.get(mapping.sourceEntityId);
+        const sfName = fieldNameById.get(mapping.sourceFieldId);
+        if (seName && sfName) genSources.push(`${seName}.${sfName}`);
+      }
+      if (mapping.transform) {
+        const additionalRefs = extractTransformSources(mapping.transform, entityNameById);
+        for (const ref of additionalRefs) {
+          if (!genSources.includes(ref)) genSources.push(ref);
+        }
+      }
+
+      // Merge into aggregated (deduplicated)
+      const existing = aggregatedGenSources.get(cf.name) || [];
+      for (const src of genSources) {
+        if (!existing.includes(src)) existing.push(src);
+      }
+      aggregatedGenSources.set(cf.name, existing);
+    }
+  }
+
+  // Match each parent field against SOT using aggregated genSources
+  const fieldResults: FieldSourceMatch[] = [];
+
+  for (const tf of targetFields) {
+    const sotField = sotData.fields[tf.name];
+    const genSources = aggregatedGenSources.get(tf.name) || [];
+    const sotSources = sotField?.sotSources || [];
+    const fieldInSot = !!sotField;
+
+    const { matchType, score } = matchSources(genSources, sotSources, fieldInSot);
+    fieldResults.push({ field: tf.name, matchType, score, genSources, sotSources });
+  }
+
+  // Compute aggregate scores
   const scorableResults = fieldResults.filter((r) => isScorable(r.matchType));
   const scoredFields = scorableResults.length;
   const sourceExactCount = scorableResults.filter(

@@ -15,10 +15,11 @@ for (const line of readFileSync(".env.local", "utf-8").split("\n")) {
 }
 
 import { db } from "../src/lib/db";
-import { entity, field, fieldMapping, generation, user } from "../src/lib/db/schema";
+import { entity, field, fieldMapping, generation, user, mappingContext } from "../src/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { startGeneration, executeGeneration } from "../src/lib/generation/runner";
 import { evaluateEntityMappings } from "../src/lib/evaluation/mapping-evaluator";
+import { extractCitations } from "../src/lib/generation/citation-parser";
 
 const DEFAULT_ENTITIES = [
   "loan",
@@ -128,6 +129,44 @@ async function processEntity(name: string): Promise<Result | null> {
         }).run();
       }
       console.log(`  Persisted ${mappings.length} mappings`);
+
+      // Citation-based context linking
+      const promptSnap = gen.promptSnapshot as Record<string, unknown> | null;
+      const contextUsed = (promptSnap?.contextUsed ?? []) as { id: string; name: string }[];
+      if (contextUsed.length > 0) {
+        const contextIdSet = new Set(contextUsed.map((c) => c.id));
+        let citedCount = 0;
+        let fallbackCount = 0;
+
+        for (const fm of mappings) {
+          if (!fm.targetFieldId) continue;
+          // Find the mapping we just inserted
+          const saved = db.select({ id: fieldMapping.id }).from(fieldMapping)
+            .where(and(eq(fieldMapping.targetFieldId, fm.targetFieldId), eq(fieldMapping.isLatest, true)))
+            .get();
+          if (!saved) continue;
+
+          const cited = extractCitations(fm.reasoning, fm.notes, fm.reviewComment);
+          const validCited = [...cited].filter((id) => contextIdSet.has(id));
+
+          if (validCited.length > 0) {
+            for (const ctxId of validCited) {
+              db.insert(mappingContext).values({
+                fieldMappingId: saved.id, contextId: ctxId, contextType: "context_reference",
+              }).run();
+            }
+            citedCount++;
+          } else {
+            for (const ctx of contextUsed) {
+              db.insert(mappingContext).values({
+                fieldMappingId: saved.id, contextId: ctx.id, contextType: "context_reference",
+              }).run();
+            }
+            fallbackCount++;
+          }
+        }
+        console.log(`  Context links: ${citedCount} citation-based, ${fallbackCount} fallback (${contextUsed.length} docs available)`);
+      }
     }
   }
 

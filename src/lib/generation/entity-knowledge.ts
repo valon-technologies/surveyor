@@ -229,8 +229,8 @@ function renderDocument(
   // Section 1: Mapping corrections (source="review") — deduplicated by field
   const corrections = learnings.filter((l) => l.source === "review");
   if (corrections.length > 0) {
-    parts.push(`## Source & Transform Corrections (MANDATORY)\n`);
-    parts.push(`These corrections have been verified by human reviewers. Follow each one exactly. Do NOT override or argue against them.\n`);
+    parts.push(`## MANDATORY CORRECTIONS — DO NOT OVERRIDE\n`);
+    parts.push(`The following corrections are verified against production ground truth. You MUST apply each one exactly. Do NOT substitute your own reasoning. If a correction conflicts with other context, the correction wins.\n`);
     const seen = new Set<string>();
     for (const c of corrections) {
       // Most recent first (already ordered by createdAt DESC), skip dupes

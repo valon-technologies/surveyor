@@ -7,6 +7,7 @@ import { resolveProvider } from "./provider-resolver";
 import { issueToQuestion, type ValidationIssue } from "./yaml-validator";
 import { parseYamlOutput, type YamlParseResult } from "./output-parser";
 import type { ParseResult, ParsedFieldMapping } from "@/types/generation";
+import { extractCitations } from "./citation-parser";
 import type { MappingStatus } from "@/lib/constants";
 import { createBulkChatRun, executeBulkChatRun } from "./bulk-chat-runner";
 import type { BigQueryConfig } from "@/types/workspace";
@@ -295,19 +296,46 @@ async function generateFlatEntity(
     batchRunId,
   );
 
-  // Populate mappingContext junction table — link each new mapping to the
-  // context docs that were included in the generation prompt.
+  // Populate mappingContext junction table — link each new mapping to context
+  // docs that were actually cited in its reasoning/notes. Falls back to all
+  // available context if no citations were found (older models or uncited output).
   const promptSnap = gen.promptSnapshot as Record<string, unknown> | null;
   const contextUsed = (promptSnap?.contextUsed ?? []) as { id: string; name: string; tokens: number }[];
   if (contextUsed.length > 0) {
+    const contextIdSet = new Set(contextUsed.map((c) => c.id));
+
+    // Build per-mapping citation index from parsed output
+    const citationsByField = new Map<string, Set<string>>();
+    for (const fm of parsed.fieldMappings) {
+      const cited = extractCitations(fm.reasoning, fm.notes, fm.reviewComment);
+      // Only keep citations that match actual context IDs from the prompt
+      const validCited = new Set([...cited].filter((id) => contextIdSet.has(id)));
+      if (validCited.size > 0) {
+        citationsByField.set(fm.targetFieldName.toLowerCase(), validCited);
+      }
+    }
+
     const rows: { fieldMappingId: string; contextId: string; contextType: string }[] = [];
-    for (const [, info] of mappingLookup) {
-      for (const ctx of contextUsed) {
-        rows.push({
-          fieldMappingId: info.mappingId,
-          contextId: ctx.id,
-          contextType: "context_reference",
-        });
+    for (const [fieldName, info] of mappingLookup) {
+      const cited = citationsByField.get(fieldName);
+      if (cited && cited.size > 0) {
+        // Citation-based: only link docs the LLM actually referenced
+        for (const ctxId of cited) {
+          rows.push({
+            fieldMappingId: info.mappingId,
+            contextId: ctxId,
+            contextType: "context_reference",
+          });
+        }
+      } else {
+        // Fallback: no citations found, link all context (backwards compat)
+        for (const ctx of contextUsed) {
+          rows.push({
+            fieldMappingId: info.mappingId,
+            contextId: ctx.id,
+            contextType: "context_reference",
+          });
+        }
       }
     }
     // Batch insert in chunks of 500 (SQLite variable limit)

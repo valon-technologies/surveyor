@@ -72,6 +72,7 @@ export interface MappingWithContext extends FieldMapping {
     id: string;
     name: string;
     displayName: string | null;
+    description: string | null;
     dataType: string | null;
     entityId: string;
     entityName: string;

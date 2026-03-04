@@ -84,7 +84,7 @@ export function loadSotForEntity(entityName: string): SotEntityData | null {
       for (const col of yamlData.columns) {
         fields[col.targetColumn] = {
           field: col.targetColumn,
-          sotSources: col.resolvedSources,
+          sotSources: [...col.resolvedSources],
           sotSummary: col.expression
             ? `transform: ${col.transform} | expression: ${col.expression.slice(0, 200)}`
             : col.transform
@@ -92,6 +92,25 @@ export function loadSotForEntity(entityName: string): SotEntityData | null {
               : null,
         };
       }
+
+      // For assembly parents: merge staging component ACDC sources into parent fields.
+      // Parent columns have bare source refs (e.g., `source: first_name`) that don't resolve
+      // to ACDC table.column format. The real ACDC sources live in staging components.
+      if (yamlData.stagingDetail) {
+        for (const comp of yamlData.stagingDetail) {
+          for (const compCol of comp.columns) {
+            const parentField = fields[compCol.targetColumn];
+            if (parentField) {
+              for (const src of compCol.resolvedSources) {
+                if (!parentField.sotSources.includes(src)) {
+                  parentField.sotSources.push(src);
+                }
+              }
+            }
+          }
+        }
+      }
+
       return { entityName: yamlData.table, fields };
     }
   }

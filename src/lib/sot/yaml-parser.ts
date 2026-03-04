@@ -249,8 +249,29 @@ export function loadSotEntity(
   const stagingSources = mapping.sources.filter((s) => s.sourceType === "staging");
   if (stagingSources.length > 0) {
     const stagingDetail: StagingComponentDetail[] = [];
+
+    // Build table name → filename index for this milestone dir (handles name mismatches
+    // like borrower_comortgr table name → borrower_comrtgr.yaml filename)
+    const dirPath = path.join(sotDir, milestoneDir);
+    const tableToFilePath = new Map<string, string>();
+    if (fs.existsSync(dirPath)) {
+      for (const f of fs.readdirSync(dirPath).filter((f) => f.endsWith(".yaml"))) {
+        const fp = path.join(dirPath, f);
+        tableToFilePath.set(f.replace(".yaml", ""), fp);
+        try {
+          const text = fs.readFileSync(fp, "utf-8");
+          const data = yaml.load(text) as Record<string, unknown>;
+          const tbl = data.table as string | undefined;
+          if (tbl && tbl !== f.replace(".yaml", "")) {
+            tableToFilePath.set(tbl, fp);
+          }
+        } catch { /* skip */ }
+      }
+    }
+
     for (const staging of stagingSources) {
-      const componentPath = path.join(sotDir, milestoneDir, `${staging.table}.yaml`);
+      const componentPath = tableToFilePath.get(staging.table)
+        || path.join(sotDir, milestoneDir, `${staging.table}.yaml`);
       if (!fs.existsSync(componentPath)) continue;
       try {
         const compYaml = fs.readFileSync(componentPath, "utf-8");
