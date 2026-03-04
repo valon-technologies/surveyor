@@ -40,6 +40,7 @@ const navItems: NavItem[] = [
     children: [
       { href: "/", label: "Progress Summary" },
       { href: "/mapping", label: "Human Review UI" },
+      { href: "/mapping/fields", label: "VDS Fields by Milestone" },
       { href: "/mapping/questions", label: "Questions from Human Review" },
       { href: "/docs", label: "Review Guide" },
     ],

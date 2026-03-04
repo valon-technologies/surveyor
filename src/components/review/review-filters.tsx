@@ -5,8 +5,10 @@ import { useReviewStore } from "@/stores/review-store";
 import { useReviewQueue } from "@/queries/review-queries";
 import {
   MAPPING_STATUS_LABELS,
+  MILESTONE_LABELS,
   type ConfidenceLevel,
   type MappingStatus,
+  type Milestone,
 } from "@/lib/constants";
 
 export function ReviewFilters() {
@@ -17,6 +19,8 @@ export function ReviewFilters() {
     setEntityFilter,
     statusFilter,
     setStatusFilter,
+    milestoneFilter,
+    setMilestoneFilter,
     sortBy,
     setSortBy,
     sortOrder,
@@ -29,11 +33,13 @@ export function ReviewFilters() {
   // Derive distinct values from actual data
   const confidenceValues = new Set<ConfidenceLevel>();
   const statusValues = new Set<MappingStatus>();
+  const milestoneValues = new Set<Milestone>();
   const entityMap = new Map<string, string>(); // id → display name
 
   for (const card of allCards || []) {
     if (card.confidence) confidenceValues.add(card.confidence);
     if (card.status) statusValues.add(card.status);
+    if (card.milestone) milestoneValues.add(card.milestone as Milestone);
     // Only show top-level entities (skip children)
     if (card.parentEntityId) {
       // Ensure parent appears in dropdown even if it has no cards of its own
@@ -63,6 +69,13 @@ export function ReviewFilters() {
       statusOptions.push({ value: s, label: MAPPING_STATUS_LABELS[s] });
     }
   }
+
+  const milestoneOptions = [
+    { value: "all", label: "All Milestones" },
+    ...Array.from(milestoneValues)
+      .sort()
+      .map((m) => ({ value: m, label: MILESTONE_LABELS[m] || m })),
+  ];
 
   const entityOptions = [
     { value: "all", label: "All Entities" },
@@ -95,6 +108,12 @@ export function ReviewFilters() {
         value={statusFilter}
         onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
         className="w-40"
+      />
+      <Select
+        options={milestoneOptions}
+        value={milestoneFilter}
+        onChange={(e) => setMilestoneFilter(e.target.value as typeof milestoneFilter)}
+        className="w-36"
       />
       <Select
         options={entityOptions}

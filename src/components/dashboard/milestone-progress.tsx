@@ -78,26 +78,25 @@ export function MilestoneProgress({ stats }: { stats: MilestoneStats[] }) {
                   );
                 })}
               </div>
+              <div className="flex gap-3 text-[10px] text-muted-foreground mt-0.5">
+                {STATUS_ORDER.map((status) => {
+                  const count = s.statusBreakdown[status] || 0;
+                  if (count === 0) return null;
+                  return (
+                    <span key={status} className="flex items-center gap-1">
+                      <span
+                        className="inline-block w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: MAPPING_STATUS_COLORS[status] || "#6b7280" }}
+                      />
+                      {count} {MAPPING_STATUS_LABELS[status] || status}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
 
-        {/* Shared legend */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 border-t">
-          {STATUS_ORDER.filter((s) => activeStatuses.has(s)).map((status) => (
-            <div key={status} className="flex items-center gap-1.5 text-[11px]">
-              <div
-                className="h-2 w-2 rounded-full"
-                style={{
-                  backgroundColor: MAPPING_STATUS_COLORS[status] || "#6b7280",
-                }}
-              />
-              <span className="text-muted-foreground">
-                {MAPPING_STATUS_LABELS[status] || status}
-              </span>
-            </div>
-          ))}
-        </div>
       </CardContent>
     </Card>
   );

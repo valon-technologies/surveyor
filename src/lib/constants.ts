@@ -104,12 +104,13 @@ export const ENTITY_STATUS_LABELS: Record<EntityStatus, string> = {
 };
 
 // ─── Milestones (field-level delivery targets) ──────────────
-export const MILESTONES = ["M1", "M2", "M3", "M4", "NR"] as const;
+export const MILESTONES = ["M1", "M2", "M2.5", "M3", "M4", "NR"] as const;
 export type Milestone = (typeof MILESTONES)[number];
 
 export const MILESTONE_COLORS: Record<Milestone, string> = {
   M1: "#ef4444",
   M2: "#f59e0b",
+  "M2.5": "#f97316",
   M3: "#3b82f6",
   M4: "#6b7280",
   NR: "#d4d4d8",
@@ -118,6 +119,7 @@ export const MILESTONE_COLORS: Record<Milestone, string> = {
 export const MILESTONE_LABELS: Record<Milestone, string> = {
   M1: "M1 — 2/1",
   M2: "M2 — 5/1",
+  "M2.5": "M2.5",
   M3: "M3 — 7/1",
   M4: "M4 — 9/1",
   NR: "Not Required",

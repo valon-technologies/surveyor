@@ -7,9 +7,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   // Mapping editor, discuss, and auth pages use full-screen layout (no sidebar)
-  // Exclude /mapping/questions which should keep the sidebar
+  // Keep sidebar for /mapping/questions, /mapping/fields, and other known sub-pages
+  const sidebarPages = ["/mapping/questions", "/mapping/fields"];
   const isFullScreen =
-    (pathname.match(/^\/mapping\/[^/]+$/) && pathname !== "/mapping/questions") ||
+    (pathname.match(/^\/mapping\/[^/]+$/) && !sidebarPages.includes(pathname)) ||
     pathname.startsWith("/mapping/discuss/") ||
     pathname.startsWith("/mapping/discuss-entity/") ||
     pathname.startsWith("/auth");

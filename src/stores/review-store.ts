@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ConfidenceLevel, MappingStatus } from "@/lib/constants";
+import type { ConfidenceLevel, MappingStatus, Milestone } from "@/lib/constants";
 import type { ReviewSortBy, ReviewSortOrder } from "@/types/review";
 
 interface ReviewState {
@@ -11,6 +11,9 @@ interface ReviewState {
 
   statusFilter: MappingStatus | "all";
   setStatusFilter: (s: MappingStatus | "all") => void;
+
+  milestoneFilter: Milestone | "all";
+  setMilestoneFilter: (m: Milestone | "all") => void;
 
   sortBy: ReviewSortBy;
   setSortBy: (s: ReviewSortBy) => void;
@@ -34,6 +37,9 @@ export const useReviewStore = create<ReviewState>((set) => ({
 
   statusFilter: "all",
   setStatusFilter: (s) => set({ statusFilter: s }),
+
+  milestoneFilter: "all",
+  setMilestoneFilter: (m) => set({ milestoneFilter: m }),
 
   sortBy: "confidence",
   setSortBy: (s) => set({ sortBy: s }),

@@ -5,11 +5,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api-client";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { cn } from "@/lib/utils";
-import { Check, X, Copy, Pencil } from "lucide-react";
+import { Check, X, Copy, Pencil, ArrowDownToLine, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BatchRunPanel } from "@/components/review/batch-run-panel";
+import { LinearSyncPanel } from "@/components/admin/linear-sync-panel";
 
-type Tab = "corrections" | "questions" | "generation";
+type Tab = "corrections" | "questions" | "generation" | "linear";
 
 interface PendingLearning {
   id: string;
@@ -118,6 +119,17 @@ export default function AdminPage() {
         >
           Generation
         </button>
+        <button
+          onClick={() => setTab("linear")}
+          className={cn(
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+            tab === "linear"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Linear Sync
+        </button>
       </div>
 
       {/* Corrections tab */}
@@ -197,6 +209,11 @@ export default function AdminPage() {
         <div className="space-y-3">
           <BatchRunPanel />
         </div>
+      )}
+
+      {/* Linear Sync tab */}
+      {tab === "linear" && (
+        <LinearSyncPanel />
       )}
     </div>
   );

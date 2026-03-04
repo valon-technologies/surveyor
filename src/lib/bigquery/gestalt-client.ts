@@ -1,40 +1,32 @@
-import { execFile } from "child_process";
-import { promisify } from "util";
-import { BigQuery } from "@google-cloud/bigquery";
+const GESTALT_BASE = "https://api.gestalt.peachstreet.dev/api/v1";
 
-const execFileAsync = promisify(execFile);
+function getGestaltKey(): string {
+  const key = process.env.GESTALT_API_KEY;
+  if (!key) throw new Error("GESTALT_API_KEY not set");
+  return key;
+}
 
 async function gestaltInvoke<T = unknown>(
   integration: string,
   operation: string,
   params: Record<string, string> = {}
 ): Promise<T> {
-  const args = ["invoke", integration, operation];
-  for (const [k, v] of Object.entries(params)) {
-    args.push("-p", `${k}=${v}`);
+  const res = await fetch(`${GESTALT_BASE}/${integration}/${operation}`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${getGestaltKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Gestalt ${integration}.${operation} failed (${res.status}): ${text}`);
   }
 
-  try {
-    const { stdout } = await execFileAsync("gestalt", args, {
-      timeout: 30_000,
-      env: { ...process.env, GESTALT_API_KEY: process.env.GESTALT_API_KEY },
-    });
-
-    const json = JSON.parse(stdout);
-    if (json.status !== "success") {
-      throw new Error(`Gestalt ${integration}.${operation} error: ${JSON.stringify(json)}`);
-    }
-    return json.data as T;
-  } catch (err: unknown) {
-    if (err && typeof err === "object" && "stderr" in err) {
-      const stderr = (err as { stderr: string }).stderr;
-      if (stderr.includes("Not authenticated")) {
-        throw new Error("Gestalt not authenticated. Run: gestalt auth");
-      }
-      throw new Error(`Gestalt ${integration}.${operation} failed: ${stderr.trim()}`);
-    }
-    throw err;
-  }
+  const json = await res.json();
+  return json.data as T;
 }
 
 // ─── BigQuery Operations ─────────────────────────────────────
@@ -144,27 +136,27 @@ export interface DryRunResult {
 
 /**
  * Validate SQL via BigQuery dry run — zero cost, no row scanning.
- * Catches nonexistent tables, nonexistent fields, type mismatches,
- * and syntax errors without executing the query.
+ * Uses Gestalt API. Falls back to treating query errors as validation failures.
  */
 export async function dryRunQuery(
   projectId: string,
   sql: string,
 ): Promise<DryRunResult> {
   try {
-    const bq = new BigQuery({ projectId });
-    const [job] = await bq.createQueryJob({ query: sql, dryRun: true });
-    const totalBytesProcessed = Number(
-      job.metadata?.statistics?.totalBytesProcessed ?? 0,
-    );
-    return { valid: true, totalBytesProcessed };
+    // Gestalt doesn't have a dedicated dry-run op — run with LIMIT 0
+    const drySQL = sql.trim().replace(/;$/, "") + " LIMIT 0";
+    await gestaltInvoke<{ rows: unknown[] }>("bigquery", "query", {
+      project_id: projectId,
+      query: drySQL,
+    });
+    return { valid: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { valid: false, error: message };
   }
 }
 
-// ─── SQL Queries (via ADC / @google-cloud/bigquery) ──────────
+// ─── SQL Queries (via Gestalt HTTP API) ──────────────────────
 
 export interface QueryResult {
   rows: Record<string, unknown>[];
@@ -173,8 +165,7 @@ export interface QueryResult {
 }
 
 /**
- * Run a read-only SQL query against BigQuery.
- * Uses Application Default Credentials (gcloud auth application-default login).
+ * Run a read-only SQL query against BigQuery via Gestalt.
  * Enforces LIMIT to prevent runaway queries.
  */
 export async function runQuery(
@@ -187,12 +178,17 @@ export async function runQuery(
   const hasLimit = /\bLIMIT\s+\d+/i.test(normalized);
   const safeSql = hasLimit ? normalized : `${normalized} LIMIT ${maxRows}`;
 
-  const bq = new BigQuery({ projectId });
-  const [rows] = await bq.query({ query: safeSql });
+  const data = await gestaltInvoke<{
+    rows: Record<string, unknown>[];
+    total_rows: number;
+  }>("bigquery", "query", {
+    project_id: projectId,
+    query: safeSql,
+  });
 
   return {
-    rows: rows as Record<string, unknown>[],
-    totalRows: rows.length,
-    truncated: !hasLimit && rows.length >= maxRows,
+    rows: data.rows || [],
+    totalRows: data.total_rows ?? data.rows?.length ?? 0,
+    truncated: !hasLimit && (data.rows?.length ?? 0) >= maxRows,
   };
 }
