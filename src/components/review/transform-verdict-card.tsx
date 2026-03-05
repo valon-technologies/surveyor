@@ -17,6 +17,7 @@ interface TransformVerdictCardProps {
   onAcceptSuggestion?: () => void;
   suggestionApplied?: boolean;
   aiHasOpinion?: boolean;
+  onWhyWrongProvided?: () => void;
 }
 
 export function TransformVerdictCard({
@@ -31,6 +32,7 @@ export function TransformVerdictCard({
   onAcceptSuggestion,
   suggestionApplied,
   aiHasOpinion,
+  onWhyWrongProvided,
 }: TransformVerdictCardProps) {
   const [notes, setNotes] = useState("");
   const [whyWrong, setWhyWrong] = useState("");
@@ -110,6 +112,7 @@ export function TransformVerdictCard({
 
   function handleWhyWrongBlur() {
     if (!whyWrong.trim() || !selected || selected === "current") return;
+    onWhyWrongProvided?.();
     if (selected === "suggested") {
       save("wrong", buildNotes(`Accepted AI suggestion: ${suggestedLabel}`, whyWrong));
     } else if (selected === "custom" && notes.trim()) {

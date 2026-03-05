@@ -9,8 +9,9 @@ import { Check, X, Copy, Pencil, ArrowDownToLine, Loader2, CheckCircle, AlertCir
 import { Button } from "@/components/ui/button";
 import { BatchRunPanel } from "@/components/review/batch-run-panel";
 import { LinearSyncPanel } from "@/components/admin/linear-sync-panel";
+import { AnalyticsPanel } from "@/components/admin/analytics-panel";
 
-type Tab = "corrections" | "questions" | "generation" | "linear";
+type Tab = "corrections" | "questions" | "generation" | "linear" | "analytics";
 
 interface PendingLearning {
   id: string;
@@ -38,8 +39,16 @@ interface DraftQuestion {
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("corrections");
-  const { workspaceId } = useWorkspace();
+  const { workspaceId, role } = useWorkspace();
   const qc = useQueryClient();
+
+  if (role !== "owner") {
+    return (
+      <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+        <p className="text-sm text-muted-foreground">You don't have access to the Admin page.</p>
+      </div>
+    );
+  }
   const basePath = workspacePath(workspaceId, "admin");
 
   // Corrections
@@ -130,6 +139,17 @@ export default function AdminPage() {
         >
           Linear Sync
         </button>
+        <button
+          onClick={() => setTab("analytics")}
+          className={cn(
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+            tab === "analytics"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Analytics
+        </button>
       </div>
 
       {/* Corrections tab */}
@@ -184,24 +204,14 @@ export default function AdminPage() {
 
       {/* Questions tab */}
       {tab === "questions" && (
-        <div className="space-y-3">
-          {loadingQuestions && (
-            <p className="text-sm text-muted-foreground">Loading draft questions...</p>
-          )}
-          {draftQuestions?.length === 0 && (
-            <p className="text-sm text-muted-foreground">No draft questions to curate.</p>
-          )}
-          {draftQuestions?.map((q) => (
-            <DraftQuestionCard
-              key={q.id}
-              question={q}
-              onAction={(action, opts) =>
-                curateMutation.mutate({ questionId: q.id, action, ...opts })
-              }
-              isPending={curateMutation.isPending}
-            />
-          ))}
-        </div>
+        <QuestionsTab
+          questions={draftQuestions}
+          isLoading={loadingQuestions}
+          onAction={(questionId, action, opts) =>
+            curateMutation.mutate({ questionId, action, ...opts })
+          }
+          isPending={curateMutation.isPending}
+        />
       )}
 
       {/* Generation tab */}
@@ -214,6 +224,11 @@ export default function AdminPage() {
       {/* Linear Sync tab */}
       {tab === "linear" && (
         <LinearSyncPanel />
+      )}
+
+      {/* Analytics tab */}
+      {tab === "analytics" && (
+        <AnalyticsPanel />
       )}
     </div>
   );
@@ -301,20 +316,99 @@ function DraftQuestionCard({
           {q.similarQuestions.map((sq) => (
             <div key={sq.id} className="flex items-start gap-2 mt-1.5">
               <p className="text-xs text-muted-foreground flex-1">{sq.question}</p>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 text-[10px] text-amber-600 shrink-0"
-                onClick={() => onAction("duplicate", { duplicateOf: sq.id })}
-                disabled={isPending}
-              >
-                <Copy className="h-3 w-3 mr-1" />
-                Mark duplicate
-              </Button>
+              <div className="flex gap-1 shrink-0">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-[10px] text-green-600"
+                  onClick={() => onAction("duplicate", { duplicateOf: sq.id })}
+                  disabled={isPending}
+                  title="Yes, this is a duplicate — merge into the existing question"
+                >
+                  <Check className="h-3 w-3 mr-0.5" />
+                  Duplicate
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-[10px] text-muted-foreground"
+                  onClick={() => {/* Not a duplicate — just dismiss the suggestion */}}
+                  disabled={isPending}
+                  title="Not a duplicate — keep both questions"
+                >
+                  <X className="h-3 w-3 mr-0.5" />
+                  Not dup
+                </Button>
+              </div>
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function QuestionsTab({
+  questions,
+  isLoading,
+  onAction,
+  isPending,
+}: {
+  questions: DraftQuestion[] | undefined;
+  isLoading: boolean;
+  onAction: (questionId: string, action: "approve" | "reject" | "duplicate", opts?: { duplicateOf?: string; editedQuestion?: string }) => void;
+  isPending: boolean;
+}) {
+  const [sourceFilter, setSourceFilter] = useState<"all" | "user" | "llm" | "validator">("all");
+
+  const filtered = questions?.filter((q) => {
+    if (sourceFilter === "all") return true;
+    return q.askedBy === sourceFilter;
+  });
+
+  const counts = {
+    all: questions?.length || 0,
+    user: questions?.filter((q) => q.askedBy === "user").length || 0,
+    llm: questions?.filter((q) => q.askedBy === "llm").length || 0,
+    validator: questions?.filter((q) => q.askedBy === "validator").length || 0,
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Source filter */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">Source:</span>
+        {(["all", "user", "llm", "validator"] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setSourceFilter(f)}
+            className={cn(
+              "px-2 py-0.5 text-xs rounded transition-colors",
+              sourceFilter === f
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {f === "all" ? "All" : f === "user" ? "Reviewer" : f === "llm" ? "AI" : "Validator"}{" "}
+            ({counts[f]})
+          </button>
+        ))}
+      </div>
+
+      {isLoading && (
+        <p className="text-sm text-muted-foreground">Loading draft questions...</p>
+      )}
+      {filtered?.length === 0 && (
+        <p className="text-sm text-muted-foreground">No draft questions to curate.</p>
+      )}
+      {filtered?.map((q) => (
+        <DraftQuestionCard
+          key={q.id}
+          question={q}
+          onAction={(action, opts) => onAction(q.id, action, opts)}
+          isPending={isPending}
+        />
+      ))}
     </div>
   );
 }

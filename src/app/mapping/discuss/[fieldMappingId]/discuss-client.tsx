@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { CitationMarkdown } from "@/components/context/citation-markdown";
 import { ContextUsedPanel } from "@/components/review/context-used-panel";
+import { useReviewAnalytics } from "@/lib/analytics/use-review-analytics";
 
 export function DiscussClient() {
   const params = useParams<{ fieldMappingId: string }>();
@@ -73,6 +74,16 @@ export function DiscussClient() {
     sendMessage,
     setMessages,
   } = useChatStream(activeSessionId);
+
+  // Analytics tracking for the review session
+  const {
+    trackSubmitted,
+    trackSuggestionAccepted,
+    trackSuggestionOverridden,
+    trackWhyWrongProvided,
+    trackChatSent,
+    trackChatChangedMind,
+  } = useReviewAnalytics(fieldMappingId, mapping?.targetField?.entityId);
 
   const [kickoffSent, setKickoffSent] = useState(false);
 
@@ -352,13 +363,19 @@ export function DiscussClient() {
                   sourceFieldName={mappingState.sourceFieldName ?? null}
                   initialVerdict={mappingState.sourceVerdict ?? null}
                   initialNotes={mappingState.sourceVerdictNotes ?? null}
-                  onVerdictChange={(v) => setSourceDecision(v)}
+                  onVerdictChange={(v) => {
+                    setSourceDecision(v);
+                    if (v === "correct" && aiHasReviewed) trackSuggestionAccepted("source");
+                    if (v === "wrong") trackSuggestionOverridden("source");
+                    if (messages.some((m) => m.role === "user" && !m.metadata?.kickoff)) trackChatChangedMind();
+                  }}
                   suggestedSource={effectiveUpdate?.sourceEntityName
                     ? `${effectiveUpdate.sourceEntityName}.${effectiveUpdate.sourceFieldName || "?"}`
                     : effectiveUpdate?.sourceFieldName ? String(effectiveUpdate.sourceFieldName) : null}
-                  onAcceptSuggestion={() => {}}
+                  onAcceptSuggestion={() => trackSuggestionAccepted("source")}
                   suggestionApplied={hasApplied}
                   aiHasOpinion={aiHasReviewed}
+                  onWhyWrongProvided={() => trackWhyWrongProvided("source")}
                 />
               )}
             </div>
@@ -373,12 +390,18 @@ export function DiscussClient() {
                   transform={mappingState.transform ?? null}
                   initialVerdict={mappingState.transformVerdict ?? null}
                   initialNotes={mappingState.transformVerdictNotes ?? null}
-                  onVerdictChange={(v) => setTransformDecision(v)}
+                  onVerdictChange={(v) => {
+                    setTransformDecision(v);
+                    if (v === "correct" && aiHasReviewed) trackSuggestionAccepted("transform");
+                    if (v === "wrong") trackSuggestionOverridden("transform");
+                    if (messages.some((m) => m.role === "user" && !m.metadata?.kickoff)) trackChatChangedMind();
+                  }}
                   suggestedTransform={effectiveUpdate?.transform ? String(effectiveUpdate.transform) : null}
                   suggestedMappingType={effectiveUpdate?.mappingType ? String(effectiveUpdate.mappingType) : null}
-                  onAcceptSuggestion={() => {}}
+                  onAcceptSuggestion={() => trackSuggestionAccepted("transform")}
                   suggestionApplied={hasApplied}
                   aiHasOpinion={aiHasReviewed}
+                  onWhyWrongProvided={() => trackWhyWrongProvided("transform")}
                 />
               )}
             </div>
@@ -416,6 +439,10 @@ export function DiscussClient() {
               <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Other Notes</span>
             </div>
             <textarea
+              defaultValue={
+                // Strip Linear reference section (shown in mapping summary instead)
+                (mapping?.notes || "").split("--- Linear Reference ---")[0].trim()
+              }
               placeholder="Additional context, observations, or notes about this field..."
               rows={2}
               className={cn(
@@ -455,7 +482,10 @@ export function DiscussClient() {
               onPromoteAnswer={handlePromoteAnswer}
             />
             <ChatInput
-              onSend={sendMessage}
+              onSend={(content, opts) => {
+                trackChatSent();
+                return sendMessage(content, opts);
+              }}
               disabled={isStreaming || !activeSessionId}
             />
           </div>
@@ -514,6 +544,7 @@ export function DiscussClient() {
                 size="sm"
                 onClick={async () => {
                   setReviewSubmitted(true);
+                  trackSubmitted();
                   if (!activeMappingId) return;
 
                   // Promote any pending_review questions for this field to draft (visible to admin)

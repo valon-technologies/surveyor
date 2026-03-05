@@ -24,6 +24,18 @@ export default function DocsPage() {
 
         <hr />
 
+        {/* Quick Start */}
+        <div className="not-prose bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-5 my-6">
+          <h2 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mt-0 mb-3">Quick Start: Your First Review in 2 Minutes</h2>
+          <ol className="text-sm text-blue-800 dark:text-blue-300 space-y-1 list-decimal pl-5 mb-0">
+            <li>Open <strong>Mapping</strong> in the sidebar and pick an entity</li>
+            <li>Click <strong>Discuss</strong> on any field</li>
+            <li>Read the current mapping at the top — source, transform, reasoning</li>
+            <li>In the three-column verdict area, select your verdict for Source, Transform, and Question</li>
+            <li>Click <strong>Submit Review & Next</strong> — done, on to the next field</li>
+          </ol>
+        </div>
+
         <h2>What You're Doing</h2>
         <p>
           Surveyor generates field-level mappings from ServiceMac's ACDC source system to Valon's VDS target schema using Claude.
@@ -42,6 +54,14 @@ export default function DocsPage() {
 
         <h2>The Discuss Page</h2>
         <p>The discuss page has several sections, top to bottom:</p>
+
+        <h3>Top Bar</h3>
+        <p>
+          Shows the entity name, field name, confidence level, data type, and VDS field description.
+          The <strong>Exclude</strong> button (top right) removes this field from the review queue —
+          use it for fields that don't apply to this migration (e.g., deprecated fields, fields handled
+          by a different team, or system-generated fields that don't need source mapping).
+        </p>
 
         <h3>Current Mapping</h3>
         <p>
@@ -98,6 +118,18 @@ export default function DocsPage() {
           The AI can propose changes — you decide whether to accept them.
         </p>
 
+        <h4>When to use the chat</h4>
+        <ul>
+          <li>You're unsure about the source table and want to see sample data — ask "Show me sample values from [table].[column]"</li>
+          <li>The transform logic looks plausible but you want to verify — ask "What distinct values does [column] have?"</li>
+          <li>You disagree with the AI but want to understand its reasoning before overriding</li>
+          <li>There's an open question about the field and the AI might know the answer</li>
+        </ul>
+        <p>
+          If the mapping looks obviously correct (or obviously wrong), you don't need to chat — just click your verdict and submit.
+          The chat is most valuable for ambiguous cases where you need more context.
+        </p>
+
         <h2>What Happens After You Submit</h2>
         <p>
           When you give a non-correct verdict, the system automatically:
@@ -113,6 +145,51 @@ export default function DocsPage() {
           The "Why was the AI wrong?" explanations are especially valuable because they teach the AI the reasoning
           behind corrections, not just the answers.
         </p>
+
+        <h2>How Your Work Is Measured</h2>
+        <p>
+          Surveyor tracks review activity to help us understand throughput and AI quality. The Admin Analytics dashboard shows:
+        </p>
+        <ul>
+          <li><strong>Review efficiency</strong> — how many reviews are completed per day, median time per review, completion rate</li>
+          <li><strong>AI value</strong> — how often reviewers accept AI suggestions vs. override them, and whether chatting with the AI changes decisions</li>
+          <li><strong>Quality signals</strong> — how often reviewers fill in "Why was the AI wrong?" (more is better — it drives the feedback loop)</li>
+        </ul>
+        <p>
+          This data is used to improve the AI and identify where reviewers need better context — not to grade individuals.
+          The most valuable thing you can do is write good "why wrong" explanations. A reviewer who overrides 50% of mappings
+          with clear explanations is more valuable than one who accepts 95% without checking.
+        </p>
+
+        <h2>Common Gotchas</h2>
+        <ul>
+          <li>
+            <strong>Enum mappings with null values</strong> — the AI sometimes generates enum mappings that forget to handle
+            NULL or empty-string source values. Check that there's a default/fallback case.
+          </li>
+          <li>
+            <strong>Assembly entities (SUBSET)</strong> — some VDS entities like <code>borrower</code> have multiple
+            variants (primary borrower, co-borrower) that map to different source rows. The AI maps each component
+            separately. If the primary source is correct but missing the co-borrower variant, mark source as correct
+            and note the gap — don't mark it wrong.
+          </li>
+          <li>
+            <strong>Similarly-named source tables</strong> — ServiceMac has tables with confusingly similar names
+            (e.g., <code>Foreclosure</code> vs. <code>FcSaleWorkstation</code>, or <code>LoanMaster</code> vs. <code>LoanInfo</code>).
+            The AI frequently picks the wrong one. When you correct this, explain which table is correct and why —
+            this is exactly the kind of correction that prevents the mistake from recurring.
+          </li>
+          <li>
+            <strong>Direct copy vs. transform needed</strong> — the AI defaults to <code>direct</code> mapping type
+            when it's unsure. If a field actually needs a COALESCE, CASE WHEN, date format change, or enum lookup,
+            mark the transform as wrong and specify what's needed.
+          </li>
+          <li>
+            <strong>Confidence doesn't mean correctness</strong> — high-confidence mappings can be confidently wrong
+            (the AI found a plausible-looking match). Low-confidence mappings sometimes just mean the AI couldn't find
+            enough context — the mapping itself might be fine.
+          </li>
+        </ul>
 
         <h2>Tips</h2>
         <ul>
@@ -139,14 +216,15 @@ export default function DocsPage() {
             mark source as correct and note the missing secondary source.
           </li>
           <li>
-            <strong>Confidence is a signal, not a guarantee</strong> — high confidence mappings can still be wrong.
-            Low confidence mappings sometimes just need the AI to see more context.
-          </li>
-          <li>
             <strong>Promote chat answers to questions</strong> — if there's an open question for the field
             you're reviewing and the AI gives a useful answer in the chat, you'll see a
             "Use as answer to: '...'" link below the AI's message. Click it to resolve the question
             directly with that answer — no need to copy-paste to the Questions page.
+          </li>
+          <li>
+            <strong>Use Exclude for out-of-scope fields</strong> — if a field is deprecated, handled by another team,
+            or system-generated with no source mapping needed, click <strong>Exclude</strong> in the top bar
+            rather than forcing a verdict. This keeps the review queue focused on actionable fields.
           </li>
         </ul>
 
@@ -172,6 +250,10 @@ export default function DocsPage() {
               <td>Tabular view of all target fields — type, definition, mapping status, source, transform, Linear issue</td>
             </tr>
             <tr>
+              <td><strong>Review Guide</strong></td>
+              <td>This page — onboarding docs for reviewers</td>
+            </tr>
+            <tr>
               <td><strong>Questions</strong></td>
               <td>AI-generated and reviewer questions awaiting answers</td>
             </tr>
@@ -190,6 +272,10 @@ export default function DocsPage() {
             <tr>
               <td><strong>Data Preview</strong></td>
               <td>BigQuery sample data for any entity — see what the source data looks like</td>
+            </tr>
+            <tr>
+              <td><strong>Admin</strong></td>
+              <td>Correction validation, question curation, batch generation, Linear sync, and analytics (owner only)</td>
             </tr>
           </tbody>
         </table>

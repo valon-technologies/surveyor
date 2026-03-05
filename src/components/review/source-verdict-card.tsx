@@ -16,6 +16,7 @@ interface SourceVerdictCardProps {
   onAcceptSuggestion?: () => void;
   suggestionApplied?: boolean;
   aiHasOpinion?: boolean;
+  onWhyWrongProvided?: () => void;
 }
 
 export function SourceVerdictCard({
@@ -29,6 +30,7 @@ export function SourceVerdictCard({
   onAcceptSuggestion,
   suggestionApplied,
   aiHasOpinion,
+  onWhyWrongProvided,
 }: SourceVerdictCardProps) {
   const [notes, setNotes] = useState("");
   const [whyWrong, setWhyWrong] = useState("");
@@ -107,6 +109,7 @@ export function SourceVerdictCard({
 
   function handleWhyWrongBlur() {
     if (!whyWrong.trim() || !selected || selected === "current") return;
+    onWhyWrongProvided?.();
     if (selected === "suggested") {
       save("wrong", buildNotes(`Accepted AI suggestion: ${suggestedSource}`, whyWrong));
     } else if (selected === "custom" && notes.trim()) {

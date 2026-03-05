@@ -79,7 +79,7 @@ export function ContextUsedPanel({ mappingId }: ContextUsedPanelProps) {
       </button>
 
       {isOpen && (
-        <div className="px-4 pb-3 space-y-3">
+        <div className="px-4 pb-3 space-y-3 max-h-48 overflow-y-auto">
           {Array.from(groups.entries()).map(([type, items]) => (
             <div key={type}>
               <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">

@@ -955,6 +955,34 @@ export const skillRefresh = pgTable(
   ]
 );
 
+// ─── Analytics Events ──────────────────────────────────────────
+
+export const analyticsEvent = pgTable(
+  "analytics_event",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .references(() => user.id, { onDelete: "set null" }),
+    eventName: text("event_name").notNull(),
+    fieldMappingId: text("field_mapping_id"),
+    entityId: text("entity_id"),
+    sessionId: text("session_id"),
+    durationMs: integer("duration_ms"),
+    properties: jsonb("properties").$type<Record<string, unknown>>(),
+    createdAt: text("created_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("analytics_event_workspace_idx").on(table.workspaceId),
+    index("analytics_event_user_idx").on(table.userId),
+    index("analytics_event_name_idx").on(table.eventName),
+    index("analytics_event_created_idx").on(table.workspaceId, table.createdAt),
+    index("analytics_event_mapping_idx").on(table.fieldMappingId),
+  ]
+);
+
 // ─── Relations ────────────────────────────────────────────────
 
 export const workspaceRelations = relations(workspace, ({ many }) => ({

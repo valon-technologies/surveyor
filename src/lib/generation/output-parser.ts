@@ -507,11 +507,14 @@ export function parseGenerationOutput(
     const finalUncertaintyType = rawUncertainty
       ?? (finalConfidence !== "high" ? inferUncertaintyType(finalReviewComment, raw) : null);
 
+    // Force unmapped if model claimed a mapping but no valid source was resolved
+    const effectivelyUnmapped = !sourceFieldId && !sourceEntityId && status !== "unmapped";
+
     fieldMappings.push({
       targetFieldName: raw.targetFieldName,
       targetFieldId: targetField.id,
-      status,
-      mappingType,
+      status: effectivelyUnmapped ? "unmapped" : status,
+      mappingType: effectivelyUnmapped ? null : mappingType,
       sourceEntityName: raw.sourceEntityName,
       sourceEntityId,
       sourceFieldName: raw.sourceFieldName,
@@ -853,11 +856,14 @@ export function parseYamlOutput(
     const reasoning = yamlNote
       || (col.expression ? `Transform: ${col.expression.trim().slice(0, 100)}` : (sourceFieldName ? `Direct mapping from ${sourceEntityName}.${sourceFieldName}` : "No source match"));
 
+    // Force unmapped if model claimed a mapping but no valid source was resolved
+    const effectivelyUnmapped = !sourceFieldId && !sourceEntityId && status !== "unmapped";
+
     fieldMappings.push({
       targetFieldName: col.target_column,
       targetFieldId: targetField.id,
-      status,
-      mappingType,
+      status: effectivelyUnmapped ? "unmapped" as MappingStatus : status,
+      mappingType: effectivelyUnmapped ? null : mappingType,
       sourceEntityName,
       sourceEntityId,
       sourceFieldName,

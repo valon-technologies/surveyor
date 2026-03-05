@@ -32,6 +32,8 @@ interface BatchRunInput {
   outputFormat?: "json" | "yaml";
   enableStructureClassification?: boolean;
   entityIds?: string[];
+  /** When set, only fields matching this milestone are eligible for generation. */
+  milestone?: string;
 }
 
 interface EntityBatch {
@@ -60,6 +62,7 @@ async function prepareEntityForRegeneration(
   workspaceId: string,
   entityId: string,
   batchRunId: string,
+  milestone?: string,
 ): Promise<{ mappingsRetired: number; questionsDismissed: number }> {
   const now = new Date().toISOString();
 
@@ -80,10 +83,12 @@ async function prepareEntityForRegeneration(
   }
 
   // Find all field IDs for this entity and its children
+  const fieldConditions = [inArray(field.entityId, allEntityIds)];
+  if (milestone) fieldConditions.push(eq(field.milestone, milestone));
   const entityFields = await db
     .select({ id: field.id })
     .from(field)
-    .where(inArray(field.entityId, allEntityIds))
+    .where(and(...fieldConditions))
     ;
   const fieldIds = entityFields.map((f) => f.id);
 
@@ -192,6 +197,8 @@ export async function createBatchRun(input: BatchRunInput): Promise<{
       ;
 
     const eligible = fields.filter((f) => {
+      // Milestone filter: skip fields not in the target milestone
+      if (input.milestone && f.milestone !== input.milestone) return false;
       const currentStatus = fieldStatusMap.get(f.id) ?? "unmapped";
       return includeStatuses.has(currentStatus);
     });
@@ -425,6 +432,7 @@ async function generateAssemblyEntity(
   model?: string,
   bqConfig?: BigQueryConfig,
   fkConstraints?: import("./fk-constraint-store").FKConstraint[],
+  milestone?: string,
 ): Promise<{ fieldsCompleted: number }> {
   let totalFields = 0;
 
@@ -500,7 +508,7 @@ async function generateAssemblyEntity(
       }
 
       // Retire stale mappings/questions for this component entity
-      const compCleanup = await prepareEntityForRegeneration(workspaceId, compEntity.id, batchRunId);
+      const compCleanup = await prepareEntityForRegeneration(workspaceId, compEntity.id, batchRunId, milestone);
       if (compCleanup.mappingsRetired > 0 || compCleanup.questionsDismissed > 0) {
         console.log(
           `[batch] Cleanup component "${comp.name}": retired ${compCleanup.mappingsRetired} mappings, dismissed ${compCleanup.questionsDismissed} stale questions`,
@@ -1051,7 +1059,7 @@ export async function executeBatchRun(
         }
 
         // Retire stale mappings and dismiss LLM-generated questions
-        const cleanup = await prepareEntityForRegeneration(workspaceId, batch.entityId, batchRunId);
+        const cleanup = await prepareEntityForRegeneration(workspaceId, batch.entityId, batchRunId, input.milestone);
         if (cleanup.mappingsRetired > 0 || cleanup.questionsDismissed > 0) {
           console.log(
             `[batch] Cleanup "${batch.entityName}": retired ${cleanup.mappingsRetired} mappings, dismissed ${cleanup.questionsDismissed} stale questions`,
@@ -1137,6 +1145,7 @@ export async function executeBatchRun(
                 model,
                 bqConfig,
                 accumulatedConstraints.length > 0 ? accumulatedConstraints : undefined,
+                input.milestone,
               );
               completedFields += result.fieldsCompleted;
               completedEntities++;

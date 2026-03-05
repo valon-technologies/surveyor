@@ -26,6 +26,15 @@ export async function resolveProvider(
     ;
 
   if (keys.length === 0) {
+    // Fall back to environment variables when no DB keys exist
+    const envClaude = process.env.ANTHROPIC_API_KEY;
+    const envOpenAI = process.env.OPENAI_API_KEY;
+    if (envClaude && (!preferredProvider || preferredProvider === "claude")) {
+      return { provider: new ClaudeProvider(envClaude), providerName: "claude" };
+    }
+    if (envOpenAI && (!preferredProvider || preferredProvider === "openai")) {
+      return { provider: new OpenAIProvider(envOpenAI), providerName: "openai" };
+    }
     throw new Error(
       "No API keys configured. Add your API key in Settings > API Keys."
     );
@@ -74,5 +83,7 @@ export async function resolveProvider(
  * OpenAI GPT-4o 128K: 128K limit - 8K output - 30K prompt overhead ≈ 90K for context
  */
 export function getTokenBudget(providerName: "claude" | "openai"): number {
+  const override = process.env.CONTEXT_TOKEN_BUDGET;
+  if (override) return parseInt(override, 10);
   return providerName === "claude" ? 80_000 : 90_000;
 }
