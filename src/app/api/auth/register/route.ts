@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
-import { user, workspace, userWorkspace } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { user, workspace, userWorkspace, workspaceInvite } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -36,23 +36,47 @@ export async function POST(req: NextRequest) {
   const [newUser] = await db
     .insert(user)
     .values({ name, email, passwordHash })
-    .returning()
-    ;
+    .returning();
 
-  // Create a default workspace for the new user
-  const [ws] = await db
-    .insert(workspace)
-    .values({
-      name: `${name}'s Workspace`,
-      description: "Personal mapping workspace",
-      settings: { defaultProvider: "claude" },
-    })
-    .returning()
-    ;
+  // Check for pending invites — auto-accept them instead of creating an empty workspace
+  const pendingInvites = await db
+    .select()
+    .from(workspaceInvite)
+    .where(
+      and(
+        eq(workspaceInvite.email, email),
+        eq(workspaceInvite.status, "pending"),
+      ),
+    );
 
-  await db.insert(userWorkspace)
-    .values({ userId: newUser.id, workspaceId: ws.id, role: "owner" })
-    ;
+  if (pendingInvites.length > 0) {
+    // Auto-accept all pending invites
+    for (const invite of pendingInvites) {
+      await db.insert(userWorkspace)
+        .values({ userId: newUser.id, workspaceId: invite.workspaceId, role: invite.role });
+
+      await db.update(workspaceInvite)
+        .set({
+          status: "accepted",
+          acceptedBy: newUser.id,
+          acceptedAt: new Date().toISOString(),
+        })
+        .where(eq(workspaceInvite.id, invite.id));
+    }
+  } else {
+    // No invites — create a personal workspace
+    const [ws] = await db
+      .insert(workspace)
+      .values({
+        name: `${name}'s Workspace`,
+        description: "Personal mapping workspace",
+        settings: { defaultProvider: "claude" },
+      })
+      .returning();
+
+    await db.insert(userWorkspace)
+      .values({ userId: newUser.id, workspaceId: ws.id, role: "owner" });
+  }
 
   return NextResponse.json(
     { id: newUser.id, name: newUser.name, email: newUser.email },
