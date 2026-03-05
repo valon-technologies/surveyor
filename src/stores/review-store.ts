@@ -38,7 +38,7 @@ export const useReviewStore = create<ReviewState>((set) => ({
   statusFilter: "all",
   setStatusFilter: (s) => set({ statusFilter: s }),
 
-  milestoneFilter: "all",
+  milestoneFilter: "M2.5",
   setMilestoneFilter: (m) => set({ milestoneFilter: m }),
 
   sortBy: "confidence",
