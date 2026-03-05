@@ -7,7 +7,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const id = params.id;
 
   try {
-    const result = findSimilarMappings(workspaceId, id);
+    const result = await findSimilarMappings(workspaceId, id);
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
