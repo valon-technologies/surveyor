@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { fieldMapping, field, entity, question, chatSession, user, userWorkspace } from "@/lib/db/schema";
-import { eq, and, inArray, sql, count } from "drizzle-orm";
+import { eq, and, inArray, sql, count, isNull } from "drizzle-orm";
 import { ENTITY_DOMAIN_MAP, FIELD_DOMAINS, type FieldDomain } from "@/lib/constants";
 
 export interface DomainStat {
@@ -68,6 +68,7 @@ export const GET = withAuth(
           eq(fieldMapping.workspaceId, workspaceId),
           eq(fieldMapping.assigneeId, targetUserId),
           inArray(fieldMapping.status, ["accepted", "excluded"]),
+          isNull(fieldMapping.transferId),
         ),
       );
 
@@ -172,6 +173,7 @@ export const GET = withAuth(
           eq(fieldMapping.workspaceId, workspaceId),
           inArray(fieldMapping.status, ["accepted", "excluded"]),
           sql`${fieldMapping.assigneeId} IS NOT NULL`,
+          isNull(fieldMapping.transferId),
         ),
       )
       .groupBy(fieldMapping.assigneeId)

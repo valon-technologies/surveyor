@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { fieldMapping, field, entity, user } from "@/lib/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import type { ReviewCardData } from "@/types/review";
 
 export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
@@ -10,10 +10,17 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
   const statusFilter = searchParams.get("status");
   const confidence = searchParams.get("confidence");
   const entityId = searchParams.get("entityId");
+  const transferId = searchParams.get("transferId");
   const sortBy = searchParams.get("sortBy") || "confidence";
   const sortOrder = searchParams.get("sortOrder") || "desc";
 
   // 1. Load all latest mappings in one query
+  // When transferId is provided, scope to that transfer.
+  // Otherwise, exclude transfer mappings (VDS Review only).
+  const transferFilter = transferId
+    ? eq(fieldMapping.transferId, transferId)
+    : isNull(fieldMapping.transferId);
+
   const allMappings = await db
     .select()
     .from(fieldMapping)
@@ -21,6 +28,7 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
       and(
         eq(fieldMapping.workspaceId, workspaceId),
         eq(fieldMapping.isLatest, true),
+        transferFilter,
       ),
     );
 

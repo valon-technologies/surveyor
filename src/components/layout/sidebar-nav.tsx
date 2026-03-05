@@ -17,6 +17,7 @@ import {
   Sun,
   Shield,
   Scale,
+  ArrowRightLeft,
   ChevronDown,
   ChevronRight,
   type LucideIcon,
@@ -64,6 +65,14 @@ const navItems: NavItem[] = [
       { href: "/data?tab=schemas", label: "Schemas" },
       { href: "/data?tab=preview", label: "Preview" },
       { href: "/data?tab=topology", label: "Topology" },
+    ],
+  },
+  {
+    href: "/transfers",
+    label: "Servicing Transfers",
+    icon: ArrowRightLeft,
+    children: [
+      { href: "/transfers", label: "All Transfers" },
     ],
   },
   { href: "/ground-truth", label: "Verified Mappings", icon: Scale },

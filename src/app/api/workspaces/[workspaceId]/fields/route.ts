@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { entity, field, fieldMapping } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 
 export interface FieldRow {
   fieldId: string;
@@ -45,7 +45,7 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
 
   // Get latest mappings for all target fields
   const allMappings = await db.select().from(fieldMapping)
-    .where(and(eq(fieldMapping.workspaceId, workspaceId), eq(fieldMapping.isLatest, true)));
+    .where(and(eq(fieldMapping.workspaceId, workspaceId), eq(fieldMapping.isLatest, true), isNull(fieldMapping.transferId)));
   const mappingByFieldId = new Map(allMappings.map((m) => [m.targetFieldId, m]));
 
   // Resolve source entity/field names

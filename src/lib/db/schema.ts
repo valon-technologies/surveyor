@@ -235,6 +235,9 @@ export const field = pgTable(
     // When set, this takes precedence over the parent entity's domainTags
     // during auto-distribution.  null = inherit from entity.
     domainTag: text("domain_tag"),
+    position: integer("position"), // flat file position (for transfer source fields)
+    requirementType: text("requirement_type"), // ALWAYS_REQUIRED | CONDITIONALLY_REQUIRED | NOT_REQUIRED
+    requirementDetail: text("requirement_detail"),
     sampleValues: jsonb("sample_values").$type<string[]>(),
     enumValues: jsonb("enum_values").$type<string[]>(),
     sortOrder: integer("sort_order").notNull().default(0),
@@ -296,6 +299,7 @@ export const fieldMapping = pgTable(
       contextUsed?: { id: string; name: string }[];
     }>(),
     batchRunId: text("batch_run_id"),
+    transferId: text("transfer_id"),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
   },
@@ -306,6 +310,7 @@ export const fieldMapping = pgTable(
     index("mapping_status_idx").on(table.workspaceId, table.status),
     index("mapping_latest_idx").on(table.targetFieldId, table.isLatest),
     index("mapping_assignee_idx").on(table.assigneeId),
+    index("mapping_transfer_idx").on(table.transferId),
   ]
 );
 
@@ -504,6 +509,7 @@ export const generation = pgTable(
     validationScore: integer("validation_score"),
     validationIssues: jsonb("validation_issues").$type<Record<string, unknown>[]>(),
     batchRunId: text("batch_run_id"),
+    transferId: text("transfer_id"),
     createdAt: text("created_at").notNull().default(nowDefault),
     updatedAt: text("updated_at").notNull().default(nowDefault),
   },
@@ -512,6 +518,7 @@ export const generation = pgTable(
     index("generation_entity_idx").on(table.entityId),
     index("generation_status_idx").on(table.status),
     index("generation_batch_run_idx").on(table.batchRunId),
+    index("generation_transfer_idx").on(table.transferId),
   ]
 );
 
@@ -585,6 +592,7 @@ export const batchRun = pgTable(
     }>(),
     startedAt: text("started_at"),
     completedAt: text("completed_at"),
+    transferId: text("transfer_id"),
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id),
@@ -594,6 +602,7 @@ export const batchRun = pgTable(
   (table) => [
     index("batch_run_workspace_idx").on(table.workspaceId),
     index("batch_run_status_idx").on(table.status),
+    index("batch_run_transfer_idx").on(table.transferId),
   ]
 );
 
@@ -983,6 +992,89 @@ export const analyticsEvent = pgTable(
   ]
 );
 
+// ─── Transfer Workflow ─────────────────────────────────────────
+
+export const transfer = pgTable(
+  "transfer",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    clientName: text("client_name"),
+    description: text("description"),
+    status: text("status").notNull().default("draft"),
+    // draft | importing | ready | generating | reviewing | complete
+    sourceSchemaAssetId: text("source_schema_asset_id")
+      .references(() => schemaAsset.id, { onDelete: "set null" }),
+    targetSchemaAssetId: text("target_schema_asset_id")
+      .references(() => schemaAsset.id, { onDelete: "set null" }),
+    config: jsonb("config").$type<{
+      tierDomains?: Record<string, string[]>;
+      systemFields?: string[];
+      maxFieldsPerBatch?: number;
+    }>(),
+    stats: jsonb("stats").$type<{
+      totalSourceFields?: number;
+      totalTargetFields?: number;
+      mappedCount?: number;
+      unmappedCount?: number;
+      coveragePercent?: number;
+      highCount?: number;
+      mediumCount?: number;
+      lowCount?: number;
+      lastGeneratedAt?: string;
+    }>(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: text("created_at").notNull().default(nowDefault),
+    updatedAt: text("updated_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("transfer_workspace_idx").on(table.workspaceId),
+    index("transfer_status_idx").on(table.status),
+  ]
+);
+
+export const transferCorrection = pgTable(
+  "transfer_correction",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    transferId: text("transfer_id")
+      .notNull()
+      .references(() => transfer.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // hard_override | prompt_injection
+    targetEntity: text("target_entity").notNull(),
+    targetField: text("target_field"), // required for hard_override, optional for prompt_injection
+    appliesTo: jsonb("applies_to").$type<string[]>(), // entity.field targets for prompt injections
+    // Hard override payload
+    hasMapping: boolean("has_mapping"),
+    sourceFieldName: text("source_field_name"),
+    sourceFieldPosition: integer("source_field_position"),
+    transformation: text("transformation"),
+    confidence: text("confidence"),
+    reasoning: text("reasoning"),
+    contextUsed: text("context_used"),
+    // Prompt injection payload
+    note: text("note"),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: text("created_at").notNull().default(nowDefault),
+    updatedAt: text("updated_at").notNull().default(nowDefault),
+  },
+  (table) => [
+    index("transfer_correction_transfer_idx").on(table.transferId),
+    index("transfer_correction_workspace_idx").on(table.workspaceId),
+    index("transfer_correction_entity_field_idx").on(table.targetEntity, table.targetField),
+  ]
+);
+
 // ─── Relations ────────────────────────────────────────────────
 
 export const workspaceRelations = relations(workspace, ({ many }) => ({
@@ -1271,6 +1363,39 @@ export const entityPipelineRelations = relations(entityPipeline, ({ one }) => ({
   entity: one(entity, {
     fields: [entityPipeline.entityId],
     references: [entity.id],
+  }),
+}));
+
+// ─── Transfer Relations ──────────────────────────────────────
+
+export const transferRelations = relations(transfer, ({ one, many }) => ({
+  workspace: one(workspace, {
+    fields: [transfer.workspaceId],
+    references: [workspace.id],
+  }),
+  sourceSchemaAsset: one(schemaAsset, {
+    fields: [transfer.sourceSchemaAssetId],
+    references: [schemaAsset.id],
+  }),
+  createdByUser: one(user, {
+    fields: [transfer.createdBy],
+    references: [user.id],
+  }),
+  corrections: many(transferCorrection),
+}));
+
+export const transferCorrectionRelations = relations(transferCorrection, ({ one }) => ({
+  transfer: one(transfer, {
+    fields: [transferCorrection.transferId],
+    references: [transfer.id],
+  }),
+  workspace: one(workspace, {
+    fields: [transferCorrection.workspaceId],
+    references: [workspace.id],
+  }),
+  createdByUser: one(user, {
+    fields: [transferCorrection.createdBy],
+    references: [user.id],
   }),
 }));
 

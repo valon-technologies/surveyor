@@ -10,7 +10,7 @@ import {
   chatSession,
   evaluation,
 } from "@/lib/db/schema";
-import { eq, and, sql, count, notInArray, inArray } from "drizzle-orm";
+import { eq, and, sql, count, notInArray, inArray, isNull } from "drizzle-orm";
 import { MILESTONES, ENTITY_DOMAIN_MAP, FIELD_DOMAINS, type FieldDomain } from "@/lib/constants";
 import type {
   LeaderboardEntry,
@@ -47,7 +47,8 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
           eq(fieldMapping.workspaceId, workspaceId),
           eq(fieldMapping.assigneeId, userId),
           eq(fieldMapping.isLatest, true),
-          notInArray(fieldMapping.status, ["accepted", "excluded"])
+          notInArray(fieldMapping.status, ["accepted", "excluded"]),
+          isNull(fieldMapping.transferId)
         )
       )
       .orderBy(entity.sortOrder, field.sortOrder)
@@ -182,7 +183,8 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
           fieldMapping,
           and(
             eq(fieldMapping.targetFieldId, field.id),
-            eq(fieldMapping.isLatest, true)
+            eq(fieldMapping.isLatest, true),
+            isNull(fieldMapping.transferId)
           )
         )
         .where(
@@ -238,7 +240,8 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
         fieldMapping,
         and(
           eq(fieldMapping.targetFieldId, field.id),
-          eq(fieldMapping.isLatest, true)
+          eq(fieldMapping.isLatest, true),
+          isNull(fieldMapping.transferId)
         )
       )
       .where(
@@ -288,7 +291,8 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       fieldMapping,
       and(
         eq(fieldMapping.targetFieldId, field.id),
-        eq(fieldMapping.isLatest, true)
+        eq(fieldMapping.isLatest, true),
+        isNull(fieldMapping.transferId)
       )
     )
     .where(
@@ -333,7 +337,8 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
         eq(fieldMapping.workspaceId, workspaceId),
         inArray(fieldMapping.status, ["accepted", "excluded"]),
         eq(fieldMapping.isLatest, true),
-        sql`${fieldMapping.assigneeId} IS NOT NULL`
+        sql`${fieldMapping.assigneeId} IS NOT NULL`,
+        isNull(fieldMapping.transferId)
       )
     )
     .groupBy(fieldMapping.assigneeId, user.name, user.image)
@@ -408,6 +413,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
         inArray(fieldMapping.status, ["accepted", "excluded"]),
         eq(fieldMapping.isLatest, true),
         sql`${fieldMapping.assigneeId} IS NOT NULL`,
+        isNull(fieldMapping.transferId),
       ),
     );
 
