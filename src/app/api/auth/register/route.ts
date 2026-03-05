@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Check existing user
-  const existing = db.select().from(user).where(eq(user.email, email)).get();
+  const [existing] = await db.select().from(user).where(eq(user.email, email)).limit(1);
   if (existing) {
     return NextResponse.json(
       { error: "An account with this email already exists" },
@@ -33,14 +33,14 @@ export async function POST(req: NextRequest) {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const [newUser] = db
+  const [newUser] = await db
     .insert(user)
     .values({ name, email, passwordHash })
     .returning()
-    .all();
+    ;
 
   // Create a default workspace for the new user
-  const [ws] = db
+  const [ws] = await db
     .insert(workspace)
     .values({
       name: `${name}'s Workspace`,
@@ -48,11 +48,11 @@ export async function POST(req: NextRequest) {
       settings: { defaultProvider: "claude" },
     })
     .returning()
-    .all();
+    ;
 
-  db.insert(userWorkspace)
+  await db.insert(userWorkspace)
     .values({ userId: newUser.id, workspaceId: ws.id, role: "owner" })
-    .run();
+    ;
 
   return NextResponse.json(
     { id: newUser.id, name: newUser.name, email: newUser.email },

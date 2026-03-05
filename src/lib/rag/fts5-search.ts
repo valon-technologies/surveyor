@@ -1,4 +1,6 @@
-import { getSqliteDb } from "@/lib/db";
+import { db } from "@/lib/db";
+import { context } from "@/lib/db/schema";
+import { sql, eq, and } from "drizzle-orm";
 
 interface FtsResult {
   contextId: string;
@@ -7,68 +9,43 @@ interface FtsResult {
 }
 
 /**
- * Sanitize a user query for FTS5 MATCH syntax.
- * Splits into words, removes FTS5 special characters, joins with OR for broad recall.
+ * Full-text search over the context table using Postgres plainto_tsquery.
+ * Returns matching context IDs ranked by relevance.
  */
-function sanitizeFtsQuery(query: string): string {
-  const words = query
-    .replace(/[*"():^{}[\]\\]/g, "") // strip FTS5 special chars
-    .split(/\s+/)
-    .map((w) => w.trim())
-    .filter((w) => w.length > 1); // skip single chars
-
-  if (words.length === 0) return "";
-
-  // Quote each word to prevent FTS5 syntax interpretation, join with OR
-  return words.map((w) => `"${w}"`).join(" OR ");
-}
-
-/**
- * Full-text search over the context_fts virtual table.
- * Returns matching context IDs ranked by BM25 relevance.
- */
-export function searchContextsFts(
+export async function searchContextsFts(
   workspaceId: string,
   query: string,
   limit: number = 10
-): FtsResult[] {
-  const ftsQuery = sanitizeFtsQuery(query);
-  if (!ftsQuery) return [];
+): Promise<FtsResult[]> {
+  const words = query
+    .replace(/[*"():^{}[\]\\<>!@#$%&]/g, "")
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length > 1);
 
-  const sqlite = getSqliteDb();
+  if (words.length === 0) return [];
 
-  // Check if FTS5 table exists
-  const tableExists = sqlite
-    .prepare(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='context_fts'"
+  const results = await db
+    .select({
+      contextId: context.id,
+      name: context.name,
+    })
+    .from(context)
+    .where(
+      and(
+        eq(context.workspaceId, workspaceId),
+        eq(context.isActive, true),
+        sql`to_tsvector('english', coalesce(${context.name}, '') || ' ' || coalesce(${context.content}, '')) @@ plainto_tsquery('english', ${query})`
+      )
     )
-    .get();
+    .orderBy(
+      sql`ts_rank(to_tsvector('english', coalesce(${context.name}, '') || ' ' || coalesce(${context.content}, '')), plainto_tsquery('english', ${query})) DESC`
+    )
+    .limit(limit);
 
-  if (!tableExists) {
-    console.warn(
-      "context_fts table not found. Run: npx tsx scripts/migrate-fts5.ts"
-    );
-    return [];
-  }
-
-  const stmt = sqlite.prepare(`
-    SELECT context_id, name, rank
-    FROM context_fts
-    WHERE context_fts MATCH ?
-      AND workspace_id = ?
-    ORDER BY rank
-    LIMIT ?
-  `);
-
-  const rows = stmt.all(ftsQuery, workspaceId, limit) as Array<{
-    context_id: string;
-    name: string;
-    rank: number;
-  }>;
-
-  return rows.map((r) => ({
-    contextId: r.context_id,
+  return results.map((r, i) => ({
+    contextId: r.contextId,
     name: r.name,
-    rank: r.rank,
+    rank: -(i + 1),
   }));
 }

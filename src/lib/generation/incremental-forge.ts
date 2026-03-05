@@ -81,19 +81,19 @@ export async function runIncrementalForge(
   const { workspaceId, skillId, entityId, userId } = input;
 
   // Load current skill config
-  const currentConfig = loadSkillConfig(skillId);
+  const currentConfig = await loadSkillConfig(skillId);
   if (!currentConfig) {
     throw new Error(`Skill ${skillId} not found`);
   }
 
   // Evaluate signals
-  const signalEval = evaluateSignals(workspaceId, entityId);
+  const signalEval = await evaluateSignals(workspaceId, entityId);
   if (signalEval.signals.length === 0) {
     throw new Error("No unprocessed signals for this entity");
   }
 
   // Create refresh record
-  const [refresh] = db
+  const [refresh] = await db
     .insert(skillRefresh)
     .values({
       workspaceId,
@@ -103,11 +103,11 @@ export async function runIncrementalForge(
       signalCount: signalEval.signals.length,
     })
     .returning()
-    .all();
+    ;
 
   try {
     // Resolve LLM provider
-    const { provider } = resolveProvider(userId, "claude");
+    const { provider } = await resolveProvider(userId, "claude");
 
     // Build incremental prompt and run LLM
     const proposal = await generateProposal(
@@ -122,21 +122,21 @@ export async function runIncrementalForge(
     proposal.riskScore = riskScore;
 
     // Update refresh with proposal
-    db.update(skillRefresh)
+    await db.update(skillRefresh)
       .set({
         status: "proposed",
         proposal,
         updatedAt: new Date().toISOString(),
       })
       .where(eq(skillRefresh.id, refresh.id))
-      .run();
+      ;
 
     // Auto-apply if low risk
     const autoApplyable = canAutoApply(proposal);
     let autoApplied = false;
 
     if (autoApplyable) {
-      const result = autoApplyProposal(
+      const result = await autoApplyProposal(
         workspaceId,
         skillId,
         proposal,
@@ -146,7 +146,7 @@ export async function runIncrementalForge(
     }
 
     // Mark signals as processed
-    markSignalsProcessed(signalEval.signals.map((s) => s.id));
+    await markSignalsProcessed(signalEval.signals.map((s) => s.id));
 
     const finalStatus = autoApplied ? "auto_applied" : "proposed";
 
@@ -159,13 +159,13 @@ export async function runIncrementalForge(
     };
   } catch (err) {
     // Mark refresh as failed
-    db.update(skillRefresh)
+    await db.update(skillRefresh)
       .set({
         status: "failed",
         updatedAt: new Date().toISOString(),
       })
       .where(eq(skillRefresh.id, refresh.id))
-      .run();
+      ;
 
     throw err;
   }
@@ -173,11 +173,11 @@ export async function runIncrementalForge(
 
 // ─── Skill Config Loading ──────────────────────────────────────
 
-function loadSkillConfig(skillId: string): CurrentSkillConfig | null {
-  const s = db.select().from(skill).where(eq(skill.id, skillId)).get();
+async function loadSkillConfig(skillId: string): Promise<CurrentSkillConfig | null> {
+  const [s] = await db.select().from(skill).where(eq(skill.id, skillId)).limit(1);
   if (!s) return null;
 
-  const assignments = db
+  const assignments = await db
     .select({
       contextId: skillContext.contextId,
       role: skillContext.role,
@@ -188,7 +188,7 @@ function loadSkillConfig(skillId: string): CurrentSkillConfig | null {
     .innerJoin(context, eq(skillContext.contextId, context.id))
     .where(eq(skillContext.skillId, skillId))
     .orderBy(skillContext.sortOrder)
-    .all();
+    ;
 
   const totalTokens = assignments.reduce(
     (sum, a) => sum + (a.tokenCount || 0),
@@ -380,7 +380,7 @@ async function generateProposal(
     // Execute tools and build user response
     const toolResults: Array<Record<string, unknown>> = [];
     for (const tc of response.toolCalls) {
-      const result = executeForgeToolCall(tc.name, tc.input, workspaceId);
+      const result = await executeForgeToolCall(tc.name, tc.input, workspaceId);
       toolResults.push({
         type: "tool_result",
         tool_use_id: tc.id,
@@ -416,7 +416,7 @@ async function generateProposal(
 
 // ─── Proposal Parsing ──────────────────────────────────────────
 
-function parseProposal(text: string): SkillRefreshProposal {
+async function parseProposal(text: string): Promise<SkillRefreshProposal> {
   // Extract skill-refresh fenced block
   const blockMatch = text.match(
     /```skill-refresh\s*\n([\s\S]*?)```/,
@@ -430,7 +430,7 @@ function parseProposal(text: string): SkillRefreshProposal {
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0]);
-        return normalizeProposal(parsed);
+        return await normalizeProposal(parsed);
       } catch {
         // Fall through to empty proposal
       }
@@ -445,7 +445,7 @@ function parseProposal(text: string): SkillRefreshProposal {
 
   try {
     const parsed = JSON.parse(blockMatch[1].trim());
-    return normalizeProposal(parsed);
+    return await normalizeProposal(parsed);
   } catch {
     return {
       additions: [],
@@ -456,7 +456,7 @@ function parseProposal(text: string): SkillRefreshProposal {
   }
 }
 
-function normalizeProposal(raw: Record<string, unknown>): SkillRefreshProposal {
+async function normalizeProposal(raw: Record<string, unknown>): Promise<SkillRefreshProposal> {
   const additions = Array.isArray(raw.additions)
     ? raw.additions.map((a: any) => ({
         contextId: String(a.contextId || ""),
@@ -493,15 +493,17 @@ function normalizeProposal(raw: Record<string, unknown>): SkillRefreshProposal {
   };
 
   // Validate context IDs exist
-  proposal.additions = proposal.additions.filter((a) => {
-    if (!a.contextId) return false;
-    const exists = db
+  const validatedAdditions: typeof proposal.additions = [];
+  for (const a of proposal.additions) {
+    if (!a.contextId) continue;
+    const exists = await db
       .select({ id: context.id })
       .from(context)
       .where(eq(context.id, a.contextId))
-      .get();
-    return !!exists;
-  });
+      ;
+    if (exists[0]) validatedAdditions.push(a);
+  }
+  proposal.additions = validatedAdditions;
 
   proposal.removals = proposal.removals.filter((r) => !!r.contextId);
   proposal.roleChanges = proposal.roleChanges.filter(

@@ -16,7 +16,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
     return NextResponse.json({ error: "fieldMappingId required" }, { status: 400 });
   }
 
-  const result = db
+  const result = await db
     .update(question)
     .set({
       curationStatus: "draft",
@@ -29,7 +29,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
         eq(question.curationStatus, "pending_review"),
       )
     )
-    .run();
+    ;
 
-  return NextResponse.json({ promoted: result.changes });
+  return NextResponse.json({ promoted: result.length });
 }, { requiredRole: "editor" });

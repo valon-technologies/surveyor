@@ -8,24 +8,22 @@ type EntityPipelineInsert = typeof entityPipeline.$inferInsert;
 
 /**
  * Atomically create a new field mapping version, marking the old version as not-latest.
- * The mark-old + insert-new runs inside an IMMEDIATE transaction to prevent
+ * The mark-old + insert-new runs inside a transaction to prevent
  * two concurrent writers from both creating isLatest=true versions.
  */
-export function createMappingVersion(
+export async function createMappingVersion(
   existingId: string,
   newValues: FieldMappingInsert,
-): FieldMappingSelect {
-  return withTransaction(() => {
-    db.update(fieldMapping)
+): Promise<FieldMappingSelect> {
+  return await withTransaction(async (tx) => {
+    await tx.update(fieldMapping)
       .set({ isLatest: false, updatedAt: new Date().toISOString() })
-      .where(eq(fieldMapping.id, existingId))
-      .run();
+      .where(eq(fieldMapping.id, existingId));
 
-    const [newVersion] = db
+    const [newVersion] = await tx
       .insert(fieldMapping)
       .values({ ...newValues, isLatest: true })
-      .returning()
-      .all();
+      .returning();
 
     return newVersion;
   });
@@ -36,26 +34,24 @@ export function createMappingVersion(
  * Marks ALL existing latest mappings for the target field as not-latest.
  * Used by bulk operations where the existing mapping may not be known by ID.
  */
-export function createMappingVersionByTargetField(
+export async function createMappingVersionByTargetField(
   targetFieldId: string,
   newValues: FieldMappingInsert,
-): FieldMappingSelect {
-  return withTransaction(() => {
-    db.update(fieldMapping)
+): Promise<FieldMappingSelect> {
+  return await withTransaction(async (tx) => {
+    await tx.update(fieldMapping)
       .set({ isLatest: false })
       .where(
         and(
           eq(fieldMapping.targetFieldId, targetFieldId),
           eq(fieldMapping.isLatest, true),
         ),
-      )
-      .run();
+      );
 
-    const [newVersion] = db
+    const [newVersion] = await tx
       .insert(fieldMapping)
       .values({ ...newValues, isLatest: true })
-      .returning()
-      .all();
+      .returning();
 
     return newVersion;
   });
@@ -64,18 +60,16 @@ export function createMappingVersionByTargetField(
 /**
  * Atomically create a new entity pipeline version, marking the old version as not-latest.
  */
-export function createPipelineVersion(
+export async function createPipelineVersion(
   existingId: string,
   newValues: EntityPipelineInsert,
-): void {
-  withTransaction(() => {
-    db.update(entityPipeline)
+): Promise<void> {
+  await withTransaction(async (tx) => {
+    await tx.update(entityPipeline)
       .set({ isLatest: false, updatedAt: new Date().toISOString() })
-      .where(eq(entityPipeline.id, existingId))
-      .run();
+      .where(eq(entityPipeline.id, existingId));
 
-    db.insert(entityPipeline)
-      .values({ ...newValues, isLatest: true })
-      .run();
+    await tx.insert(entityPipeline)
+      .values({ ...newValues, isLatest: true });
   });
 }

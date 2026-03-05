@@ -69,17 +69,17 @@ export function getSourceSchemaToolDefinition(): ToolDefinition {
 
 // ─── Executor ──────────────────────────────────────────────────
 
-export function executeSourceSchemaSearch(
+export async function executeSourceSchemaSearch(
   input: SourceSchemaInput,
   workspaceId: string
-): SourceSchemaResult {
+): Promise<SourceSchemaResult> {
   const { query, tableName, dataType, limit: rawLimit } = input;
   const maxResults = Math.min(rawLimit || 20, 50);
   const queryLower = query.toLowerCase();
   const queryTokens = queryLower.split(/\s+/).filter(Boolean);
 
   // Load all source entities + fields
-  const sourceEntities = db
+  const sourceEntities = await db
     .select({
       id: entity.id,
       name: entity.name,
@@ -87,7 +87,7 @@ export function executeSourceSchemaSearch(
     })
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-    .all();
+    ;
 
   if (sourceEntities.length === 0) {
     return {
@@ -110,7 +110,7 @@ export function executeSourceSchemaSearch(
   let totalFieldCount = 0;
 
   for (const se of filteredEntities) {
-    const fields = db
+    const fields = await db
       .select({
         name: field.name,
         displayName: field.displayName,
@@ -119,7 +119,7 @@ export function executeSourceSchemaSearch(
       })
       .from(field)
       .where(eq(field.entityId, se.id))
-      .all();
+      ;
 
     totalFieldCount += fields.length;
 

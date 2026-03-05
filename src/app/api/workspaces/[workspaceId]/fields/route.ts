@@ -30,13 +30,12 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
   const milestoneParam = req.nextUrl.searchParams.get("milestone");
 
   // Get all target fields with their entity info
-  const targetEntities = db.select().from(entity)
-    .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target")))
-    .all();
+  const targetEntities = await db.select().from(entity)
+    .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target")));
 
   const entityById = new Map(targetEntities.map((e) => [e.id, e]));
 
-  const allFields = db.select().from(field).all()
+  const allFields = (await db.select().from(field))
     .filter((f) => entityById.has(f.entityId));
 
   // Apply milestone filter
@@ -45,15 +44,16 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
     : allFields;
 
   // Get latest mappings for all target fields
-  const allMappings = db.select().from(fieldMapping)
-    .where(and(eq(fieldMapping.workspaceId, workspaceId), eq(fieldMapping.isLatest, true)))
-    .all();
+  const allMappings = await db.select().from(fieldMapping)
+    .where(and(eq(fieldMapping.workspaceId, workspaceId), eq(fieldMapping.isLatest, true)));
   const mappingByFieldId = new Map(allMappings.map((m) => [m.targetFieldId, m]));
 
   // Resolve source entity/field names
-  const allEntities = db.select().from(entity).all();
+  const allEntities = await db.select().from(entity)
+    ;
   const entityNameById = new Map(allEntities.map((e) => [e.id, e.displayName || e.name]));
-  const allFieldsLookup = db.select().from(field).all();
+  const allFieldsLookup = await db.select().from(field)
+    ;
   const fieldNameById = new Map(allFieldsLookup.map((f) => [f.id, f.displayName || f.name]));
 
   const rows: FieldRow[] = filtered.map((f) => {

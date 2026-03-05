@@ -10,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const memberships = db
+  const memberships = await db
     .select({
       id: workspace.id,
       name: workspace.name,
@@ -20,7 +20,7 @@ export async function GET() {
     .from(userWorkspace)
     .innerJoin(workspace, eq(userWorkspace.workspaceId, workspace.id))
     .where(eq(userWorkspace.userId, session.user.id))
-    .all();
+    ;
 
   return NextResponse.json(memberships);
 }
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
-  const [ws] = db
+  const [ws] = await db
     .insert(workspace)
     .values({
       name: name.trim(),
@@ -44,11 +44,11 @@ export async function POST(req: NextRequest) {
       settings: { defaultProvider: "claude" },
     })
     .returning()
-    .all();
+    ;
 
-  db.insert(userWorkspace)
+  await db.insert(userWorkspace)
     .values({ userId: session.user.id, workspaceId: ws.id, role: "owner" })
-    .run();
+    ;
 
   return NextResponse.json(ws, { status: 201 });
 }

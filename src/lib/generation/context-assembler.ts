@@ -49,21 +49,21 @@ interface MatchedSkill {
  * Match active skills against entity/field/dataType criteria.
  * Extracted from the skills/match API route for reuse in generation.
  */
-export function matchSkills(
+export async function matchSkills(
   workspaceId: string,
   entityName: string,
   fieldName?: string,
   dataType?: string
-): MatchedSkill[] {
+): Promise<MatchedSkill[]> {
   const entityLower = entityName.toLowerCase();
   const fieldLower = fieldName?.toLowerCase() || "";
   const dataUpper = dataType?.toUpperCase() || "";
 
-  const skills = db
+  const skills = await db
     .select()
     .from(skill)
     .where(and(eq(skill.workspaceId, workspaceId), eq(skill.isActive, true)))
-    .all();
+    ;
 
   return skills.filter((s) => {
     const app = s.applicability as MatchedSkill["applicability"];
@@ -105,7 +105,7 @@ export function matchSkills(
  * primary contexts. This ensures enum lookups are available for all
  * source tables in the prompt, not just those explicitly linked by skills.
  */
-export function assembleContext(
+export async function assembleContext(
   workspaceId: string,
   entityName: string,
   tokenBudget: number,
@@ -113,7 +113,7 @@ export function assembleContext(
   sourceEntityNames?: string[],
   excludeEntityName?: string,
   entityId?: string,
-): AssembledContext {
+): Promise<AssembledContext> {
   // Skip cache when sourceEntityNames are provided — the cache key doesn't
   // include them, so a cached result might be missing enum contexts.
   if (!sourceEntityNames?.length) {
@@ -121,7 +121,7 @@ export function assembleContext(
     if (cached) return cached;
   }
 
-  const matched = matchSkills(workspaceId, entityName);
+  const matched = await matchSkills(workspaceId, entityName);
 
   const primaryContexts: AssembledContext["primaryContexts"] = [];
   const referenceContexts: AssembledContext["referenceContexts"] = [];
@@ -129,22 +129,22 @@ export function assembleContext(
   const seenContextIds = new Set<string>();
 
   for (const s of matched) {
-    const scs = db
+    const scs = await db
       .select()
       .from(skillContext)
       .where(eq(skillContext.skillId, s.id))
       .orderBy(skillContext.sortOrder)
-      .all();
+      ;
 
     for (const sc of scs) {
       if (seenContextIds.has(sc.contextId)) continue;
       seenContextIds.add(sc.contextId);
 
-      const ctx = db
+      const ctx = (await db
         .select()
         .from(context)
         .where(eq(context.id, sc.contextId))
-        .get();
+        )[0];
 
       if (!ctx || !ctx.isActive || !ctx.content) continue;
 
@@ -169,7 +169,7 @@ export function assembleContext(
   // Direct inclusion 1: Entity Knowledge doc for this specific entity (bypasses skill routing).
   // This is the fast-loop feedback path — corrections and resolved questions flow here.
   if (entityId) {
-    const ekDocs = db
+    const ekDocs = await db
       .select()
       .from(context)
       .where(
@@ -180,7 +180,7 @@ export function assembleContext(
           eq(context.isActive, true),
         ),
       )
-      .all();
+      ;
 
     for (const doc of ekDocs) {
       if (seenContextIds.has(doc.id) || !doc.content) continue;
@@ -193,7 +193,7 @@ export function assembleContext(
 
   // Direct inclusion 2: Foundational docs (distilled learnings, mortgage domain) for all entities.
   // These don't need skill routing — they're always relevant.
-  const foundationalDocs = db
+  const foundationalDocs = await db
     .select()
     .from(context)
     .where(
@@ -203,7 +203,7 @@ export function assembleContext(
         eq(context.isActive, true),
       ),
     )
-    .all();
+    ;
 
   for (const doc of foundationalDocs) {
     if (seenContextIds.has(doc.id) || !doc.content) continue;
@@ -242,11 +242,11 @@ export function assembleContext(
   );
 
   if (includedTableKeys.size > 0) {
-    const enumContexts = db
+    const enumContexts = await db
       .select()
       .from(context)
       .where(and(eq(context.subcategory, "enum_map"), eq(context.isActive, true)))
-      .all();
+      ;
 
     for (const ec of enumContexts) {
       if (seenContextIds.has(ec.id) || !ec.content) continue;
@@ -289,16 +289,16 @@ export function assembleContext(
 
   // FTS5 query-aware retrieval: add relevant docs beyond skill matching
   if (query) {
-    const ftsResults = searchContextsFts(workspaceId, query, 10);
+    const ftsResults = await searchContextsFts(workspaceId, query, 10);
     for (const fts of ftsResults) {
       if (seenContextIds.has(fts.contextId)) continue;
       seenContextIds.add(fts.contextId);
 
-      const ctx = db
+      const ctx = (await db
         .select()
         .from(context)
         .where(eq(context.id, fts.contextId))
-        .get();
+        )[0];
 
       if (!ctx || !ctx.isActive || !ctx.content) continue;
 

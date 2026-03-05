@@ -9,15 +9,15 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const mcs = db
+  const mcs = await db
     .select()
     .from(mappingContext)
     .where(eq(mappingContext.fieldMappingId, id))
-    .all();
+    ;
 
-  const withDetail = mcs.map((mc) => {
+  const withDetail = await Promise.all(mcs.map(async (mc) => {
     const ctxDoc = mc.contextId
-      ? db.select().from(context).where(eq(context.id, mc.contextId)).get()
+      ? (await db.select().from(context).where(eq(context.id, mc.contextId)).limit(1))[0]
       : null;
     return {
       ...mc,
@@ -25,7 +25,7 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
       contextCategory: ctxDoc?.category ?? null,
       contextPreview: ctxDoc?.content?.slice(0, 120) ?? null,
     };
-  });
+  }));
 
   return NextResponse.json(withDetail);
 });
@@ -42,7 +42,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
 
   const input = parsed.data;
 
-  const [created] = db
+  const [created] = await db
     .insert(mappingContext)
     .values({
       fieldMappingId: id,
@@ -52,11 +52,11 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
       relevance: input.relevance,
     })
     .returning()
-    .all();
+    ;
 
   // Return with context name
   const ctxDoc = input.contextId
-    ? db.select().from(context).where(eq(context.id, input.contextId)).get()
+    ? (await db.select().from(context).where(eq(context.id, input.contextId)).limit(1))[0]
     : null;
 
   return NextResponse.json(

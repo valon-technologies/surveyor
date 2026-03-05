@@ -56,35 +56,39 @@ export default function DocsPage() {
           Use this to verify the AI's reasoning — if it says "per Entity Knowledge corrections," you can click through and check.
         </p>
 
-        <h3>Source Verdict</h3>
-        <p>Is the AI pointing at the right source table and field? Your options:</p>
-        <ul>
-          <li><strong>correct</strong> — the source table and field are right</li>
-          <li><strong>wrong_table</strong> — the data comes from a different ACDC table entirely</li>
-          <li><strong>wrong_field</strong> — right table, wrong column</li>
-          <li><strong>should_be_unmapped</strong> — this field has no ACDC source</li>
-          <li><strong>missing_source</strong> — the source exists but the AI couldn't find it</li>
-        </ul>
+        <h3>Source, Transform, and Question (Three-Column Verdicts)</h3>
         <p>
-          For any non-correct verdict, add a note explaining the correction.
-          Example: <em>"Should be EventDates.ActualFirstLegalActionDate, not DefaultWorkstations.FcStartDate"</em>
+          Below the mapping summary is a three-column verdict area. All three must be resolved before you can submit.
         </p>
 
-        <h3>Transform Verdict</h3>
-        <p>Is the transform logic correct? Your options:</p>
+        <h4>Source</h4>
+        <p>Is the AI pointing at the right source table and field? You have three choices:</p>
         <ul>
-          <li><strong>correct</strong> — the transform is right (or identity is appropriate)</li>
-          <li><strong>not_needed</strong> — the AI added unnecessary transform logic, should be identity</li>
-          <li><strong>needed_but_missing</strong> — needs a transform but the AI mapped as identity</li>
-          <li><strong>wrong_enum</strong> — enum/code mapping is incorrect</li>
-          <li><strong>wrong_logic</strong> — the SQL/expression logic is wrong</li>
+          <li><strong>Current</strong> — the existing source table and field are correct (may show "AI Review confirms" if the AI agrees)</li>
+          <li><strong>AI Suggestion</strong> — if the AI's review proposes a different source, it appears as a blue option. Select it to accept.</li>
+          <li><strong>Custom</strong> — type the correct source yourself (e.g., "EventDates.ActualFirstLegalActionDate")</li>
         </ul>
+        <p>
+          When you select AI Suggestion or Custom (i.e., the current mapping is wrong), a{" "}
+          <strong>"Why was the AI wrong?"</strong> box appears. Use this to explain the reasoning behind
+          the correction — for example, "AI confused this with a similarly-named field in another table"
+          or "This data comes from the event history table, not the workstation snapshot." These explanations
+          feed directly into the AI's Entity Knowledge so it avoids repeating the same mistake.
+        </p>
 
-        <h3>Question</h3>
+        <h4>Transform</h4>
+        <p>Is the transform logic correct? Same three choices: Current, AI Suggestion, or Custom.</p>
+        <p>
+          When the AI is wrong, the <strong>"Why was the AI wrong?"</strong> box appears here too.
+          Be specific — e.g., "AI used a direct copy but this field needs a COALESCE across two sources"
+          or "Enum mapping is missing the UNKNOWN default case."
+        </p>
+
+        <h4>Question</h4>
         <p>
           The AI may have generated a question about this field (e.g., "Which FcStopCode value represents judgement entered?").
-          You can mark the question as acceptable, suggest a better question, or create your own.
-          All three sections must be resolved before you can submit.
+          Mark it as acceptable (Yes) or not helpful (No). If not helpful, select a reason and optionally suggest a better question.
+          If there's no linked question, you can create one.
         </p>
 
         <h3>AI Assistant</h3>
@@ -99,17 +103,24 @@ export default function DocsPage() {
           When you give a non-correct verdict, the system automatically:
         </p>
         <ol>
-          <li>Creates a <strong>learning record</strong> from your correction</li>
+          <li>Creates a <strong>learning record</strong> from your correction and "why wrong" explanation</li>
           <li>An admin validates the correction</li>
-          <li>Once validated, the entity's <strong>Entity Knowledge</strong> doc is rebuilt with your correction</li>
-          <li>The next time mappings are generated for this entity, the AI reads your correction and avoids the same mistake</li>
+          <li>Once validated, the entity's <strong>Entity Knowledge</strong> doc is rebuilt — your correction becomes a mandatory instruction the AI must follow</li>
+          <li>The next time mappings are generated for this entity, the AI reads your correction (including why it was wrong) and avoids the same mistake</li>
         </ol>
         <p>
           This is the feedback loop — your corrections compound. Each review cycle makes the AI more accurate.
+          The "Why was the AI wrong?" explanations are especially valuable because they teach the AI the reasoning
+          behind corrections, not just the answers.
         </p>
 
         <h2>Tips</h2>
         <ul>
+          <li>
+            <strong>Explain why, not just what</strong> — when correcting the AI, use the "Why was the AI wrong?" box.
+            "AI confused foreclosure_sale dates with foreclosure dates — sale data comes from the FcSaleWorkstation table"
+            is far more useful than just typing "FcSaleWorkstation.SaleDate."
+          </li>
           <li>
             <strong>Check SOT Mappings</strong> — the SOT Mappings page in the sidebar shows production mappings.
             If you're unsure about a field, check what the production YAML says.
@@ -119,8 +130,8 @@ export default function DocsPage() {
             Click it to verify the claim against the source material.
           </li>
           <li>
-            <strong>Be specific in notes</strong> — "wrong" is less useful than "Should be EventDates.FcRemovalDate because
-            the removal date comes from the event history table, not the workstation snapshot."
+            <strong>Use the milestone filter</strong> — the review queue can be filtered by milestone (M1, M2, M2.5, M3, etc.)
+            to focus on the fields that matter now. The VDS Fields by Milestone page in the sidebar gives a full tabular view.
           </li>
           <li>
             <strong>Don't worry about SUBSET fields</strong> — fields that need multiple source tables (e.g., both
@@ -150,11 +161,15 @@ export default function DocsPage() {
           <tbody>
             <tr>
               <td><strong>Dashboard</strong></td>
-              <td>Progress overview — entity completion, status distribution, your assigned work</td>
+              <td>Progress overview — entity completion, milestone coverage, status distribution</td>
             </tr>
             <tr>
-              <td><strong>Mapping</strong></td>
-              <td>Review queue — pick entities and fields to review</td>
+              <td><strong>Human Review UI</strong></td>
+              <td>Review queue — pick entities and fields to review, filterable by milestone</td>
+            </tr>
+            <tr>
+              <td><strong>VDS Fields by Milestone</strong></td>
+              <td>Tabular view of all target fields — type, definition, mapping status, source, transform, Linear issue</td>
             </tr>
             <tr>
               <td><strong>Questions</strong></td>
@@ -166,7 +181,7 @@ export default function DocsPage() {
             </tr>
             <tr>
               <td><strong>SOT Accuracy</strong></td>
-              <td>Accuracy dashboard — how well do our generated mappings match production</td>
+              <td>Accuracy dashboard — how well do generated mappings match production</td>
             </tr>
             <tr>
               <td><strong>Context</strong></td>

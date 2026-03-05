@@ -14,10 +14,10 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
   }
 
   // Get trimmed assembly at requested budget
-  const trimmed = assembleContext(workspaceId, entityName, tokenBudget);
+  const trimmed = await assembleContext(workspaceId, entityName, tokenBudget);
 
   // Get untrimmed assembly to compute dropped contexts
-  const untrimmed = assembleContext(workspaceId, entityName, UNTRIMMED_BUDGET);
+  const untrimmed = await assembleContext(workspaceId, entityName, UNTRIMMED_BUDGET);
 
   // Build sets of kept context IDs
   const keptIds = new Set([

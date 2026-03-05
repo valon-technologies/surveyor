@@ -17,11 +17,11 @@ export const PATCH = withAuth(
       transformVerdictNotes?: string;
     };
 
-    const existing = db
+    const existing = (await db
       .select({ id: fieldMapping.id })
       .from(fieldMapping)
       .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
-      .get();
+)[0];
 
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -37,10 +37,10 @@ export const PATCH = withAuth(
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    db.update(fieldMapping)
+    await db.update(fieldMapping)
       .set({ ...updates, updatedAt: new Date().toISOString() })
       .where(eq(fieldMapping.id, id))
-      .run();
+      ;
 
     const sourceVerdict = "sourceVerdict" in body ? body.sourceVerdict : undefined;
     const transformVerdict = "transformVerdict" in body ? body.transformVerdict : undefined;
@@ -49,7 +49,7 @@ export const PATCH = withAuth(
       (transformVerdict && transformVerdict !== "correct");
 
     // Look up target field info for event payload
-    const mappingDetail = db
+    const mappingDetail = (await db
       .select({
         targetFieldId: fieldMapping.targetFieldId,
         sourceEntityName: entity.name,
@@ -57,16 +57,16 @@ export const PATCH = withAuth(
       .from(fieldMapping)
       .leftJoin(entity, eq(fieldMapping.sourceEntityId, entity.id))
       .where(eq(fieldMapping.id, id))
-      .get();
+      )[0];
 
     let entityId: string | undefined;
     let targetFieldName: string | undefined;
     if (mappingDetail?.targetFieldId) {
-      const targetFieldInfo = db
+      const targetFieldInfo = (await db
         .select({ name: field.name, entityId: field.entityId })
         .from(field)
         .where(eq(field.id, mappingDetail.targetFieldId))
-        .get();
+        )[0];
       entityId = targetFieldInfo?.entityId;
       targetFieldName = targetFieldInfo?.name;
     }

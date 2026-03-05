@@ -55,7 +55,7 @@ export function CreateQuestionCard({
         question: submitText,
         targetForTeam: targetTeam,
         priority: "normal",
-      });
+      } as Parameters<typeof createMutation.mutateAsync>[0]);
       setSaveStatus("saved");
       setQuestionText("");
       onDecisionMade?.();

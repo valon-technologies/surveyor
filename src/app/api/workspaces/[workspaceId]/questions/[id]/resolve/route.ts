@@ -57,11 +57,11 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
   }
 
   // Verify question exists in workspace
-  const q = db
+  const q = (await db
     .select()
     .from(question)
     .where(and(eq(question.id, id), eq(question.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!q) {
     return NextResponse.json({ error: "Question not found" }, { status: 404 });
@@ -75,18 +75,18 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
   const resolutionBody = parsed.data.body?.trim();
 
   // Look up author name
-  const u = db
+  const u = (await db
     .select({ name: user.name })
     .from(user)
     .where(eq(user.id, userId))
-    .get();
+    )[0];
   const authorName = u?.name || "User";
 
   let newReplyCount = q.replyCount;
 
   // If resolution body provided, create a reply with isResolution=true
   if (resolutionBody) {
-    db.insert(questionReply)
+    await db.insert(questionReply)
       .values({
         questionId: id,
         authorId: userId,
@@ -95,12 +95,12 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
         body: resolutionBody,
         isResolution: true,
       })
-      .run();
+      ;
     newReplyCount += 1;
   }
 
   // Update question to resolved
-  const [updated] = db
+  const [updated] = await db
     .update(question)
     .set({
       status: "resolved",
@@ -115,7 +115,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
     })
     .where(eq(question.id, id))
     .returning()
-    .all();
+    ;
 
   // ── Side effects ──────────────────────────────────────────
   const answerText = resolutionBody || q.answer;
@@ -125,14 +125,14 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
     // Resolve field name for the learning record
     let fieldName: string | null = null;
     if (updated.fieldId) {
-      const f = db.select({ name: field.name }).from(field)
-        .where(eq(field.id, updated.fieldId)).get();
+      const [f] = await db.select({ name: field.name }).from(field)
+        .where(eq(field.id, updated.fieldId)).limit(1);
       fieldName = f?.name || null;
     }
 
     // 1. Auto-exclude mapping if the answer indicates no source data
     if (updated.fieldMappingId && isExcludeSignal(answerText)) {
-      db.update(fieldMapping)
+      await db.update(fieldMapping)
         .set({
           status: "excluded",
           mappingType: "not_applicable",
@@ -143,37 +143,36 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
           updatedAt: now,
         })
         .where(eq(fieldMapping.id, updated.fieldMappingId))
-        .run();
+        ;
     }
 
     // 2. Resolve schema context for the learning record
     let schemaContext = "";
     if (updated.schemaAssetIds?.length) {
-      const assets = db
+      const assets = await db
         .select({ id: schemaAsset.id, name: schemaAsset.name, side: schemaAsset.side })
         .from(schemaAsset)
         .where(inArray(schemaAsset.id, updated.schemaAssetIds))
-        .all();
+        ;
 
       if (assets.length > 0) {
-        const parts = assets.map((a) => {
-          const entityNames = db
+        const parts = await Promise.all(assets.map(async (a) => {
+          const entityNames = (await db
             .select({ name: entity.name })
             .from(entity)
             .where(eq(entity.schemaAssetId, a.id))
-            .all()
-            .map((e) => e.name);
+            ).map((e) => e.name);
           const entitiesStr = entityNames.length > 0
             ? `, ${entityNames.length} entities: ${entityNames.join(", ")}`
             : "";
           return `"${a.name}" (${a.side}${entitiesStr})`;
-        });
+        }));
         schemaContext = ` Referenced schema: ${parts.join("; ")}.`;
       }
     }
 
     // 3. Always create a learning record
-    db.insert(learning)
+    await db.insert(learning)
       .values({
         workspaceId,
         entityId: updated.entityId,
@@ -185,7 +184,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
         validationStatus: "pending", // Requires admin validation before entering EK
         createdAt: now,
       })
-      .run();
+      ;
 
     // NOTE: rebuildEntityKnowledge is NOT called here — admin must validate first.
     // EK rebuild happens in the admin validation route when learning is approved.
@@ -206,36 +205,37 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
     if (updated.fieldId && updated.entityId) {
       try {
         // Resolve the field name for cross-entity matching
-        const resolvedField = db.select({ name: field.name }).from(field)
-          .where(eq(field.id, updated.fieldId)).get();
+        const [resolvedField] = await db.select({ name: field.name }).from(field)
+          .where(eq(field.id, updated.fieldId)).limit(1);
 
         // Find sibling component entities (same parentEntityId)
-        const thisEntity = db.select({ parentEntityId: entity.parentEntityId }).from(entity)
-          .where(eq(entity.id, updated.entityId)).get();
+        const [thisEntity] = await db.select({ parentEntityId: entity.parentEntityId }).from(entity)
+          .where(eq(entity.id, updated.entityId)).limit(1);
         const siblingEntityIds: string[] = [];
         if (thisEntity?.parentEntityId && resolvedField) {
-          const siblings = db.select({ id: entity.id }).from(entity)
+          const siblings = (await db.select({ id: entity.id }).from(entity)
             .where(and(
               eq(entity.workspaceId, workspaceId),
               eq(entity.parentEntityId, thisEntity.parentEntityId),
-            )).all().filter((s) => s.id !== updated.entityId);
+            ))).filter((s) => s.id !== updated.entityId);
           siblingEntityIds.push(...siblings.map((s) => s.id));
         }
 
         // Build list of all field IDs to cascade to (same field + sibling fields by name)
         const cascadeFieldIds = [updated.fieldId];
         if (siblingEntityIds.length > 0 && resolvedField) {
-          const siblingFields = db.select({ id: field.id }).from(field)
+          const siblingFields = await db.select({ id: field.id }).from(field)
             .where(and(
               inArray(field.entityId, siblingEntityIds),
               eq(field.name, resolvedField.name),
-            )).all();
+            ))
+            ;
           cascadeFieldIds.push(...siblingFields.map((f) => f.id));
         }
 
         const allEntityIds = [updated.entityId, ...siblingEntityIds];
 
-        const relatedOpen = db
+        const relatedOpen = (await db
           .select()
           .from(question)
           .where(
@@ -246,11 +246,10 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
               eq(question.status, "open"),
             )
           )
-          .all()
-          .filter((rq) => rq.id !== id);
+          ).filter((rq) => rq.id !== id);
 
         for (const rq of relatedOpen) {
-          db.update(question)
+          await db.update(question)
             .set({
               status: "resolved",
               answer: answerText,
@@ -262,9 +261,9 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
               updatedAt: now,
             })
             .where(eq(question.id, rq.id))
-            .run();
+            ;
 
-          db.insert(questionReply)
+          await db.insert(questionReply)
             .values({
               questionId: rq.id,
               authorId: null,
@@ -273,12 +272,12 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
               body: `Auto-resolved: sibling entity question about "${resolvedField?.name || "this field"}" was answered — "${answerText}"`,
               isResolution: true,
             })
-            .run();
+            ;
 
-          db.update(question)
+          await db.update(question)
             .set({ replyCount: rq.replyCount + 1 })
             .where(eq(question.id, rq.id))
-            .run();
+            ;
 
           cascadeCount++;
         }

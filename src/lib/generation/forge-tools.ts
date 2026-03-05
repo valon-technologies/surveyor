@@ -205,26 +205,26 @@ export interface ForgeToolResult {
   clientData?: ForgeClientData; // Structured data for UI cards
 }
 
-export function executeForgeToolCall(
+export async function executeForgeToolCall(
   toolName: string,
   input: Record<string, unknown>,
   workspaceId: string
-): ForgeToolResult {
+): Promise<ForgeToolResult> {
   switch (toolName) {
     case "search_contexts":
-      return executeSearchContexts(input, workspaceId);
+      return await executeSearchContexts(input, workspaceId);
     case "browse_contexts":
-      return executeBrowseContexts(input, workspaceId);
+      return await executeBrowseContexts(input, workspaceId);
     case "read_context":
-      return executeReadContext(input, workspaceId);
+      return await executeReadContext(input, workspaceId);
     case "list_target_fields":
-      return executeListTargetFields(input, workspaceId);
+      return await executeListTargetFields(input, workspaceId);
     case "get_existing_skill":
-      return executeGetExistingSkill(input);
+      return await executeGetExistingSkill(input);
     case "list_skills":
-      return executeListSkills(input, workspaceId);
+      return await executeListSkills(input, workspaceId);
     case "get_mapping_feedback":
-      return executeMappingFeedback(input, workspaceId);
+      return await executeMappingFeedback(input, workspaceId);
     default:
       return {
         success: false,
@@ -235,14 +235,14 @@ export function executeForgeToolCall(
   }
 }
 
-function executeSearchContexts(
+async function executeSearchContexts(
   input: Record<string, unknown>,
   workspaceId: string
-): ForgeToolResult {
+): Promise<ForgeToolResult> {
   const query = input.query as string;
   const limit = Math.min((input.limit as number) || 15, 30);
 
-  const ftsResults = searchContextsFts(workspaceId, query, limit);
+  const ftsResults = await searchContextsFts(workspaceId, query, limit);
 
   if (ftsResults.length === 0) {
     return {
@@ -256,7 +256,7 @@ function executeSearchContexts(
 
   // Load full context records for previews
   const contextIds = ftsResults.map((r) => r.contextId);
-  const contexts = db
+  const contexts = await db
     .select({
       id: context.id,
       name: context.name,
@@ -267,7 +267,7 @@ function executeSearchContexts(
     })
     .from(context)
     .where(inArray(context.id, contextIds))
-    .all();
+    ;
 
   const contextMap = new Map(contexts.map((c) => [c.id, c]));
 
@@ -325,10 +325,10 @@ function executeSearchContexts(
   };
 }
 
-function executeBrowseContexts(
+async function executeBrowseContexts(
   input: Record<string, unknown>,
   workspaceId: string
-): ForgeToolResult {
+): Promise<ForgeToolResult> {
   const category = input.category as string | undefined;
   const subcategory = input.subcategory as string | undefined;
   const nameFilter = input.nameFilter as string | undefined;
@@ -342,7 +342,7 @@ function executeBrowseContexts(
   if (subcategory) conditions.push(eq(context.subcategory, subcategory));
   if (nameFilter) conditions.push(like(context.name, `%${nameFilter}%`));
 
-  const results = db
+  const results = await db
     .select({
       id: context.id,
       name: context.name,
@@ -354,14 +354,14 @@ function executeBrowseContexts(
     .where(and(...conditions))
     .orderBy(context.name)
     .limit(limit)
-    .all();
+    ;
 
   // Also get total count for context
-  const totalCount = db
+  const totalCount = (await db
     .select({ id: context.id })
     .from(context)
     .where(and(...conditions))
-    .all().length;
+    ).length;
 
   if (results.length === 0) {
     const filters = [category, subcategory, nameFilter].filter(Boolean).join(", ");
@@ -406,17 +406,17 @@ function executeBrowseContexts(
   };
 }
 
-function executeReadContext(
+async function executeReadContext(
   input: Record<string, unknown>,
   workspaceId: string
-): ForgeToolResult {
+): Promise<ForgeToolResult> {
   const contextId = input.contextId as string;
 
-  const ctx = db
+  const ctx = (await db
     .select()
     .from(context)
     .where(eq(context.id, contextId))
-    .get();
+    )[0];
 
   if (!ctx) {
     return {
@@ -474,14 +474,14 @@ function executeReadContext(
   };
 }
 
-function executeListTargetFields(
+async function executeListTargetFields(
   input: Record<string, unknown>,
   workspaceId: string
-): ForgeToolResult {
+): Promise<ForgeToolResult> {
   const entityName = (input.entityName as string).toLowerCase();
 
   // Find target entities matching the name
-  const targetEntities = db
+  const targetEntities = (await db
     .select({
       id: entity.id,
       name: entity.name,
@@ -490,7 +490,7 @@ function executeListTargetFields(
     })
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target")))
-    .all()
+    )
     .filter(
       (e) =>
         (e.displayName || e.name).toLowerCase().includes(entityName) ||
@@ -509,7 +509,7 @@ function executeListTargetFields(
   const lines: string[] = [];
 
   for (const te of targetEntities) {
-    const fields = db
+    const fields = await db
       .select({
         name: field.name,
         displayName: field.displayName,
@@ -520,7 +520,7 @@ function executeListTargetFields(
       .from(field)
       .where(eq(field.entityId, te.id))
       .orderBy(field.sortOrder)
-      .all();
+      ;
 
     const eName = te.displayName || te.name;
     lines.push(`## ${eName} (${fields.length} fields)`);
@@ -542,14 +542,14 @@ function executeListTargetFields(
     lines.push("");
   }
 
-  const totalFields = targetEntities.reduce((sum, te) => {
-    const count = db
+  let totalFields = 0;
+  for (const te of targetEntities) {
+    const fields = await db
       .select({ id: field.id })
       .from(field)
-      .where(eq(field.entityId, te.id))
-      .all().length;
-    return sum + count;
-  }, 0);
+      .where(eq(field.entityId, te.id));
+    totalFields += fields.length;
+  }
 
   const entityDisplayName = targetEntities.map((te) => te.displayName || te.name).join(", ");
 
@@ -562,12 +562,12 @@ function executeListTargetFields(
   };
 }
 
-function executeGetExistingSkill(
+async function executeGetExistingSkill(
   input: Record<string, unknown>
-): ForgeToolResult {
+): Promise<ForgeToolResult> {
   const skillId = input.skillId as string;
 
-  const s = db.select().from(skill).where(eq(skill.id, skillId)).get();
+  const [s] = await db.select().from(skill).where(eq(skill.id, skillId)).limit(1);
 
   if (!s) {
     return {
@@ -579,7 +579,7 @@ function executeGetExistingSkill(
   }
 
   // Load context assignments
-  const assignments = db
+  const assignments = await db
     .select({
       scId: skillContext.id,
       contextId: skillContext.contextId,
@@ -595,7 +595,7 @@ function executeGetExistingSkill(
     .innerJoin(context, eq(skillContext.contextId, context.id))
     .where(eq(skillContext.skillId, skillId))
     .orderBy(skillContext.sortOrder)
-    .all();
+    ;
 
   const app = s.applicability as {
     entityPatterns?: string[];
@@ -663,16 +663,16 @@ function executeGetExistingSkill(
   };
 }
 
-function executeListSkills(
+async function executeListSkills(
   input: Record<string, unknown>,
   workspaceId: string
-): ForgeToolResult {
+): Promise<ForgeToolResult> {
   const nameFilter = input.nameFilter as string | undefined;
 
   const conditions = [eq(skill.workspaceId, workspaceId)];
   if (nameFilter) conditions.push(like(skill.name, `%${nameFilter}%`));
 
-  const skills = db
+  const skills = await db
     .select({
       id: skill.id,
       name: skill.name,
@@ -683,7 +683,7 @@ function executeListSkills(
     .from(skill)
     .where(and(...conditions))
     .orderBy(skill.name)
-    .all();
+    ;
 
   if (skills.length === 0) {
     return {
@@ -707,11 +707,11 @@ function executeListSkills(
     const patterns = app?.entityPatterns?.join(", ") || "";
 
     // Count contexts
-    const ctxCount = db
+    const ctxCount = (await db
       .select({ id: skillContext.id })
       .from(skillContext)
       .where(eq(skillContext.skillId, s.id))
-      .all().length;
+      ).length;
 
     lines.push(
       `| ${i + 1} | ${s.id} | ${s.name} | ${patterns} | ${ctxCount} | ${s.isActive ? "Yes" : "No"} |`
@@ -719,13 +719,13 @@ function executeListSkills(
   }
 
   // Build client data with context counts already computed
-  const skillClientItems: SkillPreview[] = skills.map((s) => {
+  const skillClientItems: SkillPreview[] = await Promise.all(skills.map(async (s) => {
     const app2 = s.applicability as { entityPatterns?: string[] } | null;
-    const ctxCount = db
+    const ctxCount = (await db
       .select({ id: skillContext.id })
       .from(skillContext)
       .where(eq(skillContext.skillId, s.id))
-      .all().length;
+      ).length;
     return {
       id: s.id,
       name: s.name,
@@ -733,7 +733,7 @@ function executeListSkills(
       contextCount: ctxCount,
       isActive: s.isActive,
     };
-  });
+  }));
 
   return {
     success: true,
@@ -744,18 +744,18 @@ function executeListSkills(
   };
 }
 
-function executeMappingFeedback(
+async function executeMappingFeedback(
   input: Record<string, unknown>,
   workspaceId: string
-): ForgeToolResult {
+): Promise<ForgeToolResult> {
   const entityId = input.entityId as string;
 
   // Find the target entity
-  const targetEntity = db
+  const targetEntity = (await db
     .select({ id: entity.id, name: entity.name, displayName: entity.displayName })
     .from(entity)
     .where(eq(entity.id, entityId))
-    .get();
+    )[0];
 
   if (!targetEntity) {
     return {
@@ -767,16 +767,16 @@ function executeMappingFeedback(
   }
 
   // Get all target fields for this entity
-  const targetFields = db
+  const targetFields = await db
     .select({ id: field.id, name: field.name, displayName: field.displayName })
     .from(field)
     .where(eq(field.entityId, entityId))
-    .all();
+    ;
 
   const fieldNames = new Map(targetFields.map((f) => [f.id, f.displayName || f.name]));
 
   // Get latest mappings for all target fields
-  const mappings = db
+  const mappings = (await db
     .select({
       id: fieldMapping.id,
       targetFieldId: fieldMapping.targetFieldId,
@@ -794,7 +794,7 @@ function executeMappingFeedback(
         eq(fieldMapping.isLatest, true)
       )
     )
-    .all()
+    )
     .filter((m) => fieldNames.has(m.targetFieldId));
 
   const mappedFieldIds = new Set(mappings.map((m) => m.targetFieldId));

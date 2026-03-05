@@ -23,18 +23,18 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const id = params.id;
 
   // 1. Verify batch run exists and belongs to workspace
-  const run = db
+  const run = (await db
     .select()
     .from(batchRun)
     .where(and(eq(batchRun.id, id), eq(batchRun.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!run) {
     return NextResponse.json({ error: "Batch run not found" }, { status: 404 });
   }
 
   // 2. Find all field mappings created by this batch run
-  const mappings = db
+  const mappings = await db
     .select({
       id: fieldMapping.id,
       targetFieldId: fieldMapping.targetFieldId,
@@ -50,7 +50,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
         eq(fieldMapping.workspaceId, workspaceId)
       )
     )
-    .all();
+    ;
 
   if (mappings.length === 0) {
     return NextResponse.json({
@@ -65,7 +65,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const mappingById = new Map(mappings.map((m) => [m.id, m]));
 
   // 3. Fetch sessions linked to these mappings
-  const sessions = db
+  const sessions = await db
     .select({
       id: chatSession.id,
       fieldMappingId: chatSession.fieldMappingId,
@@ -92,7 +92,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
       )
     )
     .orderBy(chatSession.createdAt)
-    .all();
+    ;
 
   // If we have chat sessions, return chat mode
   if (sessions.length > 0) {
@@ -100,7 +100,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     const sessionIds = sessions.map((s) => s.id);
     const allMessages =
       sessionIds.length > 0
-        ? db
+        ? await db
             .select()
             .from(chatMessage)
             .where(
@@ -110,7 +110,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
               )
             )
             .orderBy(chatMessage.createdAt)
-            .all()
+
         : [];
 
     // Group messages by session
@@ -164,7 +164,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   }
 
   // 6. Single-shot mode fallback: query generation records for this batch run
-  const generations = db
+  const generations = await db
     .select({
       id: generation.id,
       entityId: generation.entityId,
@@ -180,10 +180,10 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     .leftJoin(entity, eq(generation.entityId, entity.id))
     .where(eq(generation.batchRunId, id))
     .orderBy(generation.createdAt)
-    .all();
+    ;
 
   // 7. For each generation, gather field mappings with source info
-  const batchMappings = db
+  const batchMappings = await db
     .select({
       id: fieldMapping.id,
       generationId: fieldMapping.generationId,
@@ -204,7 +204,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
       )
     )
     .orderBy(field.name)
-    .all();
+    ;
 
   // Batch-lookup source field and entity names
   const sourceFieldIds = [...new Set(batchMappings.map((m) => m.sourceFieldId).filter(Boolean))] as string[];
@@ -212,21 +212,21 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
 
   const sourceFieldNames = sourceFieldIds.length > 0
     ? new Map(
-        db.select({ id: field.id, name: field.name })
+        (await db.select({ id: field.id, name: field.name })
           .from(field)
           .where(inArray(field.id, sourceFieldIds))
-          .all()
-          .map((f) => [f.id, f.name])
+          )
+          .map((f: { id: string; name: string }) => [f.id, f.name] as [string, string])
       )
     : new Map<string, string>();
 
   const sourceEntityNames = sourceEntityIds.length > 0
     ? new Map(
-        db.select({ id: entity.id, name: entity.name })
+        (await db.select({ id: entity.id, name: entity.name })
           .from(entity)
           .where(inArray(entity.id, sourceEntityIds))
-          .all()
-          .map((e) => [e.id, e.name])
+          )
+          .map((e: { id: string; name: string }) => [e.id, e.name] as [string, string])
       )
     : new Map<string, string>();
 

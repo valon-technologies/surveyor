@@ -11,17 +11,17 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
   const offset = parseInt(url.searchParams.get("offset") || "0");
 
-  const evaluations = db
+  const evaluations = await db
     .select()
     .from(evaluation)
     .where(eq(evaluation.workspaceId, workspaceId))
     .orderBy(sql`${evaluation.createdAt} DESC`)
     .limit(limit)
     .offset(offset)
-    .all();
+    ;
 
   // Aggregate stats
-  const stats = db
+  const stats = (await db
     .select({
       totalEvaluations: sql<number>`COUNT(*)`,
       avgJudgeScore: sql<number | null>`AVG(${evaluation.judgeScore})`,
@@ -34,7 +34,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
         eq(evaluation.status, "completed")
       )
     )
-    .get();
+    )[0];
 
   return NextResponse.json({
     evaluations,
@@ -64,7 +64,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
     targetQuestionIds = questionIds;
   } else {
     // All resolved questions in workspace
-    const resolved = db
+    const resolved = await db
       .select({ id: question.id })
       .from(question)
       .where(
@@ -73,7 +73,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
           eq(question.status, "resolved")
         )
       )
-      .all();
+      ;
     targetQuestionIds = resolved.map((q) => q.id);
   }
 
@@ -109,7 +109,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
       const errorMsg = err instanceof Error ? err.message : "Unknown error";
 
       // Record failed evaluation
-      db.insert(evaluation)
+      await db.insert(evaluation)
         .values({
           workspaceId,
           questionId: qId,
@@ -117,7 +117,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
           status: "failed",
           error: errorMsg,
         })
-        .run();
+        ;
 
       results.push({
         questionId: qId,

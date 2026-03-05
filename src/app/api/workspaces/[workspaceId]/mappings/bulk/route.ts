@@ -18,7 +18,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
   const created: typeof fieldMapping.$inferSelect[] = [];
 
   for (const input of inputs) {
-    const mapping = createMappingVersionByTargetField(input.targetFieldId, {
+    const mapping = await createMappingVersionByTargetField(input.targetFieldId, {
       workspaceId,
       targetFieldId: input.targetFieldId,
       status: input.status,
@@ -42,9 +42,9 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
 
     // Auto-create review thread for non-high-confidence mappings with reviewComment
     if (input.reviewComment && input.confidence !== "high") {
-      const targetField = db.select().from(field).where(eq(field.id, input.targetFieldId)).get();
+      const [targetField] = await db.select().from(field).where(eq(field.id, input.targetFieldId)).limit(1);
 
-      const [thread] = db
+      const [thread] = await db
         .insert(commentThread)
         .values({
           workspaceId,
@@ -55,16 +55,16 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
           commentCount: 1,
         })
         .returning()
-        .all();
+        ;
 
-      db.insert(comment)
+      await db.insert(comment)
         .values({
           threadId: thread.id,
           authorName: "AI Auto-Map",
           body: input.reviewComment,
           bodyFormat: "markdown",
         })
-        .run();
+        ;
     }
   }
 

@@ -35,7 +35,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     conditions.push(eq(chatSession.entityId, filterEntityId));
   }
 
-  const sessions = db
+  const sessions = await db
     .select({
       id: chatSession.id,
       workspaceId: chatSession.workspaceId,
@@ -54,7 +54,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     .leftJoin(user, eq(chatSession.createdBy, user.id))
     .where(and(...conditions))
     .orderBy(desc(chatSession.createdAt))
-    .all();
+    ;
 
   return NextResponse.json(sessions);
 });
@@ -73,13 +73,13 @@ export const POST = withAuth(
     const { entityId } = parsed.data;
 
     // Load entity
-    const targetEntity = db
+    const targetEntity = (await db
       .select()
       .from(entity)
       .where(
         and(eq(entity.id, entityId), eq(entity.workspaceId, workspaceId))
       )
-      .get();
+      )[0];
 
     if (!targetEntity) {
       return NextResponse.json(
@@ -89,14 +89,14 @@ export const POST = withAuth(
     }
 
     // Load all target fields and their latest mappings
-    const targetFields = db
+    const targetFields = await db
       .select()
       .from(field)
       .where(eq(field.entityId, entityId))
       .orderBy(field.sortOrder)
-      .all();
+      ;
 
-    const latestMappings = db
+    const latestMappings = await db
       .select()
       .from(fieldMapping)
       .where(
@@ -105,30 +105,30 @@ export const POST = withAuth(
           eq(fieldMapping.isLatest, true)
         )
       )
-      .all();
+      ;
 
     // Load source entities for name resolution
-    const sourceEntities = db
+    const sourceEntities = await db
       .select()
       .from(entity)
       .where(
         and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source"))
       )
-      .all();
+      ;
 
     // Build field summaries
-    const fields = targetFields.map((tf) => {
+    const fields = await Promise.all(targetFields.map(async (tf) => {
       const m = latestMappings.find((lm) => lm.targetFieldId === tf.id);
       let sourceInfo: string | null = null;
       if (m?.sourceEntityId) {
         const se = sourceEntities.find((e) => e.id === m.sourceEntityId);
         let sfName: string | null = null;
         if (m.sourceFieldId) {
-          const sfld = db
+          const sfld = (await db
             .select({ name: field.name })
             .from(field)
             .where(eq(field.id, m.sourceFieldId))
-            .get();
+            )[0];
           sfName = sfld?.name || null;
         }
         sourceInfo = se
@@ -147,14 +147,14 @@ export const POST = withAuth(
         transform: m?.transform ?? null,
         confidence: m?.confidence ?? null,
       };
-    });
+    }));
 
     // Detect RAG mode
-    const wsForRag = db
+    const wsForRag = (await db
       .select({ settings: workspace.settings })
       .from(workspace)
       .where(eq(workspace.id, workspaceId))
-      .get();
+      )[0];
     const wsSettings = wsForRag?.settings as Record<string, unknown> | null;
     const ragEnabled = wsSettings?.ragMode !== false;
 
@@ -166,12 +166,11 @@ export const POST = withAuth(
     if (ragEnabled) {
       let totalFields = 0;
       for (const se of sourceEntities) {
-        const count = db
+        const seFields = await db
           .select({ name: field.name })
           .from(field)
-          .where(eq(field.entityId, se.id))
-          .all().length;
-        totalFields += count;
+          .where(eq(field.entityId, se.id));
+        totalFields += seFields.length;
       }
       sourceSchemaStats = {
         tableCount: sourceEntities.length,
@@ -209,7 +208,7 @@ export const POST = withAuth(
         }
       | undefined;
 
-    const pipeline = db
+    const pipeline = (await db
       .select()
       .from(entityPipeline)
       .where(
@@ -218,7 +217,7 @@ export const POST = withAuth(
           eq(entityPipeline.isLatest, true)
         )
       )
-      .get();
+      )[0];
 
     if (pipeline) {
       const sources =
@@ -238,7 +237,7 @@ export const POST = withAuth(
     }
 
     // Entity learnings
-    const entityLearnings = db
+    const entityLearnings = (await db
       .select({
         content: learning.content,
         fieldName: learning.fieldName,
@@ -252,15 +251,14 @@ export const POST = withAuth(
       )
       .orderBy(desc(learning.createdAt))
       .limit(15)
-      .all()
-      .filter((l) => l.fieldName)
+      ).filter((l) => l.fieldName)
       .map((l) => ({
         fieldName: l.fieldName!,
         correction: l.content,
       }));
 
     // Answered questions
-    const answeredQs = db
+    const answeredQs = (await db
       .select({
         question: question.question,
         answer: question.answer,
@@ -275,8 +273,7 @@ export const POST = withAuth(
           eq(question.status, "resolved")
         )
       )
-      .all()
-      .filter((q) => q.answer)
+      ).filter((q) => q.answer)
       .map((q) => ({
         question: q.question,
         answer: q.answer!,
@@ -288,11 +285,11 @@ export const POST = withAuth(
       | { projectId: string; sourceDataset: string }
       | undefined;
     try {
-      const ws = db
+      const ws = (await db
         .select({ settings: workspace.settings })
         .from(workspace)
         .where(eq(workspace.id, workspaceId))
-        .get();
+        )[0];
       bqConfig = (ws?.settings as Record<string, unknown> | null)
         ?.bigquery as typeof bqConfig;
     } catch {
@@ -301,7 +298,7 @@ export const POST = withAuth(
 
     // Assemble context
     const tokenBudget = getTokenBudget("claude");
-    const assembledCtx = assembleContext(
+    const assembledCtx = await assembleContext(
       workspaceId,
       targetEntity.name,
       ragEnabled ? 0 : tokenBudget
@@ -328,8 +325,8 @@ export const POST = withAuth(
     const sessionId = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    const session = withTransaction(() => {
-      db.insert(chatSession)
+    const session = await withTransaction(async () => {
+      await db.insert(chatSession)
         .values({
           id: sessionId,
           workspaceId,
@@ -343,22 +340,22 @@ export const POST = withAuth(
           createdAt: now,
           updatedAt: now,
         })
-        .run();
+        ;
 
-      db.insert(chatMessage)
+      await db.insert(chatMessage)
         .values({
           sessionId,
           role: "system",
           content: systemMessage + "\n\n" + contextMessage,
           createdAt: now,
         })
-        .run();
+        ;
 
-      return db
+      return (await db
         .select()
         .from(chatSession)
         .where(eq(chatSession.id, sessionId))
-        .get();
+        )[0];
     });
 
     return NextResponse.json(session);

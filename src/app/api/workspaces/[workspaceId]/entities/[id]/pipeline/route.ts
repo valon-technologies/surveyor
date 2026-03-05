@@ -17,7 +17,7 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId }) => {
   const entityId = params.id;
 
   // Get the latest pipeline for this entity
-  let pipeline = db
+  let pipeline = (await db
     .select()
     .from(entityPipeline)
     .where(
@@ -27,29 +27,29 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId }) => {
         eq(entityPipeline.isLatest, true)
       )
     )
-    .get();
+    )[0];
 
   // If no pipeline exists, try to synthesize one from field mappings
   if (!pipeline) {
-    const targetEntity = db
+    const targetEntity = (await db
       .select()
       .from(entityTable)
       .where(eq(entityTable.id, entityId))
-      .get();
+      )[0];
 
     if (!targetEntity) {
       return NextResponse.json({ error: "Entity not found" }, { status: 404 });
     }
 
     // Check if there are any field mappings for this entity
-    const fieldIds = db
+    const fieldIds = (await db
       .select({ id: field.id })
       .from(field)
       .where(eq(field.entityId, entityId))
-      .all()
+)
       .map((f) => f.id);
 
-    const hasMappings = fieldIds.length > 0 && db
+    const hasMappings = fieldIds.length > 0 && (await db
       .select({ id: fieldMapping.id, targetFieldId: fieldMapping.targetFieldId })
       .from(fieldMapping)
       .where(
@@ -58,18 +58,18 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId }) => {
           eq(fieldMapping.isLatest, true)
         )
       )
-      .all()
-      .some((m) => fieldIds.includes(m.targetFieldId));
+      )
+      .some((m: { targetFieldId: string }) => fieldIds.includes(m.targetFieldId));
 
     if (hasMappings) {
       try {
-        synthesizePipelineFromMappings({
+        await synthesizePipelineFromMappings({
           workspaceId,
           entityId,
           entityName: targetEntity.displayName || targetEntity.name,
         });
 
-        pipeline = db
+        pipeline = (await db
           .select()
           .from(entityPipeline)
           .where(
@@ -79,7 +79,7 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId }) => {
               eq(entityPipeline.isLatest, true)
             )
           )
-          .get();
+          )[0];
       } catch (err) {
         console.warn("[pipeline] Auto-synthesis failed:", err);
       }
@@ -95,11 +95,11 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId }) => {
     try {
       rebuildPipelineYaml(pipeline.id);
       // Re-read the updated record
-      const updated = db
+      const updated = (await db
         .select()
         .from(entityPipeline)
         .where(eq(entityPipeline.id, pipeline.id))
-        .get();
+        )[0];
 
       if (updated) {
         const columns = parseColumnsFromYaml(updated.yamlSpec);

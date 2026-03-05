@@ -14,13 +14,13 @@ export const POST = withAuth(async (_req, ctx, { workspaceId, userId }) => {
   const params = await ctx.params;
   const id = params.id as string;
 
-  const refresh = db
+  const refresh = (await db
     .select()
     .from(skillRefresh)
     .where(
       and(eq(skillRefresh.id, id), eq(skillRefresh.workspaceId, workspaceId)),
     )
-    .get();
+    )[0];
 
   if (!refresh) {
     return NextResponse.json(
@@ -45,7 +45,7 @@ export const POST = withAuth(async (_req, ctx, { workspaceId, userId }) => {
 
   const proposal = refresh.proposal as SkillRefreshProposal;
 
-  const result = applyApprovedProposal(
+  const result = await applyApprovedProposal(
     workspaceId,
     refresh.skillId,
     proposal,

@@ -83,42 +83,42 @@ export function getSiblingMappingsToolDefinition(): ToolDefinition {
 
 // ─── Executor ──────────────────────────────────────────────────
 
-export function executeSiblingMappingLookup(
+export async function executeSiblingMappingLookup(
   input: SiblingMappingsInput,
   workspaceId: string,
   entityId: string,
   targetFieldId: string
-): SiblingMappingsResult {
+): Promise<SiblingMappingsResult> {
   const { filter, searchTerm, limit: rawLimit } = input;
   const maxResults = Math.min(rawLimit || 30, 60);
 
   // Load all sibling fields (exclude current target field)
-  const siblingFields = db
+  const siblingFields = (await db
     .select()
     .from(field)
     .where(eq(field.entityId, entityId))
     .orderBy(field.sortOrder)
-    .all()
+    )
     .filter((f) => f.id !== targetFieldId);
 
   // Load latest mappings for this workspace
-  const latestMappings = db
+  const latestMappings = await db
     .select()
     .from(fieldMapping)
     .where(and(eq(fieldMapping.workspaceId, workspaceId), eq(fieldMapping.isLatest, true)))
-    .all();
+    ;
 
   // Load source entities for name resolution
-  const sourceEntities = db
+  const sourceEntities = await db
     .select({ id: entity.id, name: entity.name, displayName: entity.displayName })
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-    .all();
+    ;
 
   const entityMap = new Map(sourceEntities.map((e) => [e.id, e.displayName || e.name]));
 
   // Build sibling rows with mapping info
-  const rows: SiblingRow[] = siblingFields.map((sf) => {
+  const rows: SiblingRow[] = await Promise.all(siblingFields.map(async (sf) => {
     const m = latestMappings.find((lm) => lm.targetFieldId === sf.id);
     let sourceTable: string | null = null;
     let sourceField: string | null = null;
@@ -127,11 +127,11 @@ export function executeSiblingMappingLookup(
       sourceTable = entityMap.get(m.sourceEntityId) || null;
     }
     if (m?.sourceFieldId) {
-      const sfld = db
+      const sfld = (await db
         .select({ name: field.name })
         .from(field)
         .where(eq(field.id, m.sourceFieldId))
-        .get();
+        )[0];
       sourceField = sfld?.name || null;
     }
 
@@ -146,7 +146,7 @@ export function executeSiblingMappingLookup(
       transform: m?.transform || null,
       reasoning: m?.reasoning || null,
     };
-  });
+  }));
 
   // Apply filter
   let filtered: SiblingRow[];

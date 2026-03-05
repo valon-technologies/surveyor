@@ -15,7 +15,7 @@ export const PATCH = withAuth(async (req, ctx, { workspaceId }) => {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const [updated] = db
+  const [updated] = await db
     .update(comment)
     .set({
       body: parsed.data.body,
@@ -23,7 +23,7 @@ export const PATCH = withAuth(async (req, ctx, { workspaceId }) => {
     })
     .where(and(eq(comment.id, commentId), eq(comment.threadId, threadId)))
     .returning()
-    .all();
+    ;
 
   if (!updated) {
     return NextResponse.json({ error: "Comment not found" }, { status: 404 });
@@ -37,18 +37,18 @@ export const DELETE = withAuth(async (_req, ctx, { workspaceId }) => {
   const { threadId, commentId } = params;
 
   // Delete comment
-  db.delete(comment)
+  await db.delete(comment)
     .where(and(eq(comment.id, commentId), eq(comment.threadId, threadId)))
-    .run();
+    ;
 
   // Atomic decrement — avoids stale read-modify-write under concurrency
-  db.update(commentThread)
+  await db.update(commentThread)
     .set({
       commentCount: sql`MAX(0, ${commentThread.commentCount} - 1)`,
       updatedAt: new Date().toISOString(),
     })
     .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId)))
-    .run();
+    ;
 
   return NextResponse.json({ success: true });
 }, { requiredRole: "editor" });

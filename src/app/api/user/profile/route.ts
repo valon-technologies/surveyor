@@ -16,7 +16,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const profile = db
+  const profile = (await db
     .select({
       id:      user.id,
       name:    user.name,
@@ -26,7 +26,7 @@ export async function GET() {
     })
     .from(user)
     .where(eq(user.id, session.user.id))
-    .get();
+    )[0];
 
   if (!profile) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -66,16 +66,16 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "No updatable fields provided" }, { status: 400 });
   }
 
-  db.update(user)
+  await db.update(user)
     .set({ ...updates, updatedAt: new Date().toISOString() })
     .where(eq(user.id, session.user.id))
-    .run();
+    ;
 
-  const updated = db
+  const updated = (await db
     .select({ id: user.id, name: user.name, email: user.email, domains: user.domains })
     .from(user)
     .where(eq(user.id, session.user.id))
-    .get();
+    )[0];
 
   return NextResponse.json(updated);
 }

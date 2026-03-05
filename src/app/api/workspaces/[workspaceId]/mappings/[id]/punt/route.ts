@@ -20,13 +20,13 @@ export const POST = withAuth(
       );
     }
 
-    const mapping = db
+    const mapping = (await db
       .select()
       .from(fieldMapping)
       .where(
         and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId))
       )
-      .get();
+      )[0];
 
     if (!mapping) {
       return NextResponse.json(
@@ -38,25 +38,25 @@ export const POST = withAuth(
     const now = new Date().toISOString();
 
     // Update mapping
-    db.update(fieldMapping)
+    await db.update(fieldMapping)
       .set({
         status: "punted",
         puntNote: parsed.data.note,
         updatedAt: now,
       })
       .where(eq(fieldMapping.id, id))
-      .run();
+      ;
 
     // Optionally create a question for SM team
     if (parsed.data.assignToSM) {
       // Resolve entity from target field
-      const targetField = db
+      const targetField = (await db
         .select()
         .from(field)
         .where(eq(field.id, mapping.targetFieldId))
-        .get();
+        )[0];
 
-      db.insert(question)
+      await db.insert(question)
         .values({
           workspaceId,
           entityId: targetField?.entityId || null,
@@ -69,7 +69,7 @@ export const POST = withAuth(
           fieldMappingId: id,
           createdByUserId: userId,
         })
-        .run();
+        ;
     }
 
     logActivity({
@@ -86,11 +86,11 @@ export const POST = withAuth(
       },
     });
 
-    const updated = db
+    const updated = (await db
       .select()
       .from(fieldMapping)
       .where(eq(fieldMapping.id, id))
-      .get();
+      )[0];
 
     return NextResponse.json(updated);
   },

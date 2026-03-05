@@ -15,34 +15,34 @@ import {
 import { eq, and } from "drizzle-orm";
 import { normalizeDtype } from "./dtype-normalizer";
 
-export function synthesizePipelineFromMappings(opts: {
+export async function synthesizePipelineFromMappings(opts: {
   workspaceId: string;
   entityId: string;
   entityName: string;
   batchRunId?: string;
-}): void {
+}): Promise<void> {
   const { workspaceId, entityId, entityName, batchRunId } = opts;
   const timestamp = new Date().toISOString();
 
   // Load target entity info
-  const targetEntity = db
+  const targetEntity = (await db
     .select()
     .from(entity)
     .where(eq(entity.id, entityId))
-    .get();
+    )[0];
   const tableName = targetEntity?.name || entityName;
 
   // Load all fields for this entity (ordered)
-  const fields = db
+  const fields = await db
     .select()
     .from(field)
     .where(eq(field.entityId, entityId))
     .orderBy(field.sortOrder)
-    .all();
+    ;
 
   // Load latest field mappings
   const fieldIds = fields.map((f) => f.id);
-  const mappings = db
+  const mappings = (await db
     .select()
     .from(fieldMapping)
     .where(
@@ -51,7 +51,7 @@ export function synthesizePipelineFromMappings(opts: {
         eq(fieldMapping.isLatest, true)
       )
     )
-    .all()
+)
     .filter((m) => fieldIds.includes(m.targetFieldId));
 
   const mappingByFieldId = new Map(mappings.map((m) => [m.targetFieldId, m]));
@@ -65,12 +65,12 @@ export function synthesizePipelineFromMappings(opts: {
   // Load source entity details
   const sourceEntities =
     sourceEntityIds.size > 0
-      ? db
+      ? (await db
           .select()
           .from(entity)
           .where(eq(entity.workspaceId, workspaceId))
-          .all()
-          .filter((e) => sourceEntityIds.has(e.id))
+          )
+          .filter((e: { id: string }) => sourceEntityIds.has(e.id))
       : [];
 
   // Build sources array with short aliases
@@ -113,11 +113,11 @@ export function synthesizePipelineFromMappings(opts: {
 
     let source: unknown = [];
     if (mapping.sourceFieldId) {
-      const sourceField = db
+      const sourceField = (await db
         .select()
         .from(field)
         .where(eq(field.id, mapping.sourceFieldId))
-        .get();
+        )[0];
       if (sourceField) {
         const alias = entityIdToAlias.get(sourceField.entityId);
         source = alias ? `${alias}.${sourceField.name}` : sourceField.name;
@@ -182,7 +182,7 @@ export function synthesizePipelineFromMappings(opts: {
   });
 
   // Check for existing pipeline and version appropriately
-  const existing = db
+  const existing = (await db
     .select()
     .from(entityPipeline)
     .where(
@@ -191,16 +191,16 @@ export function synthesizePipelineFromMappings(opts: {
         eq(entityPipeline.isLatest, true)
       )
     )
-    .get();
+    )[0];
 
   if (existing) {
-    db.update(entityPipeline)
+    await db.update(entityPipeline)
       .set({ isLatest: false, updatedAt: timestamp })
       .where(eq(entityPipeline.id, existing.id))
-      .run();
+      ;
   }
 
-  db.insert(entityPipeline)
+  await db.insert(entityPipeline)
     .values({
       workspaceId,
       entityId,
@@ -219,7 +219,7 @@ export function synthesizePipelineFromMappings(opts: {
       createdAt: timestamp,
       updatedAt: timestamp,
     })
-    .run();
+    ;
 
   console.log(
     `[pipeline-synthesizer] Created pipeline for "${entityName}": ${sources.length} sources, ${columns.length} columns`

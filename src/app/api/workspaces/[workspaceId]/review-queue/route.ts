@@ -19,11 +19,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     eq(fieldMapping.isLatest, true),
   ];
 
-  const allMappings = db
+  const allMappings = await db
     .select()
     .from(fieldMapping)
     .where(and(...conditions))
-    .all();
+    ;
 
   // Deduplicate by targetFieldId — keep only the most recent version
   const byTarget = new Map<string, typeof allMappings[number]>();
@@ -39,18 +39,18 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const cards: ReviewCardData[] = [];
 
   for (const m of mappings) {
-    const targetField = db
+    const targetField = (await db
       .select()
       .from(field)
       .where(eq(field.id, m.targetFieldId))
-      .get();
+      )[0];
     if (!targetField) continue;
 
-    const targetEntity = db
+    const targetEntity = (await db
       .select()
       .from(entity)
       .where(eq(entity.id, targetField.entityId))
-      .get();
+      )[0];
     if (!targetEntity) continue;
 
     // Apply filters
@@ -61,7 +61,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     // Resolve parent entity name
     let parentEntityName: string | null = null;
     if (targetEntity.parentEntityId) {
-      const pe = db.select().from(entity).where(eq(entity.id, targetEntity.parentEntityId)).get();
+      const [pe] = await db.select().from(entity).where(eq(entity.id, targetEntity.parentEntityId)).limit(1);
       parentEntityName = pe?.displayName || pe?.name || null;
     }
 
@@ -70,18 +70,18 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     let sourceFieldName: string | null = null;
 
     if (m.sourceEntityId) {
-      const se = db.select().from(entity).where(eq(entity.id, m.sourceEntityId)).get();
+      const [se] = await db.select().from(entity).where(eq(entity.id, m.sourceEntityId)).limit(1);
       sourceEntityName = se?.displayName || se?.name || null;
     }
     if (m.sourceFieldId) {
-      const sf = db.select().from(field).where(eq(field.id, m.sourceFieldId)).get();
+      const [sf] = await db.select().from(field).where(eq(field.id, m.sourceFieldId)).limit(1);
       sourceFieldName = sf?.displayName || sf?.name || null;
     }
 
     // Resolve assignee name
     let assigneeName: string | null = null;
     if (m.assigneeId) {
-      const assignee = db.select({ name: user.name }).from(user).where(eq(user.id, m.assigneeId)).get();
+      const [assignee] = await db.select({ name: user.name }).from(user).where(eq(user.id, m.assigneeId)).limit(1);
       assigneeName = assignee?.name ?? null;
     }
 

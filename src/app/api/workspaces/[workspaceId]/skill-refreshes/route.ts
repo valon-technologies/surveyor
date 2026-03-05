@@ -19,7 +19,7 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
     conditions.push(eq(skillRefresh.status, statusFilter));
   }
 
-  const refreshes = db
+  const refreshes = await db
     .select({
       id: skillRefresh.id,
       skillId: skillRefresh.skillId,
@@ -37,7 +37,7 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
     .where(and(...conditions))
     .orderBy(desc(skillRefresh.createdAt))
     .limit(50)
-    .all();
+    ;
 
   return NextResponse.json(refreshes);
 });
@@ -64,7 +64,7 @@ export const POST = withAuth(async (req, _ctx, { workspaceId, userId }) => {
   // Resolve skillId if not provided — find matching skill for entity
   let resolvedSkillId = skillId;
   if (!resolvedSkillId) {
-    const matched = matchSkills(workspaceId, entityId);
+    const matched = await matchSkills(workspaceId, entityId);
     if (matched.length > 0) {
       resolvedSkillId = matched[0].id;
     }

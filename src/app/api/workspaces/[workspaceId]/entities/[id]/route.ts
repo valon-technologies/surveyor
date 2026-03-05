@@ -27,27 +27,27 @@ function deriveEntityStatus(
 export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   const { id } = await ctx.params;
 
-  const ent = db
+  const ent = (await db
     .select()
     .from(entity)
     .where(and(eq(entity.id, id), eq(entity.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!ent) {
     return NextResponse.json({ error: "Entity not found" }, { status: 404 });
   }
 
   // Get fields with their latest mappings
-  const fields = db
+  const fields = await db
     .select()
     .from(field)
     .where(eq(field.entityId, id))
     .orderBy(field.sortOrder)
-    .all();
+    ;
 
   const fieldsWithMappings = [];
   for (const f of fields) {
-    const mapping = db
+    const mapping = (await db
       .select()
       .from(fieldMapping)
       .where(
@@ -56,43 +56,43 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
           eq(fieldMapping.isLatest, true)
         )
       )
-      .get();
+      )[0];
 
     // If we have a mapping with source field, get the source names
     let sourceEntityName: string | undefined;
     let sourceFieldName: string | undefined;
     if (mapping?.sourceFieldId) {
-      const sf = db
+      const sf = (await db
         .select()
         .from(field)
         .where(eq(field.id, mapping.sourceFieldId))
-        .get();
+        )[0];
       if (sf) {
         sourceFieldName = sf.name;
-        const se = db
+        const se = (await db
           .select()
           .from(entity)
           .where(eq(entity.id, sf.entityId))
-          .get();
+          )[0];
         sourceEntityName = se?.name;
       }
     } else if (mapping?.sourceEntityId) {
-      const se = db
+      const se = (await db
         .select()
         .from(entity)
         .where(eq(entity.id, mapping.sourceEntityId))
-        .get();
+        )[0];
       sourceEntityName = se?.name;
     }
 
     // Resolve assignee name
     let assigneeName: string | null = null;
     if (mapping?.assigneeId) {
-      const assignee = db
+      const assignee = (await db
         .select({ name: user.name })
         .from(user)
         .where(eq(user.id, mapping.assigneeId))
-        .get();
+        )[0];
       assigneeName = assignee?.name || null;
     }
 
@@ -136,21 +136,21 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   }
 
   // Stats
-  const openQs = db
+  const openQs = (await db
     .select({ cnt: count() })
     .from(question)
     .where(and(eq(question.entityId, id), eq(question.status, "open")))
-    .get();
+)[0];
 
   const mappedCount = statusBreakdown["accepted"] || 0;
 
   // Auto-derive entity status (preserve manual "blocked" override)
   const computedStatus = deriveEntityStatus(statusBreakdown, fields.length);
   if (ent.status !== "blocked" && ent.status !== computedStatus) {
-    db.update(entity)
+    await db.update(entity)
       .set({ status: computedStatus, updatedAt: new Date().toISOString() })
       .where(eq(entity.id, id))
-      .run();
+      ;
   }
 
   const effectiveStatus = ent.status === "blocked" ? "blocked" : computedStatus;
@@ -184,12 +184,12 @@ export const PATCH = withAuth(
       );
     }
 
-    const [updated] = db
+    const [updated] = await db
       .update(entity)
       .set({ ...parsed.data, updatedAt: new Date().toISOString() })
       .where(and(eq(entity.id, id), eq(entity.workspaceId, workspaceId)))
       .returning()
-      .all();
+      ;
 
     if (!updated) {
       return NextResponse.json(

@@ -72,16 +72,16 @@ export async function pullFromLinear(workspaceId: string): Promise<PullResult> {
   }
 
   // 4. Get or create schema asset for Linear imports
-  const assetId = getOrCreateSchemaAsset(workspaceId);
+  const assetId = await getOrCreateSchemaAsset(workspaceId);
 
   // 5. Load existing entities + fields for dedup
   const existingEntities = new Map<string, { id: string; metadata: unknown }>();
-  for (const e of db.select().from(entity).where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target"))).all()) {
+  for (const e of await db.select().from(entity).where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target")))) {
     existingEntities.set(e.name, { id: e.id, metadata: e.metadata });
   }
 
   const existingFields = new Map<string, { id: string; entityId: string; metadata: unknown }>();
-  for (const f of db.select().from(field).all()) {
+  for (const f of await db.select().from(field)) {
     const e = existingEntities.get(""); // We'll look up by entityId
     existingFields.set(`${f.entityId}|${f.name}`, { id: f.id, entityId: f.entityId, metadata: f.metadata });
   }
@@ -90,19 +90,19 @@ export async function pullFromLinear(workspaceId: string): Promise<PullResult> {
   const fieldLookup = new Map<string, { id: string; entityId: string }>();
   for (const e of existingEntities) {
     const [eName, eData] = e;
-    const fields = db.select().from(field).where(eq(field.entityId, eData.id)).all();
+    const fields = await db.select().from(field).where(eq(field.entityId, eData.id))
+      ;
     for (const f of fields) {
       fieldLookup.set(`${eName}|${f.name}`, { id: f.id, entityId: eData.id });
     }
   }
 
   // 6. Load source entities + fields for mapping resolution
-  const sourceEntities = db.select().from(entity)
-    .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-    .all();
+  const sourceEntities = await db.select().from(entity)
+    .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")));
   const sourceEntityByName = new Map(sourceEntities.map((e) => [e.name.toLowerCase(), e]));
 
-  const sourceFields = db.select().from(field).all();
+  const sourceFields = await db.select().from(field);
   const sourceFieldsByEntity = new Map<string, typeof sourceFields>();
   for (const sf of sourceFields) {
     if (!sourceFieldsByEntity.has(sf.entityId)) sourceFieldsByEntity.set(sf.entityId, []);
@@ -145,20 +145,20 @@ export async function pullFromLinear(workspaceId: string): Promise<PullResult> {
       if (entityIssue) {
         const meta = (existing.metadata as Record<string, unknown>) || {};
         if (!meta.linearIssueId) {
-          db.update(entity)
+          await db.update(entity)
             .set({
               metadata: { ...meta, linearIssueId: entityIssue.identifier, linearIssueUuid: entityIssue.id },
               updatedAt: new Date().toISOString(),
             })
             .where(eq(entity.id, entityId))
-            .run();
+            ;
           result.entitiesUpdated++;
         }
       }
     } else {
       // Create new entity
       entityId = crypto.randomUUID();
-      db.insert(entity).values({
+      await db.insert(entity).values({
         id: entityId,
         workspaceId,
         schemaAssetId: assetId,
@@ -172,7 +172,7 @@ export async function pullFromLinear(workspaceId: string): Promise<PullResult> {
           : null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      }).run();
+      });
       existingEntities.set(entityName, { id: entityId, metadata: null });
       result.entitiesCreated++;
       console.log(`[linear-sync] Created entity: ${entityName}`);
@@ -204,7 +204,7 @@ export async function pullFromLinear(workspaceId: string): Promise<PullResult> {
         if (fieldMilestone) updates.milestone = fieldMilestone;
 
         // Set Linear metadata
-        const existingMeta = db.select({ metadata: field.metadata }).from(field).where(eq(field.id, fieldId)).get();
+        const [existingMeta] = await db.select({ metadata: field.metadata }).from(field).where(eq(field.id, fieldId)).limit(1);
         const meta = (existingMeta?.metadata as Record<string, unknown>) || {};
         if (!meta.linearIssueId) {
           updates.metadata = { ...meta, linearIssueId: fi.identifier, linearIssueUuid: fi.id };
@@ -212,13 +212,13 @@ export async function pullFromLinear(workspaceId: string): Promise<PullResult> {
 
         if (Object.keys(updates).length > 0) {
           updates.updatedAt = new Date().toISOString();
-          db.update(field).set(updates).where(eq(field.id, fieldId)).run();
+          await db.update(field).set(updates).where(eq(field.id, fieldId));
           result.fieldsUpdated++;
         }
       } else {
         // Create new field
         fieldId = crypto.randomUUID();
-        db.insert(field).values({
+        await db.insert(field).values({
           id: fieldId,
           entityId,
           name: fieldName,
@@ -231,7 +231,7 @@ export async function pullFromLinear(workspaceId: string): Promise<PullResult> {
           metadata: { linearIssueId: fi.identifier, linearIssueUuid: fi.id },
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-        }).run();
+        });
         fieldLookup.set(lookupKey, { id: fieldId, entityId });
         result.fieldsCreated++;
       }
@@ -239,7 +239,7 @@ export async function pullFromLinear(workspaceId: string): Promise<PullResult> {
       // Import completed mappings
       const isCompleted = ["Completed", "Needs Implementation"].includes(fi.state.name);
       if (isCompleted && parsed.acdcField) {
-        const imported = importMapping(workspaceId, fieldId, parsed, fi, sourceEntityByName, sourceFieldsByEntity);
+        const imported = await importMapping(workspaceId, fieldId, parsed, fi, sourceEntityByName, sourceFieldsByEntity);
         if (imported) result.mappingsImported++;
         if (imported === "error") result.errors.push(`Failed to resolve source for ${entityName}.${fieldName}: ${parsed.acdcField}`);
       }
@@ -250,20 +250,20 @@ export async function pullFromLinear(workspaceId: string): Promise<PullResult> {
   return result;
 }
 
-function importMapping(
+async function importMapping(
   workspaceId: string,
   targetFieldId: string,
   parsed: ReturnType<typeof parseFieldDescription>,
   issue: LinearIssue,
   sourceEntityByName: Map<string, { id: string; name: string }>,
   sourceFieldsByEntity: Map<string, { id: string; name: string }[]>,
-): boolean | "error" {
+): Promise<boolean | "error"> {
   if (!parsed.acdcField) return false;
 
   // Check if a mapping already exists
-  const existing = db.select().from(fieldMapping)
+  const [existing] = await db.select().from(fieldMapping)
     .where(and(eq(fieldMapping.targetFieldId, targetFieldId), eq(fieldMapping.isLatest, true)))
-    .get();
+    .limit(1);
   if (existing) return false; // Don't overwrite existing mappings
 
   // Resolve source entity + field
@@ -285,7 +285,7 @@ function importMapping(
     }
   }
 
-  db.insert(fieldMapping).values({
+  await db.insert(fieldMapping).values({
     id: crypto.randomUUID(),
     workspaceId,
     targetFieldId,
@@ -301,7 +301,7 @@ function importMapping(
     isLatest: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  }).run();
+  });
 
   return true;
 }
@@ -331,15 +331,15 @@ function normalizeDataType(raw: string | null): string | null {
   return map[upper] || raw;
 }
 
-function getOrCreateSchemaAsset(workspaceId: string): string {
+async function getOrCreateSchemaAsset(workspaceId: string): Promise<string> {
   const name = "Linear M2.5 Import";
-  const existing = db.select().from(schemaAsset)
+  const [existing] = await db.select().from(schemaAsset)
     .where(and(eq(schemaAsset.workspaceId, workspaceId), eq(schemaAsset.name, name)))
-    .get();
+    .limit(1);
   if (existing) return existing.id;
 
   const id = crypto.randomUUID();
-  db.insert(schemaAsset).values({
+  await db.insert(schemaAsset).values({
     id,
     workspaceId,
     name,
@@ -347,6 +347,6 @@ function getOrCreateSchemaAsset(workspaceId: string): string {
     format: "linear",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  }).run();
+  });
   return id;
 }

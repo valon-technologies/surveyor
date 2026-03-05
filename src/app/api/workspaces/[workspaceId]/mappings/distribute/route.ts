@@ -57,7 +57,7 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { workspaceId }) => 
   } = body;
 
   // ── 1. Load eligible mappings ──────────────────────────────────────────────
-  const mappingRows = db
+  const mappingRows = await db
     .select({
       mappingId:     fieldMapping.id,
       targetFieldId: fieldMapping.targetFieldId,
@@ -80,7 +80,7 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { workspaceId }) => 
         entityIds?.length ? inArray(field.entityId, entityIds) : undefined,
       )
     )
-    .all();
+    ;
 
   // ── 2. Resolve effective domain per mapping ────────────────────────────────
   const withDomain = mappingRows.map((row) => {
@@ -97,7 +97,7 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { workspaceId }) => 
     : withDomain;
 
   // ── 3. Build eligible assignee pool ───────────────────────────────────────
-  const members = db
+  const members = await db
     .select({
       userId:  user.id,
       name:    user.name,
@@ -113,7 +113,7 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { workspaceId }) => 
         inArray(userWorkspace.role, ["owner", "editor"]),
       )
     )
-    .all();
+    ;
 
   // ── 4. Distribute ──────────────────────────────────────────────────────────
   const assignments: DistributeAssignment[] = [];
@@ -156,7 +156,7 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { workspaceId }) => 
   // ── 5. Persist (unless dry run) ───────────────────────────────────────────
   if (!dryRun) {
     for (const a of assignments) {
-      db.update(fieldMapping)
+      await db.update(fieldMapping)
         .set({ assigneeId: a.assigneeId, updatedAt: new Date().toISOString() })
         .where(
           and(
@@ -164,7 +164,7 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { workspaceId }) => 
             eq(fieldMapping.isLatest, true),
           )
         )
-        .run();
+        ;
     }
   }
 

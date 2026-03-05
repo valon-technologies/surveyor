@@ -131,12 +131,12 @@ function entityNameToLabel(entityName: string): string {
 
 type CtxRow = { id: string; name: string; tokenCount: number | null };
 
-function loadAllContexts(workspaceId: string): CtxRow[] {
-  return db
+async function loadAllContexts(workspaceId: string): Promise<CtxRow[]> {
+  return await db
     .select({ id: context.id, name: context.name, tokenCount: context.tokenCount })
     .from(context)
     .where(and(eq(context.workspaceId, workspaceId), eq(context.isActive, true)))
-    .all();
+    ;
 }
 
 function findCtxByExactName(contexts: CtxRow[], name: string): CtxRow | undefined {
@@ -236,12 +236,12 @@ function findQaCtxs(contexts: CtxRow[], entityName: string): CtxRow[] {
 // ── Source Table Derivation ────────────────────────────────────
 // Layered strategy: scaffold → pipeline → field mappings
 
-function deriveSourceTables(
+async function deriveSourceTables(
   workspaceId: string,
   entityId: string
-): string[] {
+): Promise<string[]> {
   // Layer 1: Entity scaffold (richest source)
-  const scaffold = db
+  const scaffold = (await db
     .select({
       sourceTables: entityScaffold.sourceTables,
       primarySources: entityScaffold.primarySources,
@@ -254,7 +254,7 @@ function deriveSourceTables(
         eq(entityScaffold.entityId, entityId),
       )
     )
-    .get();
+    )[0];
 
   if (scaffold?.sourceTables) {
     const tables = (scaffold.sourceTables as { name: string; role: string }[])
@@ -273,7 +273,7 @@ function deriveSourceTables(
   }
 
   // Layer 2: Entity pipeline sources
-  const pipeline = db
+  const pipeline = (await db
     .select({ sources: entityPipeline.sources })
     .from(entityPipeline)
     .where(
@@ -283,7 +283,7 @@ function deriveSourceTables(
         eq(entityPipeline.isLatest, true),
       )
     )
-    .get();
+    )[0];
 
   if (pipeline?.sources) {
     const pipelineSources = (pipeline.sources as { name: string }[])
@@ -293,16 +293,16 @@ function deriveSourceTables(
   }
 
   // Layer 3: Field mapping sourceEntityId counts
-  const targetFields = db
+  const targetFields = await db
     .select({ id: field.id })
     .from(field)
     .where(eq(field.entityId, entityId))
-    .all();
+    ;
 
   if (targetFields.length > 0) {
     const fieldIds = targetFields.map((f) => f.id);
     // Count source entities across latest mappings for these fields
-    const sourceEntityCounts = db
+    const sourceEntityCounts = await db
       .select({
         sourceEntityId: fieldMapping.sourceEntityId,
         cnt: sql<number>`COUNT(*)`,
@@ -321,18 +321,18 @@ function deriveSourceTables(
       )
       .groupBy(fieldMapping.sourceEntityId)
       .orderBy(sql`COUNT(*) DESC`)
-      .all();
+      ;
 
     if (sourceEntityCounts.length > 0) {
       // Resolve entity names
       const sourceNames: string[] = [];
       for (const row of sourceEntityCounts) {
         if (!row.sourceEntityId) continue;
-        const ent = db
+        const ent = (await db
           .select({ name: entity.name })
           .from(entity)
           .where(eq(entity.id, row.sourceEntityId))
-          .get();
+          )[0];
         if (ent) sourceNames.push(ent.name);
       }
       if (sourceNames.length > 0) return sourceNames;
@@ -385,24 +385,24 @@ function extractKeywords(entityName: string, domainTags: string[] | null): strin
 
 // ── Core Generation Function ───────────────────────────────────
 
-export function generateSkillForEntity(
+export async function generateSkillForEntity(
   workspaceId: string,
   targetEntityId: string,
   allContexts?: CtxRow[]
-): SkillGenerationResult | null {
+): Promise<SkillGenerationResult | null> {
   // Load target entity
-  const targetEntity = db
+  const targetEntity = (await db
     .select()
     .from(entity)
     .where(and(eq(entity.id, targetEntityId), eq(entity.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!targetEntity || targetEntity.side !== "target") {
     return null;
   }
 
   // Load all contexts (reuse if provided)
-  const contexts = allContexts ?? loadAllContexts(workspaceId);
+  const contexts = allContexts ?? await loadAllContexts(workspaceId);
 
   // 1. Find VDS entity context
   const vdsEntityCtx = findVdsEntityCtx(contexts, targetEntity.name);
@@ -414,7 +414,7 @@ export function generateSkillForEntity(
   const vdsCategoryCtx = findVdsCategoryCtx(contexts, targetEntity.name);
 
   // 3. Derive source tables
-  const sourceTables = deriveSourceTables(workspaceId, targetEntityId);
+  const sourceTables = await deriveSourceTables(workspaceId, targetEntityId);
 
   // 4. Find SM table contexts
   const smTableCtxs: CtxRow[] = [];
@@ -476,24 +476,24 @@ ${sourceTableList}
   const skillId = crypto.randomUUID();
   let contextCount = 0;
 
-  withTransaction(() => {
+  await withTransaction(async () => {
     // Find and delete existing skill for this entity
-    const existingSkills = db
+    const existingSkills = await db
       .select({ id: skill.id, applicability: skill.applicability })
       .from(skill)
       .where(eq(skill.workspaceId, workspaceId))
-      .all();
+      ;
 
     for (const existing of existingSkills) {
       const app = existing.applicability as { entityPatterns?: string[] } | null;
       if (app?.entityPatterns?.includes(targetEntity.name)) {
-        db.delete(skillContext).where(eq(skillContext.skillId, existing.id)).run();
-        db.delete(skill).where(eq(skill.id, existing.id)).run();
+        await db.delete(skillContext).where(eq(skillContext.skillId, existing.id));
+        await db.delete(skill).where(eq(skill.id, existing.id));
       }
     }
 
     // Create new skill
-    db.insert(skill)
+    await db.insert(skill)
       .values({
         id: skillId,
         workspaceId,
@@ -505,13 +505,13 @@ ${sourceTableList}
         isActive: true,
         sortOrder: 0,
       })
-      .run();
+      ;
 
     let ctxOrder = 0;
 
     // Helper to link a context
-    const linkCtx = (ctxId: string, role: string, notes: string) => {
-      db.insert(skillContext)
+    const linkCtx = async (ctxId: string, role: string, notes: string) => {
+      await db.insert(skillContext)
         .values({
           skillId,
           contextId: ctxId,
@@ -519,44 +519,44 @@ ${sourceTableList}
           sortOrder: ctxOrder++,
           notes,
         })
-        .run();
+        ;
       contextCount++;
     };
 
     // 1. VDS entity (primary)
-    linkCtx(vdsEntityCtx.id, "primary",
+    await linkCtx(vdsEntityCtx.id, "primary",
       `VDS ${targetEntity.name} entity definition — fields, enums, mapping patterns`);
 
     // 2. SM tables (primary)
     for (const ctx of smTableCtxs) {
-      linkCtx(ctx.id, "primary", `ServiceMac source table — ${ctx.name}`);
+      await linkCtx(ctx.id, "primary", `ServiceMac source table — ${ctx.name}`);
     }
 
     // 3. SM enum contexts (reference)
     for (const ctx of smEnumCtxs) {
-      linkCtx(ctx.id, "reference",
+      await linkCtx(ctx.id, "reference",
         `ServiceMac enum values — authoritative code definitions from Lookups tab`);
     }
 
     // 4. SM domains (reference)
     for (const ctx of smDomainCtxs) {
-      linkCtx(ctx.id, "reference", `ServiceMac domain — cross-table mapping guide`);
+      await linkCtx(ctx.id, "reference", `ServiceMac domain — cross-table mapping guide`);
     }
 
     // 5. VDS category overview (reference)
     if (vdsCategoryCtx) {
-      linkCtx(vdsCategoryCtx.id, "reference",
+      await linkCtx(vdsCategoryCtx.id, "reference",
         "VDS category overview — related entities and navigation");
     }
 
     // 6. Mortgage domain contexts (supplementary)
     for (const ctx of mortgageCtxs) {
-      linkCtx(ctx.id, "supplementary", `Regulatory context: ${ctx.name}`);
+      await linkCtx(ctx.id, "supplementary", `Regulatory context: ${ctx.name}`);
     }
 
     // 7. Q&A contexts (reference)
     for (const ctx of qaCtxs) {
-      linkCtx(ctx.id, "reference", `Prior Q&A: ${ctx.name}`);
+      await linkCtx(ctx.id, "reference", `Prior Q&A: ${ctx.name}`);
     }
   });
 
@@ -570,30 +570,30 @@ ${sourceTableList}
 
 // ── Bulk Regeneration ──────────────────────────────────────────
 
-export function regenerateAllSkills(workspaceId: string): RegenerateAllResult {
+export async function regenerateAllSkills(workspaceId: string): Promise<RegenerateAllResult> {
   // Load all target entities
-  const targetEntities = db
+  const targetEntities = await db
     .select({ id: entity.id, name: entity.name })
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target")))
     .orderBy(entity.sortOrder)
-    .all();
+    ;
 
   // Pre-load all contexts once for efficiency
-  const allContexts = loadAllContexts(workspaceId);
+  const allContexts = await loadAllContexts(workspaceId);
 
   // Clean slate: delete all existing skills + links for this workspace
-  withTransaction(() => {
-    const existingSkills = db
+  await withTransaction(async () => {
+    const existingSkills = await db
       .select({ id: skill.id })
       .from(skill)
       .where(eq(skill.workspaceId, workspaceId))
-      .all();
+      ;
 
     for (const s of existingSkills) {
-      db.delete(skillContext).where(eq(skillContext.skillId, s.id)).run();
+      await db.delete(skillContext).where(eq(skillContext.skillId, s.id));
     }
-    db.delete(skill).where(eq(skill.workspaceId, workspaceId)).run();
+    await db.delete(skill).where(eq(skill.workspaceId, workspaceId));
   });
 
   let created = 0;
@@ -601,7 +601,7 @@ export function regenerateAllSkills(workspaceId: string): RegenerateAllResult {
   let contextLinks = 0;
 
   for (const ent of targetEntities) {
-    const result = generateSkillForEntity(workspaceId, ent.id, allContexts);
+    const result = await generateSkillForEntity(workspaceId, ent.id, allContexts);
     if (result) {
       created++;
       contextLinks += result.contextCount;

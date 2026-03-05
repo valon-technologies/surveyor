@@ -12,7 +12,7 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   const params = await ctx.params;
   const id = params.id as string;
 
-  const refresh = db
+  const refresh = (await db
     .select({
       id: skillRefresh.id,
       workspaceId: skillRefresh.workspaceId,
@@ -33,7 +33,7 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
     .where(
       and(eq(skillRefresh.id, id), eq(skillRefresh.workspaceId, workspaceId)),
     )
-    .get();
+    )[0];
 
   if (!refresh) {
     return NextResponse.json(
@@ -63,13 +63,13 @@ export const PUT = withAuth(async (req, ctx, { workspaceId, userId }) => {
     );
   }
 
-  const refresh = db
+  const refresh = (await db
     .select()
     .from(skillRefresh)
     .where(
       and(eq(skillRefresh.id, id), eq(skillRefresh.workspaceId, workspaceId)),
     )
-    .get();
+    )[0];
 
   if (!refresh) {
     return NextResponse.json(
@@ -85,14 +85,14 @@ export const PUT = withAuth(async (req, ctx, { workspaceId, userId }) => {
     );
   }
 
-  db.update(skillRefresh)
+  await db.update(skillRefresh)
     .set({
       status,
       reviewedBy: userId,
       updatedAt: new Date().toISOString(),
     })
     .where(eq(skillRefresh.id, id))
-    .run();
+    ;
 
   return NextResponse.json({ id, status });
 }, { requiredRole: "editor" });

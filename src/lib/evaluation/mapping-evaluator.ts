@@ -29,16 +29,16 @@ export interface MappingEvaluation {
  * For assembly entities (those with component children in the DB),
  * aggregates genSources from all component mappings before scoring.
  */
-export function evaluateEntityMappings(
+export async function evaluateEntityMappings(
   workspaceId: string,
   entityId: string,
-): MappingEvaluation | null {
+): Promise<MappingEvaluation | null> {
   // 1. Load the target entity
-  const targetEntity = db
+  const targetEntity = (await db
     .select()
     .from(entity)
     .where(and(eq(entity.id, entityId), eq(entity.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!targetEntity) {
     throw new Error(`Entity ${entityId} not found`);
@@ -51,27 +51,27 @@ export function evaluateEntityMappings(
   }
 
   // 3. Load all target fields for this entity
-  const targetFields = db
+  const targetFields = await db
     .select()
     .from(field)
     .where(eq(field.entityId, entityId))
-    .all();
+    ;
 
   // 4. Check if this is an assembly entity with component children
-  const componentEntities = db
+  const componentEntities = await db
     .select()
     .from(entity)
     .where(and(eq(entity.parentEntityId, entityId), eq(entity.workspaceId, workspaceId)))
-    .all();
+    ;
 
   if (componentEntities.length > 0) {
-    return evaluateAssemblyEntity(
+    return await evaluateAssemblyEntity(
       workspaceId, entityId, targetEntity, sotData, targetFields, componentEntities,
     );
   }
 
   // 5. Load latest field mappings with source entity/field names resolved (flat entity path)
-  const latestMappings = db
+  const latestMappings = (await db
     .select({
       targetFieldId: fieldMapping.targetFieldId,
       sourceEntityId: fieldMapping.sourceEntityId,
@@ -87,7 +87,7 @@ export function evaluateEntityMappings(
         eq(fieldMapping.isLatest, true),
       )
     )
-    .all()
+    )
     // Only mappings for this entity's target fields
     .filter((m) => targetFields.some((tf) => tf.id === m.targetFieldId));
 
@@ -106,7 +106,8 @@ export function evaluateEntityMappings(
 
   const entityNameById = new Map<string, string>();
   if (sourceEntityIds.size > 0) {
-    const entities = db.select().from(entity).all();
+    const entities = await db.select().from(entity)
+      ;
     for (const e of entities) {
       entityNameById.set(e.id, e.name);
     }
@@ -114,7 +115,8 @@ export function evaluateEntityMappings(
 
   const fieldNameById = new Map<string, string>();
   if (sourceFieldIds.size > 0) {
-    const fields = db.select().from(field).all();
+    const fields = await db.select().from(field)
+      ;
     for (const f of fields) {
       fieldNameById.set(f.id, f.name);
     }
@@ -208,18 +210,20 @@ export function evaluateEntityMappings(
  * entity mappings, then comparing against the merged SOT (which includes
  * ACDC sources from all staging components).
  */
-function evaluateAssemblyEntity(
+async function evaluateAssemblyEntity(
   workspaceId: string,
   entityId: string,
   targetEntity: { id: string; name: string },
   sotData: import("./sot-loader").SotEntityData,
   targetFields: { id: string; name: string }[],
   componentEntities: { id: string; name: string }[],
-): MappingEvaluation {
+): Promise<MappingEvaluation> {
   // Load all entities and fields for name resolution (batch)
-  const allEntities = db.select().from(entity).all();
+  const allEntities = await db.select().from(entity)
+    ;
   const entityNameById = new Map(allEntities.map((e) => [e.id, e.name]));
-  const allFields = db.select().from(field).all();
+  const allFields = await db.select().from(field)
+    ;
   const fieldNameById = new Map(allFields.map((f) => [f.id, f.name]));
 
   // For each parent field, aggregate genSources from all component mappings
@@ -227,13 +231,13 @@ function evaluateAssemblyEntity(
   let generationId: string | null = null;
 
   for (const compEntity of componentEntities) {
-    const compFields = db
+    const compFields = await db
       .select()
       .from(field)
       .where(eq(field.entityId, compEntity.id))
-      .all();
+      ;
 
-    const compMappings = db
+    const compMappings = (await db
       .select({
         targetFieldId: fieldMapping.targetFieldId,
         sourceEntityId: fieldMapping.sourceEntityId,
@@ -248,7 +252,7 @@ function evaluateAssemblyEntity(
           eq(fieldMapping.isLatest, true),
         )
       )
-      .all()
+      )
       .filter((m) => compFields.some((cf) => cf.id === m.targetFieldId));
 
     const compMappingByFieldId = new Map(

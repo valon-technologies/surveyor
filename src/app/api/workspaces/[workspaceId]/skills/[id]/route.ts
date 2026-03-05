@@ -10,28 +10,28 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const s = db
+  const s = (await db
     .select()
     .from(skill)
     .where(and(eq(skill.id, id), eq(skill.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!s) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   // Fetch contexts with detail
-  const scs = db
+  const scs = await db
     .select()
     .from(skillContext)
     .where(eq(skillContext.skillId, id))
     .orderBy(skillContext.sortOrder)
-    .all();
+    ;
 
-  const contexts = scs.map((sc) => {
-    const ctxRow = db.select().from(context).where(eq(context.id, sc.contextId)).get();
+  const contexts = await Promise.all(scs.map(async (sc) => {
+    const [ctxRow] = await db.select().from(context).where(eq(context.id, sc.contextId)).limit(1);
     return { ...sc, context: ctxRow };
-  });
+  }));
 
   return NextResponse.json({ ...s, contexts });
 });
@@ -46,12 +46,12 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const [updated] = db
+  const [updated] = await db
     .update(skill)
     .set({ ...parsed.data, updatedAt: new Date().toISOString() })
     .where(and(eq(skill.id, id), eq(skill.workspaceId, workspaceId)))
     .returning()
-    .all();
+    ;
 
   if (!updated) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -65,9 +65,9 @@ export const DELETE = withAuth(async (req, ctx, { userId, workspaceId, role }) =
   const params = await ctx.params;
   const { id } = params;
 
-  db.delete(skill)
+  await db.delete(skill)
     .where(and(eq(skill.id, id), eq(skill.workspaceId, workspaceId)))
-    .run();
+    ;
 
   invalidateWorkspaceContextCache(workspaceId);
   return NextResponse.json({ success: true });

@@ -82,13 +82,13 @@ function loadProductionDependencies(): ProductionDependencies | null {
  * Build a dependency graph. Prefers production dependencies from
  * sdt_mapping_config.yaml when available, falls back to heuristic.
  */
-export function buildDependencyGraph(workspaceId: string): DependencyGraph {
+export async function buildDependencyGraph(workspaceId: string): Promise<DependencyGraph> {
   // Load all target entities
-  const targetEntities = db
+  const targetEntities = await db
     .select()
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target")))
-    .all();
+    ;
 
   const entityNameToId = new Map<string, string>();
   const entityIdToName = new Map<string, string>();
@@ -132,11 +132,11 @@ export function buildDependencyGraph(workspaceId: string): DependencyGraph {
     }
 
     // Scan target fields for *_id patterns
-    const fields = db
+    const fields = await db
       .select()
       .from(field)
       .where(eq(field.entityId, e.id))
-      .all();
+      ;
 
     for (const f of fields) {
       const match = f.name.match(/^(.+)_id$/);

@@ -55,7 +55,7 @@ export const POST = withAuth(
     }
 
     // Verify session exists and is a forge session
-    const session = db
+    const session = (await db
       .select()
       .from(chatSession)
       .where(
@@ -65,7 +65,7 @@ export const POST = withAuth(
           eq(chatSession.sessionType, "forge")
         )
       )
-      .get();
+      )[0];
 
     if (!session) {
       return NextResponse.json(
@@ -80,7 +80,7 @@ export const POST = withAuth(
     const userMeta: Record<string, unknown> = {};
     if (parsed.data.kickoff) userMeta.kickoff = true;
 
-    db.insert(chatMessage)
+    await db.insert(chatMessage)
       .values({
         sessionId,
         role: "user",
@@ -88,15 +88,15 @@ export const POST = withAuth(
         metadata: Object.keys(userMeta).length > 0 ? userMeta : null,
         createdAt: now,
       })
-      .run();
+      ;
 
     // Load full message history
-    const allMessages = db
+    const allMessages = await db
       .select()
       .from(chatMessage)
       .where(eq(chatMessage.sessionId, sessionId))
       .orderBy(chatMessage.createdAt)
-      .all();
+      ;
 
     const systemMsg = allMessages.find((m) => m.role === "system");
     const conversationMessages = allMessages
@@ -110,7 +110,7 @@ export const POST = withAuth(
     let provider;
     let providerName: string;
     try {
-      const resolved = resolveProvider(userId);
+      const resolved = await resolveProvider(userId);
       provider = resolved.provider;
       providerName = resolved.providerName;
     } catch (error) {
@@ -134,11 +134,11 @@ export const POST = withAuth(
     // Add BigQuery if configured
     let bqConfig: BigQueryConfig | undefined;
     try {
-      const ws = db
+      const ws = (await db
         .select({ settings: workspace.settings })
         .from(workspace)
         .where(eq(workspace.id, workspaceId))
-        .get();
+        )[0];
       const wsSettings = ws?.settings as Record<string, unknown> | null;
       bqConfig = wsSettings?.bigquery as BigQueryConfig | undefined;
       if (bqConfig) {
@@ -301,14 +301,14 @@ export const POST = withAuth(
                 ].includes(tc.name)
               ) {
                 // Forge-specific tools
-                forgeResult = executeForgeToolCall(
+                forgeResult = await executeForgeToolCall(
                   tc.name,
                   tc.input,
                   workspaceId
                 );
-                llmContent = forgeResult.data;
-                success = forgeResult.success;
-                summary = forgeResult.summary;
+                llmContent = forgeResult!.data;
+                success = forgeResult!.success;
+                summary = forgeResult!.summary;
               } else if (tc.name === "query_bigquery" && bqConfig) {
                 const result = await executeBigQueryTool(
                   tc.input as { sql: string; purpose: string },
@@ -328,7 +328,7 @@ export const POST = withAuth(
                   )
                 );
               } else if (tc.name === "search_source_schema") {
-                const result = executeSourceSchemaSearch(
+                const result = await executeSourceSchemaSearch(
                   tc.input as unknown as SourceSchemaInput,
                   workspaceId
                 );
@@ -345,7 +345,7 @@ export const POST = withAuth(
                   )
                 );
               } else if (tc.name === "get_reference_docs") {
-                const result = executeReferenceDocRetrieval(
+                const result = await executeReferenceDocRetrieval(
                   tc.input as unknown as ReferenceDocsInput,
                   workspaceId
                 );
@@ -433,7 +433,7 @@ export const POST = withAuth(
             ...(allToolCalls.length > 0 ? { toolCalls: allToolCalls } : {}),
           };
 
-          db.insert(chatMessage)
+          await db.insert(chatMessage)
             .values({
               sessionId,
               role: "assistant",
@@ -441,17 +441,17 @@ export const POST = withAuth(
               metadata: msgMetadata as typeof chatMessage.$inferInsert.metadata,
               createdAt: msgNow,
             })
-            .run();
+            ;
 
           // Update session
-          db.update(chatSession)
+          await db.update(chatSession)
             .set({
               messageCount: allMessages.length + 1,
               lastMessageAt: msgNow,
               updatedAt: msgNow,
             })
             .where(eq(chatSession.id, sessionId))
-            .run();
+            ;
 
           controller.enqueue(
             encoder.encode(

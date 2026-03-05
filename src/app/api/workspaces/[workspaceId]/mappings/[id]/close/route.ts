@@ -10,11 +10,11 @@ export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const existing = db
+  const existing = (await db
     .select()
     .from(fieldMapping)
     .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!existing) {
     return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
@@ -24,9 +24,9 @@ export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
     return NextResponse.json({ error: "Already closed" }, { status: 400 });
   }
 
-  const targetField = db.select().from(field).where(eq(field.id, existing.targetFieldId)).get();
+  const [targetField] = await db.select().from(field).where(eq(field.id, existing.targetFieldId)).limit(1);
 
-  const newVersion = createMappingVersion(existing.id, {
+  const newVersion = await createMappingVersion(existing.id, {
     ...existing,
     id: crypto.randomUUID(),
     status: "accepted",

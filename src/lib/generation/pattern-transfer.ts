@@ -31,30 +31,30 @@ export interface ComponentPattern {
  * Extract the mapping pattern from a completed component entity.
  * Used as reference when mapping similar components.
  */
-export function extractComponentPattern(
+export async function extractComponentPattern(
   workspaceId: string,
   componentEntityId: string,
-): ComponentPattern | null {
+): Promise<ComponentPattern | null> {
   // Load the component entity
-  const comp = db
+  const comp = (await db
     .select()
     .from(entity)
     .where(eq(entity.id, componentEntityId))
-    .get();
+    )[0];
 
   if (!comp) return null;
 
   // Load latest mappings for this component
-  const fields = db
+  const fields = await db
     .select()
     .from(field)
     .where(eq(field.entityId, componentEntityId))
-    .all();
+    ;
 
   const fieldPatterns: ComponentPattern["fieldPatterns"] = [];
 
   for (const f of fields) {
-    const mapping = db
+    const mapping = (await db
       .select()
       .from(fieldMapping)
       .where(
@@ -63,29 +63,29 @@ export function extractComponentPattern(
           eq(fieldMapping.isLatest, true),
         )
       )
-      .get();
+      )[0];
 
     if (!mapping) continue;
 
     // Resolve source entity name
     let sourceEntityName: string | null = null;
     if (mapping.sourceEntityId) {
-      const se = db
+      const se = (await db
         .select({ name: entity.name })
         .from(entity)
         .where(eq(entity.id, mapping.sourceEntityId))
-        .get();
+        )[0];
       sourceEntityName = se?.name ?? null;
     }
 
     // Resolve source field name
     let sourceFieldName: string | null = null;
     if (mapping.sourceFieldId) {
-      const sf = db
+      const sf = (await db
         .select({ name: field.name })
         .from(field)
         .where(eq(field.id, mapping.sourceFieldId))
-        .get();
+        )[0];
       sourceFieldName = sf?.name ?? null;
     }
 
@@ -174,29 +174,29 @@ export function buildDeltaPromptSection(
  * Extract FK constraint patterns from completed entity mappings.
  * Used to inject into downstream entity prompts for consistency.
  */
-export function extractFKConstraints(
+export async function extractFKConstraints(
   workspaceId: string,
   entityId: string,
-): { entityName: string; idField: string; hashColumns: string[] | null; transform: string | null }[] {
-  const targetEntity = db
+): Promise<{ entityName: string; idField: string; hashColumns: string[] | null; transform: string | null }[]> {
+  const targetEntity = (await db
     .select()
     .from(entity)
     .where(eq(entity.id, entityId))
-    .get();
+    )[0];
 
   if (!targetEntity) return [];
 
   // Find key fields (likely PKs)
-  const keyFields = db
+  const keyFields = await db
     .select()
     .from(field)
     .where(and(eq(field.entityId, entityId), eq(field.isKey, true)))
-    .all();
+    ;
 
   const constraints: { entityName: string; idField: string; hashColumns: string[] | null; transform: string | null }[] = [];
 
   for (const kf of keyFields) {
-    const mapping = db
+    const mapping = (await db
       .select()
       .from(fieldMapping)
       .where(
@@ -205,7 +205,7 @@ export function extractFKConstraints(
           eq(fieldMapping.isLatest, true),
         )
       )
-      .get();
+      )[0];
 
     if (!mapping) continue;
 

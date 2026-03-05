@@ -11,11 +11,11 @@ export const GET = withAuth(async (_req, routeCtx, { workspaceId }) => {
   const params = await routeCtx.params;
   const { id } = params;
 
-  const ctx = db
+  const ctx = (await db
     .select()
     .from(context)
     .where(and(eq(context.id, id), eq(context.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!ctx) {
     return NextResponse.json({ error: "Context not found" }, { status: 404 });
@@ -34,12 +34,12 @@ export const PATCH = withAuth(async (req, routeCtx, { workspaceId }) => {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const [updated] = db
+  const [updated] = await db
     .update(context)
     .set({ ...parsed.data, updatedAt: new Date().toISOString() })
     .where(and(eq(context.id, id), eq(context.workspaceId, workspaceId)))
     .returning()
-    .all();
+    ;
 
   if (!updated) {
     return NextResponse.json({ error: "Context not found" }, { status: 404 });
@@ -66,9 +66,9 @@ export const DELETE = withAuth(async (_req, routeCtx, { workspaceId }) => {
   const params = await routeCtx.params;
   const { id } = params;
 
-  db.delete(context)
+  await db.delete(context)
     .where(and(eq(context.id, id), eq(context.workspaceId, workspaceId)))
-    .run();
+    ;
 
   invalidateWorkspaceContextCache(workspaceId);
   return NextResponse.json({ success: true });

@@ -12,27 +12,27 @@ export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const mapping = db
+  const mapping = (await db
     .select()
     .from(fieldMapping)
     .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!mapping) {
     return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
   }
 
-  const targetField = db.select().from(field).where(eq(field.id, mapping.targetFieldId)).get();
+  const [targetField] = await db.select().from(field).where(eq(field.id, mapping.targetFieldId)).limit(1);
   const targetEntity = targetField
-    ? db.select().from(entity).where(eq(entity.id, targetField.entityId)).get()
+    ? (await db.select().from(entity).where(eq(entity.id, targetField.entityId)).limit(1))[0]
     : null;
 
   let sourceField = null;
   let sourceEntity = null;
   if (mapping.sourceFieldId) {
-    sourceField = db.select().from(field).where(eq(field.id, mapping.sourceFieldId)).get();
+    sourceField = (await db.select().from(field).where(eq(field.id, mapping.sourceFieldId)).limit(1))[0];
     if (sourceField) {
-      sourceEntity = db.select().from(entity).where(eq(entity.id, sourceField.entityId)).get();
+      sourceEntity = (await db.select().from(entity).where(eq(entity.id, sourceField.entityId)).limit(1))[0];
     }
   }
 
@@ -52,18 +52,18 @@ export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
   };
 
   // Load workspace BQ config
-  const ws = db
+  const ws = (await db
     .select({ settings: workspace.settings })
     .from(workspace)
     .where(eq(workspace.id, workspaceId))
-    .get();
+    )[0];
 
   const bqConfig = (ws?.settings as Record<string, unknown> | null)?.bigquery as BigQueryConfig | undefined;
 
   const result = await runValidation(input, bqConfig);
 
   // Store result
-  const [stored] = db
+  const [stored] = await db
     .insert(validation)
     .values({
       workspaceId,
@@ -77,7 +77,7 @@ export const POST = withAuth(async (_req, ctx, { userId, workspaceId }) => {
       ranBy: userId,
     })
     .returning()
-    .all();
+    ;
 
   logActivity({
     workspaceId,
@@ -101,13 +101,13 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const latest = db
+  const latest = (await db
     .select()
     .from(validation)
     .where(and(eq(validation.fieldMappingId, id), eq(validation.workspaceId, workspaceId)))
     .orderBy(desc(validation.createdAt))
     .limit(1)
-    .get();
+    )[0];
 
   if (!latest) {
     return NextResponse.json(null);

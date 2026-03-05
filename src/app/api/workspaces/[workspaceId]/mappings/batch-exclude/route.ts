@@ -13,7 +13,7 @@ export const POST = withAuth(
     const { mappingIds, reason } = parsed;
 
     // Verify all IDs belong to this workspace
-    const mappings = db
+    const mappings = await db
       .select({ id: fieldMapping.id })
       .from(fieldMapping)
       .where(
@@ -22,7 +22,7 @@ export const POST = withAuth(
           eq(fieldMapping.workspaceId, workspaceId)
         )
       )
-      .all();
+      ;
 
     const validIds = new Set(mappings.map((m) => m.id));
     const invalidIds = mappingIds.filter((id) => !validIds.has(id));
@@ -37,14 +37,14 @@ export const POST = withAuth(
     const now = new Date().toISOString();
 
     for (const id of mappingIds) {
-      db.update(fieldMapping)
+      await db.update(fieldMapping)
         .set({
           status: "excluded",
           excludeReason: reason || null,
           updatedAt: now,
         })
         .where(eq(fieldMapping.id, id))
-        .run();
+        ;
 
       logActivity({
         workspaceId,

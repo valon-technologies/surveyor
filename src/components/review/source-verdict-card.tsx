@@ -31,9 +31,15 @@ export function SourceVerdictCard({
   aiHasOpinion,
 }: SourceVerdictCardProps) {
   const [notes, setNotes] = useState("");
+  const [whyWrong, setWhyWrong] = useState("");
   const [selected, setSelected] = useState<"current" | "suggested" | "custom" | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const mutation = useUpdateMappingVerdict();
+
+  function buildNotes(correction: string, explanation: string): string {
+    if (!explanation.trim()) return correction;
+    return `${correction}\nWhy AI was wrong: ${explanation.trim()}`;
+  }
 
   const sourceLabel =
     sourceEntityName && sourceFieldName
@@ -78,8 +84,7 @@ export function SourceVerdictCard({
     }
     setSelected("suggested");
     onAcceptSuggestion?.();
-    // Save as "wrong" so the learning pipeline captures the correction
-    save("wrong", `Accepted AI suggestion: ${suggestedSource}`);
+    save("wrong", buildNotes(`Accepted AI suggestion: ${suggestedSource}`, whyWrong));
   }
 
   function handleSelectCustom() {
@@ -96,7 +101,16 @@ export function SourceVerdictCard({
 
   function handleNotesBlur() {
     if (selected === "custom" && notes.trim()) {
-      save("wrong", notes);
+      save("wrong", buildNotes(notes, whyWrong));
+    }
+  }
+
+  function handleWhyWrongBlur() {
+    if (!whyWrong.trim() || !selected || selected === "current") return;
+    if (selected === "suggested") {
+      save("wrong", buildNotes(`Accepted AI suggestion: ${suggestedSource}`, whyWrong));
+    } else if (selected === "custom" && notes.trim()) {
+      save("wrong", buildNotes(notes, whyWrong));
     }
   }
 
@@ -206,6 +220,23 @@ export function SourceVerdictCard({
           )}
         />
       </div>
+
+      {/* Why was the AI wrong — shown when reviewer disagrees */}
+      {(selected === "suggested" || selected === "custom") && (
+        <div className="rounded px-2 py-1.5 border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
+          <label className="text-[10px] font-medium text-amber-700 dark:text-amber-400 block mb-1">
+            Why was the AI wrong?
+          </label>
+          <textarea
+            value={whyWrong}
+            onChange={(e) => setWhyWrong(e.target.value)}
+            onBlur={handleWhyWrongBlur}
+            placeholder="e.g. AI confused this with a similarly-named field in another table..."
+            rows={2}
+            className="w-full text-xs bg-transparent resize-none border-0 focus:outline-none focus:ring-0 placeholder:text-muted-foreground/60"
+          />
+        </div>
+      )}
     </div>
   );
 }

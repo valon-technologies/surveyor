@@ -21,26 +21,26 @@ interface LearningContext {
 /**
  * Resolve an entity ID to its display name.
  */
-function resolveEntityName(entityId: string | null): string | null {
+async function resolveEntityName(entityId: string | null): Promise<string | null> {
   if (!entityId) return null;
-  const e = db
+  const e = (await db
     .select({ name: entity.name, displayName: entity.displayName })
     .from(entity)
     .where(eq(entity.id, entityId))
-    .get();
+    )[0];
   return e?.displayName || e?.name || null;
 }
 
 /**
  * Resolve a field ID to its name.
  */
-function resolveFieldName(fieldId: string | null): string | null {
+async function resolveFieldName(fieldId: string | null): Promise<string | null> {
   if (!fieldId) return null;
-  const f = db
+  const f = (await db
     .select({ name: field.name })
     .from(field)
     .where(eq(field.id, fieldId))
-    .get();
+    )[0];
   return f?.name || null;
 }
 
@@ -51,11 +51,11 @@ function resolveFieldName(fieldId: string | null): string | null {
  * or transform in a way that future LLM generations should know about.
  * Trivial edits (notes, reasoning text, confidence bumps) are ignored.
  */
-export function extractMappingLearning(
+export async function extractMappingLearning(
   oldMapping: MappingVersion,
   newMapping: MappingVersion,
   ctx: LearningContext,
-): void {
+): Promise<void> {
   const sourceEntityChanged =
     oldMapping.sourceEntityId !== newMapping.sourceEntityId &&
     (oldMapping.sourceEntityId !== null || newMapping.sourceEntityId !== null);
@@ -77,20 +77,20 @@ export function extractMappingLearning(
   }
 
   // Resolve names for human-readable learning content
-  const targetField = db
+  const [targetField] = await db
     .select({ name: field.name, entityId: field.entityId })
     .from(field)
     .where(eq(field.id, ctx.targetFieldId))
-    .get();
+    .limit(1);
   if (!targetField) return;
 
-  const targetEntityName = resolveEntityName(targetField.entityId);
+  const targetEntityName = await resolveEntityName(targetField.entityId);
   const fieldLabel = `${targetEntityName || "unknown"}.${targetField.name}`;
 
-  const oldEntityName = resolveEntityName(oldMapping.sourceEntityId);
-  const newEntityName = resolveEntityName(newMapping.sourceEntityId);
-  const oldFieldName = resolveFieldName(oldMapping.sourceFieldId);
-  const newFieldName = resolveFieldName(newMapping.sourceFieldId);
+  const oldEntityName = await resolveEntityName(oldMapping.sourceEntityId);
+  const newEntityName = await resolveEntityName(newMapping.sourceEntityId);
+  const oldFieldName = await resolveFieldName(oldMapping.sourceFieldId);
+  const newFieldName = await resolveFieldName(newMapping.sourceFieldId);
 
   const parts: string[] = [];
 
@@ -127,7 +127,7 @@ export function extractMappingLearning(
 
   try {
     // Dedup: skip if an identical learning already exists for this entity+field+content
-    const existingLearning = db
+    const [existingLearning] = await db
       .select({ id: learning.id })
       .from(learning)
       .where(
@@ -138,11 +138,11 @@ export function extractMappingLearning(
           eq(learning.content, content),
         )
       )
-      .get();
+      .limit(1);
 
     if (existingLearning) return;
 
-    db.insert(learning)
+    await db.insert(learning)
       .values({
         workspaceId: ctx.workspaceId,
         entityId: targetField.entityId,
@@ -151,10 +151,10 @@ export function extractMappingLearning(
         content,
         source: "review",
       })
-      .run();
+      ;
 
     // Rebuild the entity knowledge context doc (single source of truth)
-    rebuildEntityKnowledge(ctx.workspaceId, targetField.entityId);
+    await rebuildEntityKnowledge(ctx.workspaceId, targetField.entityId);
 
     // Emit mapping_correction signal for skill refresh tracking
     try {
@@ -172,7 +172,7 @@ export function extractMappingLearning(
 
     // Auto-detect entity boundary patterns → workspace-scoped rules
     if (sourceEntityChanged) {
-      detectEntityBoundaryPattern(
+      await detectEntityBoundaryPattern(
         oldEntityName,
         newEntityName,
         targetField.name,
@@ -211,12 +211,12 @@ const ENTITY_BOUNDARY_TABLE: Record<string, string> = {
  * Detect if a source entity correction matches a known entity boundary
  * pattern and auto-create a workspace-scoped learning.
  */
-function detectEntityBoundaryPattern(
+async function detectEntityBoundaryPattern(
   oldEntityName: string | null,
   newEntityName: string | null,
   targetFieldName: string,
   ctx: LearningContext,
-): void {
+): Promise<void> {
   if (!oldEntityName || !newEntityName) return;
   if (oldEntityName === newEntityName) return;
 
@@ -233,7 +233,7 @@ function detectEntityBoundaryPattern(
       `This is a known entity boundary — similar "original_*" fields should also map to "${newEntityName}".`;
 
     // Check for duplicate workspace rules
-    const existing = db
+    const [existing] = await db
       .select({ id: learning.id })
       .from(learning)
       .where(
@@ -243,18 +243,18 @@ function detectEntityBoundaryPattern(
           eq(learning.content, content),
         )
       )
-      .get();
+      .limit(1);
 
     if (!existing) {
       try {
-        db.insert(learning)
+        await db.insert(learning)
           .values({
             workspaceId: ctx.workspaceId,
             scope: "workspace",
             content,
             source: "review",
           })
-          .run();
+          ;
         console.log(`[mapping-learning] Auto-created workspace rule for entity boundary: ${targetFieldName}`);
       } catch (err) {
         console.warn("[mapping-learning] Failed to create workspace boundary rule:", err);
@@ -268,13 +268,13 @@ function detectEntityBoundaryPattern(
  * Called when a non-'correct' source or transform verdict is saved.
  * Triggers rebuildEntityKnowledge so the next generation sees the feedback.
  */
-export function extractVerdictLearning(
+export async function extractVerdictLearning(
   workspaceId: string,
   fieldMappingId: string,
   correlationId?: string,
-): void {
+): Promise<void> {
   // Load verdict fields + source entity/field names from the mapping
-  const mapping = db
+  const mapping = (await db
     .select({
       id: fieldMapping.id,
       sourceVerdict: fieldMapping.sourceVerdict,
@@ -288,12 +288,12 @@ export function extractVerdictLearning(
     .leftJoin(entity, eq(fieldMapping.sourceEntityId, entity.id))
     .leftJoin(field, eq(fieldMapping.sourceFieldId, field.id))
     .where(eq(fieldMapping.id, fieldMappingId))
-    .get();
+    )[0];
 
   if (!mapping) return;
 
   // Load target field + entity (separate query to avoid alias conflicts)
-  const targetInfo = db
+  const targetInfo = (await db
     .select({
       fieldName: field.name,
       entityId: field.entityId,
@@ -303,7 +303,7 @@ export function extractVerdictLearning(
     .innerJoin(field, eq(fieldMapping.targetFieldId, field.id))
     .innerJoin(entity, eq(field.entityId, entity.id))
     .where(eq(fieldMapping.id, fieldMappingId))
-    .get();
+    )[0];
 
   if (!targetInfo) return;
 
@@ -323,6 +323,7 @@ export function extractVerdictLearning(
       wrong_field: `CORRECTION (MANDATORY) ${prefix}: Wrong field within ${mapping.sourceEntityName || "the entity"}. ${notesText}`,
       should_be_unmapped: `CORRECTION (MANDATORY) ${prefix}: This field has NO source — set transform: null, source: []. Do NOT map it.`,
       missing_source: `CORRECTION (MANDATORY) ${prefix}: This field MUST be mapped. ${notesText}`,
+      wrong: notesText ? `CORRECTION (MANDATORY) ${prefix}: Source is wrong. ${notesText}` : "",
     };
 
     const content = contentMap[mapping.sourceVerdict];
@@ -338,6 +339,7 @@ export function extractVerdictLearning(
       needed_but_missing: `CORRECTION (MANDATORY) ${prefix}: A transform is REQUIRED. ${notesText}`,
       wrong_enum: `CORRECTION (MANDATORY) ${prefix}: Enum mapping is incorrect. ${notesText}`,
       wrong_logic: `CORRECTION (MANDATORY) ${prefix}: Transform logic is wrong. ${notesText}`,
+      wrong: notesText ? `CORRECTION (MANDATORY) ${prefix}: Transform is wrong. ${notesText}` : "",
     };
 
     const content = contentMap[mapping.transformVerdict];
@@ -348,7 +350,7 @@ export function extractVerdictLearning(
 
   for (const lv of learningValues) {
     // Dedup: skip if an identical learning already exists for this entity+field+content
-    const existing = db
+    const existing = (await db
       .select({ id: learning.id })
       .from(learning)
       .where(
@@ -359,14 +361,14 @@ export function extractVerdictLearning(
           eq(learning.content, lv.content),
         )
       )
-      .get();
+      )[0];
 
     if (existing) {
       continue;
     }
 
     const learningId = crypto.randomUUID();
-    db.insert(learning).values({
+    await db.insert(learning).values({
       id: learningId,
       workspaceId,
       entityId: targetInfo.entityId,
@@ -375,7 +377,7 @@ export function extractVerdictLearning(
       source: "review",
       content: lv.content,
       validationStatus: "pending", // Requires admin validation before entering EK
-    }).run();
+    });
 
     emitFeedbackEvent({
       workspaceId,
@@ -397,13 +399,13 @@ export function extractVerdictLearning(
  * Promote a correction to a workspace-wide rule.
  * Called from the review UI when a reviewer flags a correction as a global pattern.
  */
-export function promoteToWorkspaceRule(
+export async function promoteToWorkspaceRule(
   workspaceId: string,
   content: string,
   source: "review" | "manual" = "review",
-): { id: string } {
+): Promise<{ id: string }> {
   // Dedup: skip if a very similar rule already exists
-  const existing = db
+  const existing = await db
     .select({ id: learning.id, content: learning.content })
     .from(learning)
     .where(
@@ -412,7 +414,7 @@ export function promoteToWorkspaceRule(
         eq(learning.scope, "workspace"),
       )
     )
-    .all();
+    ;
 
   // Simple dedup by normalized content comparison
   const normalizedContent = content.toLowerCase().replace(/\s+/g, " ").trim();
@@ -429,7 +431,7 @@ export function promoteToWorkspaceRule(
   }
 
   const id = crypto.randomUUID();
-  db.insert(learning)
+  await db.insert(learning)
     .values({
       id,
       workspaceId,
@@ -437,7 +439,7 @@ export function promoteToWorkspaceRule(
       content,
       source,
     })
-    .run();
+    ;
 
   return { id };
 }

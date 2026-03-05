@@ -25,7 +25,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     conditions.push(eq(sotEvaluation.entityId, entityId));
   }
 
-  const evaluations = db
+  const evaluations = await db
     .select({
       id: sotEvaluation.id,
       entityId: sotEvaluation.entityId,
@@ -44,10 +44,10 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     .leftJoin(entity, eq(sotEvaluation.entityId, entity.id))
     .where(and(...conditions))
     .orderBy(desc(sotEvaluation.createdAt))
-    .all();
+    ;
 
   // Aggregate stats across latest evaluations
-  const stats = db
+  const stats = (await db
     .select({
       totalEvaluations: sql<number>`COUNT(*)`,
       avgExactPct: sql<number | null>`AVG(${sotEvaluation.sourceExactPct})`,
@@ -58,10 +58,10 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     })
     .from(sotEvaluation)
     .where(eq(sotEvaluation.workspaceId, workspaceId))
-    .get();
+    )[0];
 
   // List entities that have SOT data available
-  const availableEntities = listAvailableSotEntities();
+  const availableEntities = await listAvailableSotEntities();
 
   return NextResponse.json({
     evaluations,
@@ -89,7 +89,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
   // Determine which entities to evaluate
   let targetEntities: { id: string; name: string }[];
   if (entityIds?.length) {
-    targetEntities = db
+    targetEntities = (await db
       .select({ id: entity.id, name: entity.name })
       .from(entity)
       .where(
@@ -98,26 +98,26 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
           eq(entity.side, "target"),
         )
       )
-      .all()
+)
       .filter((e) => entityIds.includes(e.id));
   } else {
     // Only entities that have at least one generated mapping (is_latest=1)
     // Evaluating entities with no mappings produces meaningless results
     const { fieldMapping, field } = await import("@/lib/db/schema");
     const { inArray } = await import("drizzle-orm");
-    const mappedEntityIds = db
+    const mappedEntityIds = (await db
       .selectDistinct({ entityId: field.entityId })
       .from(fieldMapping)
       .innerJoin(field, eq(fieldMapping.targetFieldId, field.id))
       .where(eq(fieldMapping.isLatest, true))
-      .all()
+)
       .map((r) => r.entityId);
 
     if (mappedEntityIds.length === 0) {
       return NextResponse.json({ message: "No entities with generated mappings found", results: [] });
     }
 
-    targetEntities = db
+    targetEntities = await db
       .select({ id: entity.id, name: entity.name })
       .from(entity)
       .where(
@@ -127,7 +127,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
           inArray(entity.id, mappedEntityIds),
         )
       )
-      .all();
+      ;
   }
 
   const results: Array<{
@@ -142,7 +142,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
 
   for (const te of targetEntities) {
     try {
-      const evalResult = evaluateEntityMappings(workspaceId, te.id);
+      const evalResult = await evaluateEntityMappings(workspaceId, te.id);
 
       if (!evalResult) {
         results.push({
@@ -156,7 +156,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
 
       // Persist to DB
       const evalId = crypto.randomUUID();
-      db.insert(sotEvaluation)
+      await db.insert(sotEvaluation)
         .values({
           id: evalId,
           workspaceId,
@@ -170,10 +170,10 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
           sourceLenientPct: evalResult.sourceLenientPct,
           fieldResults: evalResult.fieldResults,
         })
-        .run();
+        ;
 
       // Look up previous eval for delta calculation
-      const previousEval = db
+      const previousEval = (await db
         .select({ sourceExactPct: sotEvaluation.sourceExactPct })
         .from(sotEvaluation)
         .where(
@@ -185,7 +185,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
         )
         .orderBy(desc(sotEvaluation.createdAt))
         .limit(1)
-        .get();
+        )[0];
 
       emitFeedbackEvent({
         workspaceId,

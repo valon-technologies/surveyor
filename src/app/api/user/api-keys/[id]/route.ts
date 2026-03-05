@@ -22,11 +22,11 @@ export async function PUT(
     return NextResponse.json({ error: "apiKey is required" }, { status: 400 });
   }
 
-  const existing = db
+  const existing = (await db
     .select()
     .from(userApiKey)
     .where(and(eq(userApiKey.id, id), eq(userApiKey.userId, session.user.id)))
-    .get();
+    )[0];
 
   if (!existing) {
     return NextResponse.json({ error: "Key not found" }, { status: 404 });
@@ -35,7 +35,7 @@ export async function PUT(
   const { encryptedKey, iv, authTag } = encrypt(apiKey);
   const keyPrefix = apiKey.slice(0, 8) + "...";
 
-  db.update(userApiKey)
+  await db.update(userApiKey)
     .set({
       encryptedKey,
       iv,
@@ -44,7 +44,7 @@ export async function PUT(
       updatedAt: new Date().toISOString(),
     })
     .where(eq(userApiKey.id, id))
-    .run();
+    ;
 
   return NextResponse.json({ id, provider: existing.provider, keyPrefix });
 }
@@ -61,17 +61,17 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const existing = db
+  const existing = (await db
     .select()
     .from(userApiKey)
     .where(and(eq(userApiKey.id, id), eq(userApiKey.userId, session.user.id)))
-    .get();
+    )[0];
 
   if (!existing) {
     return NextResponse.json({ error: "Key not found" }, { status: 404 });
   }
 
-  db.delete(userApiKey).where(eq(userApiKey.id, id)).run();
+  await db.delete(userApiKey).where(eq(userApiKey.id, id));
 
   return NextResponse.json({ success: true });
 }

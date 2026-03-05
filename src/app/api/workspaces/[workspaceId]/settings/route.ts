@@ -6,11 +6,11 @@ import { eq } from "drizzle-orm";
 
 // GET — return workspace settings
 export const GET = withAuth(async (_req, _ctx, { workspaceId }) => {
-  const row = db
+  const row = (await db
     .select({ settings: workspace.settings })
     .from(workspace)
     .where(eq(workspace.id, workspaceId))
-    .get();
+    )[0];
 
   return NextResponse.json(row?.settings || {});
 });
@@ -19,19 +19,19 @@ export const GET = withAuth(async (_req, _ctx, { workspaceId }) => {
 export const PATCH = withAuth(async (req, _ctx, { workspaceId }) => {
   const body = await req.json();
 
-  const row = db
+  const row = (await db
     .select({ settings: workspace.settings })
     .from(workspace)
     .where(eq(workspace.id, workspaceId))
-    .get();
+    )[0];
 
   const existing = (row?.settings as Record<string, unknown>) || {};
   const merged = { ...existing, ...body };
 
-  db.update(workspace)
+  await db.update(workspace)
     .set({ settings: merged, updatedAt: new Date().toISOString() })
     .where(eq(workspace.id, workspaceId))
-    .run();
+    ;
 
   return NextResponse.json(merged);
 }, { requiredRole: "editor" });

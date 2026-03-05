@@ -71,16 +71,16 @@ export function getMappingExamplesToolDefinition(): ToolDefinition {
 
 // ─── Executor ──────────────────────────────────────────────────
 
-export function executeMappingExampleSearch(
+export async function executeMappingExampleSearch(
   input: MappingExamplesInput,
   workspaceId: string,
   excludeEntityId: string
-): MappingExamplesResult {
+): Promise<MappingExamplesResult> {
   const { fieldType, mappingType, keyword, limit: rawLimit } = input;
   const maxResults = Math.min(rawLimit || 5, 15);
 
   // Load accepted/high-confidence mappings from other entities
-  const mappings = db
+  const mappings = (await db
     .select()
     .from(fieldMapping)
     .where(
@@ -89,7 +89,7 @@ export function executeMappingExampleSearch(
         eq(fieldMapping.isLatest, true)
       )
     )
-    .all()
+    )
     .filter(
       (m) =>
         m.status === "accepted" ||
@@ -98,26 +98,26 @@ export function executeMappingExampleSearch(
     );
 
   // Load source entities for name resolution
-  const sourceEntities = db
+  const sourceEntities = await db
     .select({ id: entity.id, name: entity.name, displayName: entity.displayName })
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-    .all();
+    ;
   const sourceEntityMap = new Map(sourceEntities.map((e) => [e.id, e.displayName || e.name]));
 
   // Load target entities for entity name display
-  const targetEntities = db
+  const targetEntities = await db
     .select({ id: entity.id, name: entity.name, displayName: entity.displayName })
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target")))
-    .all();
+    ;
   const targetEntityMap = new Map(targetEntities.map((e) => [e.id, e.displayName || e.name]));
 
   const examples: ExampleRow[] = [];
 
   for (const m of mappings) {
     // Load target field to get entity ID, name, data type
-    const tf = db
+    const tf = (await db
       .select({
         id: field.id,
         name: field.name,
@@ -127,7 +127,7 @@ export function executeMappingExampleSearch(
       })
       .from(field)
       .where(eq(field.id, m.targetFieldId))
-      .get();
+      )[0];
 
     if (!tf) continue;
 
@@ -157,11 +157,11 @@ export function executeMappingExampleSearch(
       sourceTable = sourceEntityMap.get(m.sourceEntityId) || null;
     }
     if (m.sourceFieldId) {
-      const sf = db
+      const sf = (await db
         .select({ name: field.name })
         .from(field)
         .where(eq(field.id, m.sourceFieldId))
-        .get();
+        )[0];
       sourceField = sf?.name || null;
     }
 

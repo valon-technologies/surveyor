@@ -26,7 +26,7 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
   const filterSkillId = searchParams.get("skillId");
 
   // Forge sessions have sessionType = "forge"
-  let sessions = db
+  let sessions = await db
     .select({
       id: chatSession.id,
       workspaceId: chatSession.workspaceId,
@@ -52,7 +52,7 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
       )
     )
     .orderBy(desc(chatSession.createdAt))
-    .all();
+    ;
 
   if (filterSkillId) {
     sessions = sessions.filter((s) => s.skillId === filterSkillId);
@@ -63,10 +63,10 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
     const entityNameLower = filterEntityName.toLowerCase();
     const entityIds = sessions.map((s) => s.entityId).filter(Boolean) as string[];
     if (entityIds.length > 0) {
-      const entities = db
+      const entities = await db
         .select({ id: entity.id, name: entity.name, displayName: entity.displayName })
         .from(entity)
-        .all();
+        ;
       const entityMap = new Map(entities.map((e) => [e.id, e]));
       sessions = sessions.filter((s) => {
         if (!s.entityId) return false;
@@ -94,13 +94,13 @@ export const POST = withAuth(
     const { entityName, skillId } = parsed.data;
 
     // Find target entity by name
-    const targetEntity = db
+    const targetEntity = (await db
       .select()
       .from(entity)
       .where(
         and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target"))
       )
-      .all()
+)
       .find(
         (e) =>
           (e.displayName || e.name).toLowerCase() === entityName.toLowerCase() ||
@@ -113,7 +113,7 @@ export const POST = withAuth(
 
     if (targetEntity) {
       entityId = targetEntity.id;
-      const fields = db
+      const fields = await db
         .select({
           name: field.name,
           displayName: field.displayName,
@@ -124,7 +124,7 @@ export const POST = withAuth(
         .from(field)
         .where(eq(field.entityId, targetEntity.id))
         .orderBy(field.sortOrder)
-        .all();
+        ;
 
       const lines = [
         `| Field | Type | Required | Description |`,
@@ -144,11 +144,11 @@ export const POST = withAuth(
     }
 
     // Context library stats
-    const allContexts = db
+    const allContexts = await db
       .select({ category: context.category })
       .from(context)
       .where(and(eq(context.workspaceId, workspaceId), eq(context.isActive, true)))
-      .all();
+      ;
 
     const categoryCounts = new Map<string, number>();
     for (const c of allContexts) {
@@ -169,9 +169,9 @@ export const POST = withAuth(
       | undefined;
 
     if (skillId) {
-      const s = db.select().from(skill).where(eq(skill.id, skillId)).get();
+      const [s] = await db.select().from(skill).where(eq(skill.id, skillId)).limit(1);
       if (s) {
-        const scs = db
+        const scs = await db
           .select({
             contextId: skillContext.contextId,
             tokenCount: context.tokenCount,
@@ -179,7 +179,7 @@ export const POST = withAuth(
           .from(skillContext)
           .innerJoin(context, eq(skillContext.contextId, context.id))
           .where(eq(skillContext.skillId, skillId))
-          .all();
+          ;
 
         existingSkillInfo = {
           id: s.id,
@@ -196,11 +196,11 @@ export const POST = withAuth(
     let bigqueryDataset: string | undefined;
     try {
       const { workspace } = await import("@/lib/db/schema");
-      const wsRow = db
+      const wsRow = (await db
         .select({ settings: workspace.settings })
         .from(workspace)
         .where(eq(workspace.id, workspaceId))
-        .get();
+        )[0];
       const wsSettings = wsRow?.settings as Record<string, unknown> | null;
       const bqConfig = wsSettings?.bigquery as {
         projectId: string;
@@ -228,8 +228,8 @@ export const POST = withAuth(
     const sessionId = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    const session = withTransaction(() => {
-      db.insert(chatSession)
+    const session = await withTransaction(async () => {
+      await db.insert(chatSession)
         .values({
           id: sessionId,
           workspaceId,
@@ -245,22 +245,22 @@ export const POST = withAuth(
           createdAt: now,
           updatedAt: now,
         })
-        .run();
+        ;
 
-      db.insert(chatMessage)
+      await db.insert(chatMessage)
         .values({
           sessionId,
           role: "system",
           content: systemMessage,
           createdAt: now,
         })
-        .run();
+        ;
 
-      return db
+      return (await db
         .select()
         .from(chatSession)
         .where(eq(chatSession.id, sessionId))
-        .get();
+        )[0];
     });
 
     return NextResponse.json(session);

@@ -28,17 +28,17 @@ export async function evaluateQuestion(
   const { workspaceId, questionId, userId, runJudge = false } = params;
 
   // Load question
-  const q = db
+  const q = (await db
     .select()
     .from(question)
     .where(and(eq(question.id, questionId), eq(question.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!q) throw new Error(`Question ${questionId} not found`);
   if (q.status !== "resolved") throw new Error("Question is not resolved");
 
   // Load human resolution answer
-  const resolution = db
+  const resolution = (await db
     .select()
     .from(questionReply)
     .where(
@@ -47,7 +47,7 @@ export async function evaluateQuestion(
         eq(questionReply.isResolution, true)
       )
     )
-    .get();
+    )[0];
 
   const humanAnswer = resolution?.body || q.answer;
   if (!humanAnswer) throw new Error("No human answer found for question");
@@ -55,31 +55,31 @@ export async function evaluateQuestion(
   // Load entity name
   let entityName = "Unknown";
   if (q.entityId) {
-    const e = db
+    const e = (await db
       .select({ name: entity.name })
       .from(entity)
       .where(eq(entity.id, q.entityId))
-      .get();
+      )[0];
     entityName = e?.name || entityName;
   }
 
   // Load field name if available
   let fieldName: string | null = null;
   if (q.fieldId) {
-    const f = db
+    const f = (await db
       .select({ name: field.name })
       .from(field)
       .where(eq(field.id, q.fieldId))
-      .get();
+      )[0];
     fieldName = f?.name || null;
   }
 
   // Resolve LLM provider
-  const { provider, providerName } = resolveProvider(userId);
+  const { provider, providerName } = await resolveProvider(userId);
   const tokenBudget = getTokenBudget(providerName);
 
   // Assemble context with query-aware retrieval
-  const assembled = assembleContext(
+  const assembled = await assembleContext(
     workspaceId,
     entityName,
     tokenBudget,
@@ -155,11 +155,11 @@ export async function evaluateQuestion(
     evalData.judgeModel = judgeResult.model;
   }
 
-  const [inserted] = db
+  const [inserted] = await db
     .insert(evaluation)
     .values(evalData as typeof evaluation.$inferInsert)
     .returning()
-    .all();
+    ;
 
   return {
     evaluationId: inserted.id,

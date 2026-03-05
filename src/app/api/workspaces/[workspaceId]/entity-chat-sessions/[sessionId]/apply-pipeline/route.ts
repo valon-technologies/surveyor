@@ -64,7 +64,7 @@ export const POST = withAuth(
     const sessionId = params.sessionId;
 
     // Verify session
-    const session = db
+    const session = (await db
       .select()
       .from(chatSession)
       .where(
@@ -73,7 +73,7 @@ export const POST = withAuth(
           eq(chatSession.workspaceId, workspaceId)
         )
       )
-      .get();
+      )[0];
 
     if (!session || !session.entityId) {
       return NextResponse.json(
@@ -108,7 +108,7 @@ export const POST = withAuth(
     const { update } = parsed.data;
 
     // Load current latest pipeline
-    const current = db
+    const current = (await db
       .select()
       .from(entityPipeline)
       .where(
@@ -117,7 +117,7 @@ export const POST = withAuth(
           eq(entityPipeline.isLatest, true)
         )
       )
-      .get();
+      )[0];
 
     if (!current) {
       return NextResponse.json(
@@ -267,22 +267,22 @@ export const POST = withAuth(
       addedSources.length > 0
     ) {
       // Load parent entity for schemaAssetId and fields
-      const parentEntity = db
+      const parentEntity = (await db
         .select()
         .from(entity)
         .where(eq(entity.id, session.entityId))
-        .get();
+        )[0];
 
       if (parentEntity) {
-        const parentFields = db
+        const parentFields = await db
           .select()
           .from(field)
           .where(eq(field.entityId, session.entityId))
-          .all();
+          ;
 
         for (const src of addedSources) {
           // Skip if child entity already exists
-          const existing = db
+          const existing = (await db
             .select()
             .from(entity)
             .where(
@@ -291,7 +291,7 @@ export const POST = withAuth(
                 eq(entity.name, src.name)
               )
             )
-            .get();
+            )[0];
 
           if (existing) continue;
 
@@ -301,7 +301,7 @@ export const POST = withAuth(
             .replace(/\b\w/g, (c) => c.toUpperCase());
 
           // Create child entity
-          db.insert(entity)
+          await db.insert(entity)
             .values({
               id: compEntityId,
               workspaceId,
@@ -314,11 +314,11 @@ export const POST = withAuth(
               createdAt: now,
               updatedAt: now,
             })
-            .run();
+            ;
 
           // Clone fields from parent
           for (const pf of parentFields) {
-            db.insert(field)
+            await db.insert(field)
               .values({
                 entityId: compEntityId,
                 name: pf.name,
@@ -330,11 +330,11 @@ export const POST = withAuth(
                 sampleValues: pf.sampleValues,
                 sortOrder: pf.sortOrder,
               })
-              .run();
+              ;
           }
 
           // Create stub flat pipeline
-          db.insert(entityPipeline)
+          await db.insert(entityPipeline)
             .values({
               workspaceId,
               entityId: compEntityId,
@@ -352,7 +352,7 @@ export const POST = withAuth(
               createdAt: now,
               updatedAt: now,
             })
-            .run();
+            ;
 
           createdEntities.push(src.name);
           changes.push(`Created child entity: ${src.name}`);

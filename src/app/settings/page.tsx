@@ -3,6 +3,8 @@
 import { useSession } from "next-auth/react";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useEffect, useState, useTransition } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api, workspacePath } from "@/lib/api-client";
 import {
   FIELD_DOMAINS,
   FIELD_DOMAIN_LABELS,
@@ -10,10 +12,19 @@ import {
   FIELD_DOMAIN_COLORS,
   type FieldDomain,
 } from "@/lib/constants";
+import type { UserStats } from "@/app/api/workspaces/[workspaceId]/members/[userId]/stats/route";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const { workspaceName, role } = useWorkspace();
+  const { workspaceId, workspaceName, role } = useWorkspace();
+  const userId = session?.user?.id;
+
+  const { data: stats } = useQuery({
+    queryKey: ["user-stats", workspaceId, userId],
+    queryFn: () =>
+      api.get<UserStats>(workspacePath(workspaceId, `members/${userId}/stats`)),
+    enabled: !!userId,
+  });
 
   const [domains, setDomains] = useState<FieldDomain[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -128,6 +139,80 @@ export default function SettingsPage() {
           </p>
         )}
       </div>
+
+      {/* Stats Dashboard */}
+      {stats && (
+        <div className="border rounded-lg p-4 space-y-4">
+          <h2 className="text-sm font-medium">Your Stats</h2>
+
+          <div className="flex items-center gap-6 text-sm">
+            <div>
+              <span className="text-2xl font-semibold">{stats.totalReviewed}</span>
+              <span className="text-muted-foreground ml-1.5">fields reviewed</span>
+            </div>
+            <div>
+              <span className="text-2xl font-semibold">{stats.totalQuestionsAnswered}</span>
+              <span className="text-muted-foreground ml-1.5">questions answered</span>
+            </div>
+            {stats.rank > 0 && (
+              <div className="ml-auto text-right">
+                <span className="text-lg font-semibold">#{stats.rank}</span>
+                <span className="text-muted-foreground ml-1 text-xs">rank</span>
+              </div>
+            )}
+          </div>
+
+          {stats.domainStats.length > 0 && (
+            <div>
+              <h3 className="text-xs font-medium text-muted-foreground mb-2">Domain Breakdown</h3>
+              <div className="border rounded-md overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted text-xs text-muted-foreground">
+                      <th className="px-3 py-1.5 text-left font-medium">Domain</th>
+                      <th className="px-3 py-1.5 text-right font-medium">Reviewed</th>
+                      <th className="px-3 py-1.5 text-right font-medium">Acceptance %</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {stats.domainStats.map((d) => (
+                      <tr key={d.domain} className="hover:bg-muted/30">
+                        <td className="px-3 py-1.5 flex items-center gap-2">
+                          {stats.strengths.includes(d.domain) && (
+                            <span className="text-amber-500 text-xs">★</span>
+                          )}
+                          <span
+                            className="inline-block w-2 h-2 rounded-full"
+                            style={{ backgroundColor: FIELD_DOMAIN_COLORS[d.domain] }}
+                          />
+                          {FIELD_DOMAIN_LABELS[d.domain]}
+                        </td>
+                        <td className="px-3 py-1.5 text-right tabular-nums">{d.reviewed}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums">
+                          <span className={d.acceptanceRate >= 80 ? "text-green-600" : d.acceptanceRate >= 60 ? "text-amber-600" : "text-red-500"}>
+                            {d.acceptanceRate}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {stats.strengths.length > 0 && (
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  ★ = strength (top domain by volume, {">"}80% acceptance)
+                </p>
+              )}
+            </div>
+          )}
+
+          {stats.totalReviewed === 0 && (
+            <p className="text-xs text-muted-foreground italic">
+              No reviewed mappings yet. Start reviewing to build your stats.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

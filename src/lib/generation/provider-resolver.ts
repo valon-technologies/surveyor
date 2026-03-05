@@ -15,15 +15,15 @@ interface ResolvedProvider {
  * Resolve an LLM provider from the user's stored API keys.
  * Preference order: preferredProvider > claude > openai.
  */
-export function resolveProvider(
+export async function resolveProvider(
   userId: string,
   preferredProvider?: "claude" | "openai"
-): ResolvedProvider {
-  const keys = db
+): Promise<ResolvedProvider> {
+  const keys = await db
     .select()
     .from(userApiKey)
     .where(eq(userApiKey.userId, userId))
-    .all();
+    ;
 
   if (keys.length === 0) {
     throw new Error(

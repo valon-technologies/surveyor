@@ -23,12 +23,14 @@ import {
 } from "lucide-react";
 import { useQuestions } from "@/queries/question-queries";
 import { useTheme } from "./theme-provider";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
 
 interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
   badge?: boolean;
+  requiredRole?: "owner";
   children?: { href: string; label: string }[];
 }
 
@@ -65,7 +67,7 @@ const navItems: NavItem[] = [
     ],
   },
   { href: "/ground-truth", label: "Verified Mappings", icon: Scale },
-  { href: "/admin", label: "Admin", icon: Shield },
+  { href: "/admin", label: "Admin", icon: Shield, requiredRole: "owner" },
 ];
 
 function NavItemRenderer({
@@ -195,8 +197,13 @@ function NavItemRenderer({
 export function SidebarNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { role } = useWorkspace();
   const { data: openQuestions } = useQuestions({ status: "open" });
   const { theme, toggle } = useTheme();
+
+  const visibleItems = navItems.filter(
+    (item) => !item.requiredRole || role === item.requiredRole,
+  );
 
   return (
     <aside className="w-56 border-r bg-sidebar h-screen flex flex-col shrink-0">
@@ -218,12 +225,12 @@ export function SidebarNav() {
 
       {/* Nav items */}
       <nav className="flex-1 p-2 space-y-0.5">
-        {navItems.map((item) => (
+        {visibleItems.map((item) => (
           <NavItemRenderer
             key={item.href}
             item={item}
             pathname={pathname}
-            navItems={navItems}
+            navItems={visibleItems}
             badgeCount={item.badge ? (openQuestions?.length || 0) : 0}
           />
         ))}

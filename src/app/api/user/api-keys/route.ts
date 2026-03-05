@@ -12,7 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const keys = db
+  const keys = await db
     .select({
       id: userApiKey.id,
       provider: userApiKey.provider,
@@ -22,7 +22,7 @@ export async function GET() {
     })
     .from(userApiKey)
     .where(eq(userApiKey.userId, session.user.id))
-    .all();
+    ;
 
   return NextResponse.json(keys);
 }
@@ -54,25 +54,18 @@ export async function POST(req: NextRequest) {
   const keyPrefix = apiKey.slice(0, 8) + "...";
 
   // Upsert: delete existing key for this provider, then insert
-  const existing = db
-    .select({ id: userApiKey.id })
+  const allKeys = await db
+    .select({ id: userApiKey.id, provider: userApiKey.provider })
     .from(userApiKey)
-    .where(eq(userApiKey.userId, session.user.id))
-    .all()
-    .filter((k) => {
-      const row = db
-        .select({ provider: userApiKey.provider })
-        .from(userApiKey)
-        .where(eq(userApiKey.id, k.id))
-        .get();
-      return row?.provider === provider;
-    });
+    .where(eq(userApiKey.userId, session.user.id));
+
+  const existing = allKeys.filter((k) => k.provider === provider);
 
   for (const k of existing) {
-    db.delete(userApiKey).where(eq(userApiKey.id, k.id)).run();
+    await db.delete(userApiKey).where(eq(userApiKey.id, k.id));
   }
 
-  const [key] = db
+  const [key] = await db
     .insert(userApiKey)
     .values({
       userId: session.user.id,
@@ -83,7 +76,7 @@ export async function POST(req: NextRequest) {
       keyPrefix,
     })
     .returning()
-    .all();
+    ;
 
   return NextResponse.json(
     { id: key.id, provider: key.provider, keyPrefix },

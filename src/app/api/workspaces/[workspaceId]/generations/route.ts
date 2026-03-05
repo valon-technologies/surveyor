@@ -14,12 +14,12 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const conditions = [eq(generation.workspaceId, workspaceId)];
   if (entityId) conditions.push(eq(generation.entityId, entityId));
 
-  const generations = db
+  const generations = await db
     .select()
     .from(generation)
     .where(and(...conditions))
     .orderBy(generation.createdAt)
-    .all();
+    ;
 
   return NextResponse.json(generations);
 });
@@ -36,7 +36,7 @@ export const POST = withAuth(
     }
 
     // Guard: check daily token budget
-    const budgetCheck = checkDailyTokenBudget(workspaceId);
+    const budgetCheck = await checkDailyTokenBudget(workspaceId);
     if (!budgetCheck.allowed) {
       return NextResponse.json(
         { error: budgetCheck.message },
@@ -45,7 +45,7 @@ export const POST = withAuth(
     }
 
     try {
-      const { startResult, prepared } = startGeneration({
+      const { startResult, prepared } = await startGeneration({
         workspaceId,
         userId,
         entityId: parsed.data.entityId,

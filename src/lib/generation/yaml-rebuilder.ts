@@ -19,27 +19,27 @@ interface RebuildResult {
  * Rebuild the YAML spec for an entity pipeline from current field mappings.
  * Updates the entityPipeline record and clears isStale.
  */
-export function rebuildPipelineYaml(pipelineId: string): RebuildResult {
-  const pipeline = db
+export async function rebuildPipelineYaml(pipelineId: string): Promise<RebuildResult> {
+  const pipeline = (await db
     .select()
     .from(entityPipeline)
     .where(eq(entityPipeline.id, pipelineId))
-    .get();
+    )[0];
 
   if (!pipeline) {
     throw new Error(`Pipeline not found: ${pipelineId}`);
   }
 
   // Load current field mappings for this entity
-  const fields = db
+  const fields = await db
     .select()
     .from(field)
     .where(eq(field.entityId, pipeline.entityId))
     .orderBy(field.sortOrder)
-    .all();
+    ;
 
   const fieldIds = fields.map((f) => f.id);
-  const latestMappings = db
+  const latestMappings = (await db
     .select()
     .from(fieldMapping)
     .where(
@@ -48,7 +48,7 @@ export function rebuildPipelineYaml(pipelineId: string): RebuildResult {
         eq(fieldMapping.isLatest, true)
       )
     )
-    .all()
+)
     .filter((m) => fieldIds.includes(m.targetFieldId));
 
   // Build mapping lookup by target field ID
@@ -59,11 +59,11 @@ export function rebuildPipelineYaml(pipelineId: string): RebuildResult {
   const sourceEntityToAlias = new Map<string, string>();
 
   // Load source entities for the workspace to map aliases
-  const sourceEntities = db
+  const sourceEntities = await db
     .select()
     .from(entityTable)
     .where(and(eq(entityTable.workspaceId, pipeline.workspaceId), eq(entityTable.side, "source")))
-    .all();
+    ;
 
   for (const src of sources) {
     const matchedEntity = sourceEntities.find(
@@ -92,7 +92,7 @@ export function rebuildPipelineYaml(pipelineId: string): RebuildResult {
     // Determine source reference
     let source: unknown = [];
     if (mapping.sourceFieldId) {
-      const sourceField = db.select().from(field).where(eq(field.id, mapping.sourceFieldId)).get();
+      const [sourceField] = await db.select().from(field).where(eq(field.id, mapping.sourceFieldId)).limit(1);
       if (sourceField) {
         const alias = sourceEntityToAlias.get(sourceField.entityId);
         source = alias ? `${alias}.${sourceField.name}` : sourceField.name;
@@ -188,14 +188,14 @@ export function rebuildPipelineYaml(pipelineId: string): RebuildResult {
   });
 
   // Update the pipeline record
-  db.update(entityPipeline)
+  await db.update(entityPipeline)
     .set({
       yamlSpec,
       isStale: false,
       updatedAt: new Date().toISOString(),
     })
     .where(eq(entityPipeline.id, pipelineId))
-    .run();
+    ;
 
   return { yamlSpec, columnsUpdated: columns.length };
 }

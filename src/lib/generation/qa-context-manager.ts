@@ -20,10 +20,10 @@ interface UpsertQaContextParams {
  * Find or create a QA Knowledge context document for the entity,
  * append the resolved Q&A, and link it to matching skills.
  */
-export function upsertQaContext(params: UpsertQaContextParams): {
+export async function upsertQaContext(params: UpsertQaContextParams): Promise<{
   contextId: string;
   created: boolean;
-} {
+}> {
   const {
     workspaceId,
     entityId,
@@ -45,7 +45,7 @@ export function upsertQaContext(params: UpsertQaContextParams): {
   ].join("\n");
 
   // Look for existing QA Knowledge context for this entity
-  const existing = db
+  const existing = (await db
     .select()
     .from(context)
     .where(
@@ -56,7 +56,7 @@ export function upsertQaContext(params: UpsertQaContextParams): {
         eq(context.entityId, entityId)
       )
     )
-    .get();
+    )[0];
 
   let contextId: string;
   let created = false;
@@ -67,14 +67,14 @@ export function upsertQaContext(params: UpsertQaContextParams): {
       ? existing.content + "\n" + qaBlock
       : qaBlock;
 
-    db.update(context)
+    await db.update(context)
       .set({
         content: newContent,
         tokenCount: estimateTokens(newContent),
         updatedAt: new Date().toISOString(),
       })
       .where(eq(context.id, existing.id))
-      .run();
+      ;
 
     contextId = existing.id;
   } else {
@@ -82,7 +82,7 @@ export function upsertQaContext(params: UpsertQaContextParams): {
     const header = `# QA Knowledge: ${entityName}\n\nResolved questions and answers for ${entityName}.\n\n`;
     const fullContent = header + qaBlock;
 
-    const [inserted] = db
+    const [inserted] = await db
       .insert(context)
       .values({
         workspaceId,
@@ -97,14 +97,14 @@ export function upsertQaContext(params: UpsertQaContextParams): {
         isActive: true,
       })
       .returning()
-      .all();
+      ;
 
     contextId = inserted.id;
     created = true;
   }
 
   // Link to matching skills as supplementary (if not already linked)
-  linkToMatchingSkills(workspaceId, contextId, entityName);
+  await linkToMatchingSkills(workspaceId, contextId, entityName);
 
   // Invalidate context cache so next generation picks up the new content
   invalidateWorkspaceContextCache(workspaceId);
@@ -126,16 +126,16 @@ export function upsertQaContext(params: UpsertQaContextParams): {
   return { contextId, created };
 }
 
-function linkToMatchingSkills(
+async function linkToMatchingSkills(
   workspaceId: string,
   contextId: string,
   entityName: string
-): void {
-  const matched = matchSkills(workspaceId, entityName);
+): Promise<void> {
+  const matched = await matchSkills(workspaceId, entityName);
 
   for (const s of matched) {
     // Check if already linked
-    const exists = db
+    const exists = (await db
       .select({ id: skillContext.id })
       .from(skillContext)
       .where(
@@ -144,10 +144,10 @@ function linkToMatchingSkills(
           eq(skillContext.contextId, contextId)
         )
       )
-      .get();
+      )[0];
 
     if (!exists) {
-      db.insert(skillContext)
+      await db.insert(skillContext)
         .values({
           skillId: s.id,
           contextId,
@@ -155,7 +155,7 @@ function linkToMatchingSkills(
           sortOrder: 999,
           notes: "Auto-linked from QA knowledge",
         })
-        .run();
+        ;
     }
   }
 }

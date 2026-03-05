@@ -10,22 +10,22 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   const params = await ctx.params;
   const { threadId } = params;
 
-  const thread = db
+  const thread = (await db
     .select()
     .from(commentThread)
     .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!thread) {
     return NextResponse.json({ error: "Thread not found" }, { status: 404 });
   }
 
-  const comments = db
+  const comments = await db
     .select()
     .from(comment)
     .where(eq(comment.threadId, threadId))
     .orderBy(asc(comment.createdAt))
-    .all();
+    ;
 
   return NextResponse.json({ ...thread, comments });
 });
@@ -41,11 +41,11 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId }) => {
   }
 
   // Get existing thread before update
-  const existingThread = db
+  const existingThread = (await db
     .select()
     .from(commentThread)
     .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   const updateData: Record<string, unknown> = {
     ...parsed.data,
@@ -60,12 +60,12 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId }) => {
     }
   }
 
-  const [updated] = db
+  const [updated] = await db
     .update(commentThread)
     .set(updateData)
     .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId)))
     .returning()
-    .all();
+    ;
 
   if (!updated) {
     return NextResponse.json({ error: "Thread not found" }, { status: 404 });
@@ -91,9 +91,9 @@ export const DELETE = withAuth(async (_req, ctx, { workspaceId }) => {
   const params = await ctx.params;
   const { threadId } = params;
 
-  db.delete(commentThread)
+  await db.delete(commentThread)
     .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId)))
-    .run();
+    ;
 
   return NextResponse.json({ success: true });
 }, { requiredRole: "editor" });

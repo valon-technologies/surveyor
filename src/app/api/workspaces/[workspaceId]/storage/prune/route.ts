@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
-import { getSqliteDb } from "@/lib/db";
+import { db } from "@/lib/db";
+import { chatSession, generation } from "@/lib/db/schema";
+import { sql, lt } from "drizzle-orm";
 import { z } from "zod/v4";
 
 const pruneSchema = z.object({
@@ -20,47 +22,34 @@ export const POST = withAuth(
     }
 
     const { target, olderThanDays } = parsed.data;
-    const sqlite = getSqliteDb();
-
     let deleted = 0;
 
-    const ageClause = olderThanDays
-      ? `AND created_at < datetime('now', '-${olderThanDays} days')`
-      : "";
+    const cutoff = olderThanDays
+      ? new Date(Date.now() - olderThanDays * 86400000).toISOString()
+      : null;
 
     switch (target) {
       case "chat_sessions": {
-        // Delete chat sessions (cascade deletes messages via FK)
-        const result = sqlite
-          .prepare(
-            `DELETE FROM chat_session WHERE 1=1 ${ageClause}`
-          )
-          .run();
-        deleted = result.changes;
+        const condition = cutoff ? lt(chatSession.createdAt, cutoff) : undefined;
+        const result = await db.delete(chatSession).where(condition);
+        deleted = (result as unknown as { rowCount?: number }).rowCount ?? 0;
         break;
       }
       case "generations": {
-        const result = sqlite
-          .prepare(
-            `DELETE FROM generation WHERE 1=1 ${ageClause}`
-          )
-          .run();
-        deleted = result.changes;
+        const condition = cutoff ? lt(generation.createdAt, cutoff) : undefined;
+        const result = await db.delete(generation).where(condition);
+        deleted = (result as unknown as { rowCount?: number }).rowCount ?? 0;
         break;
       }
       case "prompt_snapshots": {
-        const result = sqlite
-          .prepare(
-            `UPDATE generation SET prompt_snapshot = NULL WHERE prompt_snapshot IS NOT NULL ${ageClause}`
-          )
-          .run();
-        deleted = result.changes;
+        const condition = cutoff
+          ? sql`${generation.promptSnapshot} IS NOT NULL AND ${generation.createdAt} < ${cutoff}`
+          : sql`${generation.promptSnapshot} IS NOT NULL`;
+        const result = await db.update(generation).set({ promptSnapshot: null }).where(condition);
+        deleted = (result as unknown as { rowCount?: number }).rowCount ?? 0;
         break;
       }
     }
-
-    // VACUUM requires an exclusive lock that blocks all concurrent reads/writes.
-    // Run manually during maintenance windows: sqlite3 surveyor.db "VACUUM;"
 
     return NextResponse.json({ deleted });
   },

@@ -361,41 +361,41 @@ function buildStrategyNotes(
  * Generate a scaffold for a target entity. Uses heuristic analysis of
  * source-target field overlap, discriminator detection, and FK mapping.
  */
-export function generateScaffold(
+export async function generateScaffold(
   workspaceId: string,
   entityId: string,
-): EntityScaffoldData {
+): Promise<EntityScaffoldData> {
   // Load target entity
-  const targetEntity = db
+  const targetEntity = (await db
     .select()
     .from(entity)
     .where(and(eq(entity.id, entityId), eq(entity.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!targetEntity) {
     throw new Error(`Entity ${entityId} not found`);
   }
 
   // Load target fields
-  const targetFields = db
+  const targetFields = await db
     .select()
     .from(field)
     .where(eq(field.entityId, entityId))
-    .all();
+    ;
 
   const targetFieldNames = targetFields.map((f) => f.name);
 
   // Load source entities and fields
-  const sourceEntities = db
+  const sourceEntities = await db
     .select()
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-    .all();
+    ;
 
-  const allFields = db
+  const allFields = await db
     .select()
     .from(field)
-    .all();
+    ;
 
   const sourceData = sourceEntities.map((se) => ({
     name: se.name,
@@ -405,11 +405,11 @@ export function generateScaffold(
   }));
 
   // Load all target entity names for FK detection
-  const allTargetEntities = db
+  const allTargetEntities = await db
     .select({ name: entity.name })
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target")))
-    .all();
+    ;
 
   const allTargetEntityNames = allTargetEntities.map((e) => e.name);
 
@@ -448,11 +448,11 @@ export function generateScaffold(
 /**
  * Load cached scaffold from DB. Returns null if stale or missing.
  */
-export function loadCachedScaffold(
+export async function loadCachedScaffold(
   workspaceId: string,
   entityId: string,
-): EntityScaffoldData | null {
-  const row = db
+): Promise<EntityScaffoldData | null> {
+  const row = (await db
     .select()
     .from(entityScaffold)
     .where(
@@ -462,7 +462,7 @@ export function loadCachedScaffold(
         eq(entityScaffold.isStale, false),
       )
     )
-    .get();
+    )[0];
 
   if (!row) return null;
 
@@ -481,16 +481,16 @@ export function loadCachedScaffold(
 /**
  * Persist scaffold to DB for reuse across regenerations.
  */
-export function persistScaffold(
+export async function persistScaffold(
   workspaceId: string,
   entityId: string,
   scaffold: EntityScaffoldData,
   opts?: { generationId?: string; batchRunId?: string },
-): void {
+): Promise<void> {
   const now = new Date().toISOString();
 
   // Upsert: delete existing, insert new
-  const existing = db
+  const existing = (await db
     .select({ id: entityScaffold.id })
     .from(entityScaffold)
     .where(
@@ -499,10 +499,10 @@ export function persistScaffold(
         eq(entityScaffold.entityId, entityId),
       )
     )
-    .get();
+    )[0];
 
   if (existing) {
-    db.update(entityScaffold)
+    await db.update(entityScaffold)
       .set({
         topology: scaffold.topology,
         sourceTables: scaffold.sourceTables as any,
@@ -517,9 +517,9 @@ export function persistScaffold(
         updatedAt: now,
       })
       .where(eq(entityScaffold.id, existing.id))
-      .run();
+      ;
   } else {
-    db.insert(entityScaffold)
+    await db.insert(entityScaffold)
       .values({
         workspaceId,
         entityId,
@@ -536,19 +536,19 @@ export function persistScaffold(
         createdAt: now,
         updatedAt: now,
       })
-      .run();
+      ;
   }
 }
 
 /**
  * Mark scaffolds as stale for a workspace (e.g., when schemas change).
  */
-export function markScaffoldsStale(workspaceId: string, entityIds?: string[]): void {
+export async function markScaffoldsStale(workspaceId: string, entityIds?: string[]): Promise<void> {
   const now = new Date().toISOString();
 
   if (entityIds?.length) {
     for (const eid of entityIds) {
-      db.update(entityScaffold)
+      await db.update(entityScaffold)
         .set({ isStale: true, updatedAt: now })
         .where(
           and(
@@ -556,12 +556,12 @@ export function markScaffoldsStale(workspaceId: string, entityIds?: string[]): v
             eq(entityScaffold.entityId, eid),
           )
         )
-        .run();
+        ;
     }
   } else {
-    db.update(entityScaffold)
+    await db.update(entityScaffold)
       .set({ isStale: true, updatedAt: now })
       .where(eq(entityScaffold.workspaceId, workspaceId))
-      .run();
+      ;
   }
 }

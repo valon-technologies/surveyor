@@ -31,21 +31,21 @@ export async function evaluateResolution(
   const { workspaceId, questionId, resolverUserId, resolverName, resolutionText } = input;
 
   // 1. Load question — guard: only evaluate LLM-asked questions
-  const q = db
+  const q = (await db
     .select()
     .from(question)
     .where(and(eq(question.id, questionId), eq(question.workspaceId, workspaceId)))
-    .get();
+    )[0];
 
   if (!q || q.askedBy !== "llm") return;
 
   // 2. Count existing AI follow-ups — enforce loop cap
-  const replies = db
+  const replies = await db
     .select()
     .from(questionReply)
     .where(eq(questionReply.questionId, questionId))
     .orderBy(asc(questionReply.createdAt))
-    .all();
+    ;
 
   const aiFollowupCount = replies.filter(
     (r) => r.authorRole === "llm" && !r.isResolution
@@ -58,18 +58,18 @@ export async function evaluateResolution(
   let fieldName = "";
 
   if (q.entityId) {
-    const e = db.select({ name: entity.name }).from(entity)
-      .where(eq(entity.id, q.entityId)).get();
+    const [e] = await db.select({ name: entity.name }).from(entity)
+      .where(eq(entity.id, q.entityId)).limit(1);
     entityName = e?.name || "";
   }
   if (q.fieldId) {
-    const f = db.select({ name: field.name }).from(field)
-      .where(eq(field.id, q.fieldId)).get();
+    const [f] = await db.select({ name: field.name }).from(field)
+      .where(eq(field.id, q.fieldId)).limit(1);
     fieldName = f?.name || "";
   }
 
   // 4. Resolve LLM provider using the resolver's API key
-  const { provider } = resolveProvider(resolverUserId);
+  const { provider } = await resolveProvider(resolverUserId);
 
   // 5. Build conversation context from replies
   const threadContext = replies
@@ -128,7 +128,7 @@ Evaluate whether this resolution is specific enough to close the question.`;
   // 8. Post AI follow-up reply
   const followUpBody = `@${resolverName} ${result.followUp}`;
 
-  db.insert(questionReply)
+  await db.insert(questionReply)
     .values({
       questionId,
       authorId: null,
@@ -137,21 +137,21 @@ Evaluate whether this resolution is specific enough to close the question.`;
       body: followUpBody,
       isResolution: false,
     })
-    .run();
+    ;
 
   // 9. Reopen the question (only if still resolved — human may have already reopened)
-  const current = db
+  const current = (await db
     .select({ status: question.status, replyCount: question.replyCount })
     .from(question)
     .where(eq(question.id, questionId))
-    .get();
+    )[0];
 
   if (!current) return;
 
   const now = new Date().toISOString();
 
   if (current.status === "resolved") {
-    db.update(question)
+    await db.update(question)
       .set({
         status: "open",
         resolvedBy: null,
@@ -163,16 +163,16 @@ Evaluate whether this resolution is specific enough to close the question.`;
         updatedAt: now,
       })
       .where(eq(question.id, questionId))
-      .run();
+      ;
   } else {
     // Already open — just bump the reply count
-    db.update(question)
+    await db.update(question)
       .set({
         replyCount: current.replyCount + 1,
         updatedAt: now,
       })
       .where(eq(question.id, questionId))
-      .run();
+      ;
   }
 }
 

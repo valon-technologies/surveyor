@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useDashboardStats } from "@/queries/dashboard-queries";
 import { CompactStatsRow } from "@/components/dashboard/compact-stats-row";
 import { Leaderboard } from "@/components/dashboard/leaderboard";
+import { DomainLeaders } from "@/components/dashboard/domain-leaders";
 import { EntityProgressTable } from "@/components/dashboard/entity-progress-table";
 import { MilestoneProgress } from "@/components/dashboard/milestone-progress";
 import { StatusDistribution } from "@/components/dashboard/status-distribution";
@@ -78,6 +79,10 @@ export default function DashboardPage() {
               }
             }
           />
+
+          {stats.domainLeaders && stats.domainLeaders.length > 0 && (
+            <DomainLeaders data={stats.domainLeaders} />
+          )}
 
           {/* Milestone + Status Distribution */}
           {(stats.milestoneStats.length > 0 || stats.totalEntities > 0) && (

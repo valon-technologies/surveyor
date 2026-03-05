@@ -84,22 +84,22 @@ interface EntityBatch {
 
 // ─── Batch Run Creation ────────────────────────────────────────
 
-export function createBulkChatRun(input: BulkChatInput): {
+export async function createBulkChatRun(input: BulkChatInput): Promise<{
   batchRunId: string;
   entities: EntityBatch[];
   totalFields: number;
-} {
+}> {
   const { workspaceId, userId, entityIds } = input;
   const DEFAULT_INCLUDE: MappingStatus[] = ["unmapped", "unreviewed", "punted", "needs_discussion", "excluded"];
   const includeStatuses = new Set(input.includeStatuses ?? DEFAULT_INCLUDE);
 
   // Find target entities
-  let targetEntities = db
+  let targetEntities = await db
     .select()
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target")))
     .orderBy(entity.sortOrder)
-    .all();
+    ;
 
   if (entityIds?.length) {
     const idSet = new Set(entityIds);
@@ -112,7 +112,7 @@ export function createBulkChatRun(input: BulkChatInput): {
 
   // Build targetFieldId → current status map
   const fieldStatusMap = new Map<string, MappingStatus>();
-  const existing = db
+  const existing = await db
     .select({ targetFieldId: fieldMapping.targetFieldId, status: fieldMapping.status })
     .from(fieldMapping)
     .where(
@@ -121,7 +121,7 @@ export function createBulkChatRun(input: BulkChatInput): {
         eq(fieldMapping.isLatest, true)
       )
     )
-    .all();
+    ;
   for (const m of existing) fieldStatusMap.set(m.targetFieldId, m.status as MappingStatus);
 
   // Count eligible fields per entity
@@ -129,11 +129,11 @@ export function createBulkChatRun(input: BulkChatInput): {
   let totalFields = 0;
 
   for (const e of targetEntities) {
-    const fields = db
+    const fields = await db
       .select()
       .from(field)
       .where(eq(field.entityId, e.id))
-      .all();
+      ;
 
     const eligible = fields.filter((f) => {
       const currentStatus = fieldStatusMap.get(f.id) ?? "unmapped";
@@ -158,7 +158,7 @@ export function createBulkChatRun(input: BulkChatInput): {
   const batchRunId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  db.insert(batchRun)
+  await db.insert(batchRun)
     .values({
       id: batchRunId,
       workspaceId,
@@ -177,7 +177,7 @@ export function createBulkChatRun(input: BulkChatInput): {
       createdAt: now,
       updatedAt: now,
     })
-    .run();
+    ;
 
   return { batchRunId, entities, totalFields };
 }
@@ -199,29 +199,29 @@ export async function executeBulkChatRun(
   let completedFields = 0;
 
   // Resolve provider once for the whole run
-  const { provider, providerName } = resolveProvider(
+  const { provider, providerName } = await resolveProvider(
     userId,
     input.preferredProvider
   );
 
   // Load workspace settings for BQ config
-  const ws = db
+  const ws = (await db
     .select({ settings: workspace.settings })
     .from(workspace)
     .where(eq(workspace.id, workspaceId))
-    .get();
+    )[0];
   const wsSettings = ws?.settings as Record<string, unknown> | null;
   const bqConfig = wsSettings?.bigquery as BigQueryConfig | undefined;
 
   try {
-    db.update(batchRun)
+    await db.update(batchRun)
       .set({ status: "running", startedAt: now(), updatedAt: now() })
       .where(eq(batchRun.id, batchRunId))
-      .run();
+      ;
 
     for (const batch of entities) {
       // Check for cancellation before each entity
-      const currentRun = db.select({ status: batchRun.status }).from(batchRun).where(eq(batchRun.id, batchRunId)).get();
+      const [currentRun] = await db.select({ status: batchRun.status }).from(batchRun).where(eq(batchRun.id, batchRunId)).limit(1);
       if (currentRun?.status === "cancelled") {
         console.log(`[bulk-chat] Run ${batchRunId} cancelled, stopping after ${completedEntities} entities`);
         break;
@@ -233,7 +233,7 @@ export async function executeBulkChatRun(
       try {
         // Load eligible fields for this entity (re-query to reflect prior field completions)
         const fieldStatusMap = new Map<string, MappingStatus>();
-        const latestMappingsForFilter = db
+        const latestMappingsForFilter = await db
           .select({ targetFieldId: fieldMapping.targetFieldId, status: fieldMapping.status })
           .from(fieldMapping)
           .where(
@@ -242,15 +242,15 @@ export async function executeBulkChatRun(
               eq(fieldMapping.isLatest, true)
             )
           )
-          .all();
+          ;
         for (const m of latestMappingsForFilter) fieldStatusMap.set(m.targetFieldId, m.status as MappingStatus);
 
-        const entityFields = db
+        const entityFields = (await db
           .select()
           .from(field)
           .where(eq(field.entityId, batch.entityId))
           .orderBy(field.sortOrder)
-          .all()
+          )
           .filter((f) => {
             const currentStatus = fieldStatusMap.get(f.id) ?? "unmapped";
             return includeStatuses.has(currentStatus);
@@ -288,10 +288,10 @@ export async function executeBulkChatRun(
 
           // Update progress after each field
           try {
-            db.update(batchRun)
+            await db.update(batchRun)
               .set({ completedFields, updatedAt: now() })
               .where(eq(batchRun.id, batchRunId))
-              .run();
+              ;
           } catch {
             // Non-critical
           }
@@ -304,7 +304,7 @@ export async function executeBulkChatRun(
 
           // Synthesize entity pipeline YAML from completed field mappings
           try {
-            synthesizePipelineFromMappings({
+            await synthesizePipelineFromMappings({
               workspaceId,
               entityId: batch.entityId,
               entityName: batch.entityName,
@@ -352,7 +352,7 @@ export async function executeBulkChatRun(
 
       // Update entity progress
       try {
-        db.update(batchRun)
+        await db.update(batchRun)
           .set({
             completedEntities,
             failedEntities,
@@ -360,19 +360,19 @@ export async function executeBulkChatRun(
             updatedAt: now(),
           })
           .where(eq(batchRun.id, batchRunId))
-          .run();
+          ;
       } catch {
         // Non-critical
       }
     }
 
     // Mark as completed (preserve "cancelled" status if set)
-    const finalCheck = db.select({ status: batchRun.status }).from(batchRun).where(eq(batchRun.id, batchRunId)).get();
+    const [finalCheck] = await db.select({ status: batchRun.status }).from(batchRun).where(eq(batchRun.id, batchRunId)).limit(1);
     const finalStatus = finalCheck?.status === "cancelled"
       ? "cancelled"
       : failedEntities === entities.length ? "failed" : "completed";
 
-    db.update(batchRun)
+    await db.update(batchRun)
       .set({
         status: finalStatus,
         completedEntities,
@@ -382,11 +382,11 @@ export async function executeBulkChatRun(
         updatedAt: now(),
       })
       .where(eq(batchRun.id, batchRunId))
-      .run();
+      ;
   } catch (error) {
     console.error("[bulk-chat] Fatal error:", error);
     try {
-      db.update(batchRun)
+      await db.update(batchRun)
         .set({
           status: "failed",
           completedEntities,
@@ -396,7 +396,7 @@ export async function executeBulkChatRun(
           updatedAt: now(),
         })
         .where(eq(batchRun.id, batchRunId))
-        .run();
+        ;
     } catch {
       console.error("[bulk-chat] Failed to mark batch run as failed:", batchRunId);
     }
@@ -412,7 +412,7 @@ interface ProcessFieldInput {
   entityName: string;
   targetField: typeof field.$inferSelect;
   batchRunId: string;
-  provider: ReturnType<typeof resolveProvider>["provider"];
+  provider: Awaited<ReturnType<typeof resolveProvider>>["provider"];
   providerName: string;
   model?: string;
   bqConfig?: BigQueryConfig;
@@ -434,15 +434,15 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
 
   // ── 1. Load context for this field ───────────────────────────
 
-  const targetEntity = db
+  const targetEntity = (await db
     .select()
     .from(entity)
     .where(eq(entity.id, entityId))
-    .get();
+    )[0];
   if (!targetEntity) return false;
 
   // Current mapping (if any)
-  const mapping = db
+  const mapping = (await db
     .select()
     .from(fieldMapping)
     .where(
@@ -452,54 +452,54 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
         eq(fieldMapping.isLatest, true)
       )
     )
-    .get();
+    )[0];
 
   // Resolve source names for current mapping
   let sourceEntityName: string | null = null;
   let sourceFieldName: string | null = null;
   if (mapping?.sourceEntityId) {
-    const se = db
+    const se = (await db
       .select()
       .from(entity)
       .where(eq(entity.id, mapping.sourceEntityId))
-      .get();
+      )[0];
     sourceEntityName = se?.displayName || se?.name || null;
   }
   if (mapping?.sourceFieldId) {
-    const sf = db
+    const sf = (await db
       .select()
       .from(field)
       .where(eq(field.id, mapping.sourceFieldId))
-      .get();
+      )[0];
     sourceFieldName = sf?.displayName || sf?.name || null;
   }
 
   // Source schema stats
-  const sourceEntities = db
+  const sourceEntities = await db
     .select({ id: entity.id, name: entity.name, displayName: entity.displayName })
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-    .all();
+    ;
 
   let totalSourceFields = 0;
   for (const se of sourceEntities) {
-    totalSourceFields += db
+    totalSourceFields += (await db
       .select({ name: field.name })
       .from(field)
       .where(eq(field.entityId, se.id))
-      .all().length;
+      ).length;
   }
 
   // Sibling fields (fresh from DB — reflects prior field mappings)
-  const siblingTargetFields = db
+  const siblingTargetFields = (await db
     .select()
     .from(field)
     .where(eq(field.entityId, entityId))
     .orderBy(field.sortOrder)
-    .all()
+    )
     .filter((f) => f.id !== targetField.id);
 
-  const latestMappings = db
+  const latestMappings = await db
     .select()
     .from(fieldMapping)
     .where(
@@ -508,20 +508,20 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
         eq(fieldMapping.isLatest, true)
       )
     )
-    .all();
+    ;
 
-  const siblingFields = siblingTargetFields.map((sf) => {
+  const siblingFields = await Promise.all(siblingTargetFields.map(async (sf) => {
     const m = latestMappings.find((sm) => sm.targetFieldId === sf.id);
     let sourceInfo: string | null = null;
     if (m?.sourceEntityId) {
       const se = sourceEntities.find((e) => e.id === m.sourceEntityId);
       let sfName: string | null = null;
       if (m.sourceFieldId) {
-        const sfld = db
+        const sfld = (await db
           .select({ name: field.name })
           .from(field)
           .where(eq(field.id, m.sourceFieldId))
-          .get();
+          )[0];
         sfName = sfld?.name || null;
       }
       sourceInfo = se
@@ -538,7 +538,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
       reasoning: m?.reasoning ?? null,
       confidence: m?.confidence ?? null,
     };
-  });
+  }));
 
   // Derive primary source + schema stats
   const sourceCounts = new Map<string, number>();
@@ -646,7 +646,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
   }
 
   // Entity learnings
-  const structuredLearnings = db
+  const structuredLearnings = await db
     .select({ content: learning.content, fieldName: learning.fieldName, scope: learning.scope })
     .from(learning)
     .where(
@@ -657,7 +657,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
     )
     .orderBy(desc(learning.createdAt))
     .limit(10)
-    .all();
+    ;
 
   const entityLearnings: { fieldName: string; correction: string }[] = [];
   const crossEntityLearnings: {
@@ -681,7 +681,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
   }
 
   // Load workspace-scoped rules for prompt injection
-  const workspaceRules = db
+  const workspaceRules = (await db
     .select({ content: learning.content })
     .from(learning)
     .where(
@@ -692,7 +692,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
     )
     .orderBy(desc(learning.createdAt))
     .limit(20)
-    .all()
+    )
     .map((l) => l.content);
 
   // Entity pipeline structure
@@ -705,13 +705,13 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
       }
     | undefined;
 
-  const pipeline = db
+  const pipeline = (await db
     .select()
     .from(entityPipeline)
     .where(
       and(eq(entityPipeline.entityId, entityId), eq(entityPipeline.isLatest, true))
     )
-    .get();
+    )[0];
 
   const unmatchedPipelineSources: string[] = [];
 
@@ -739,10 +739,10 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
   }
 
   // Assemble context (RAG mode — metadata only)
-  const assembledCtx = assembleContext(workspaceId, targetEntity.name, 0);
+  const assembledCtx = await assembleContext(workspaceId, targetEntity.name, 0);
 
   // Answered questions for this field/entity — prevents re-flagging resolved gaps
-  const answeredQs = db
+  const answeredQs = (await db
     .select({
       question: question.question,
       answer: question.answer,
@@ -757,13 +757,13 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
         eq(question.status, "resolved")
       )
     )
-    .all()
+    )
     .filter((q) => q.answer)
     .map((q) => ({ question: q.question, answer: q.answer!, fieldName: q.fieldName }));
 
   // ── 2. Build prompt ──────────────────────────────────────────
 
-  const { systemMessage, contextMessage } = buildChatPrompt({
+  const { systemMessage, contextMessage } = await buildChatPrompt({
     entityName: targetEntity.displayName || targetEntity.name,
     entityDescription: targetEntity.description,
     targetField: {
@@ -827,7 +827,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
   if (!fieldMappingId) {
     // Create a placeholder mapping so the session has something to link to
     fieldMappingId = crypto.randomUUID();
-    db.insert(fieldMapping)
+    await db.insert(fieldMapping)
       .values({
         id: fieldMappingId,
         workspaceId,
@@ -841,10 +841,10 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
         createdAt: sessionNow,
         updatedAt: sessionNow,
       })
-      .run();
+      ;
   }
 
-  db.insert(chatSession)
+  await db.insert(chatSession)
     .values({
       id: sessionId,
       workspaceId,
@@ -858,18 +858,18 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
       createdAt: sessionNow,
       updatedAt: sessionNow,
     })
-    .run();
+    ;
 
   // Save system message
   const fullSystemMessage = systemMessage + "\n\n" + finalContextMessage;
-  db.insert(chatMessage)
+  await db.insert(chatMessage)
     .values({
       sessionId,
       role: "system",
       content: fullSystemMessage,
       createdAt: sessionNow,
     })
-    .run();
+    ;
 
   // ── 4. Run chat with tools ───────────────────────────────────
 
@@ -885,7 +885,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
   }
 
   // Save kickoff user message
-  db.insert(chatMessage)
+  await db.insert(chatMessage)
     .values({
       sessionId,
       role: "user",
@@ -893,7 +893,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
       metadata: {},
       createdAt: new Date().toISOString(),
     })
-    .run();
+    ;
 
   // Run the LLM tool loop
   const messages: Array<{
@@ -975,19 +975,19 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
       let llmContent: string;
 
       if (tc.name === "search_source_schema") {
-        const result = executeSourceSchemaSearch(
+        const result = await executeSourceSchemaSearch(
           tc.input as unknown as SourceSchemaInput,
           workspaceId
         );
         llmContent = formatSourceSchemaForLLM(result);
       } else if (tc.name === "get_reference_docs") {
-        const result = executeReferenceDocRetrieval(
+        const result = await executeReferenceDocRetrieval(
           tc.input as unknown as ReferenceDocsInput,
           workspaceId
         );
         llmContent = formatReferenceDocsForLLM(result);
       } else if (tc.name === "get_sibling_mappings") {
-        const result = executeSiblingMappingLookup(
+        const result = await executeSiblingMappingLookup(
           tc.input as unknown as SiblingMappingsInput,
           workspaceId,
           entityId,
@@ -995,7 +995,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
         );
         llmContent = formatSiblingMappingsForLLM(result);
       } else if (tc.name === "get_mapping_examples") {
-        const result = executeMappingExampleSearch(
+        const result = await executeMappingExampleSearch(
           tc.input as unknown as MappingExamplesInput,
           workspaceId,
           entityId
@@ -1037,7 +1037,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
   const msgNow = new Date().toISOString();
 
   // Save assistant message
-  db.insert(chatMessage)
+  await db.insert(chatMessage)
     .values({
       sessionId,
       role: "assistant",
@@ -1048,10 +1048,10 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
       },
       createdAt: msgNow,
     })
-    .run();
+    ;
 
   // Extract and persist CONTEXT GAP flags
-  extractAndPersistContextGaps(fullContent, {
+  await extractAndPersistContextGaps(fullContent, {
     workspaceId,
     entityId,
     fieldId: targetField.id,
@@ -1060,7 +1060,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
   });
 
   // Update session
-  db.update(chatSession)
+  await db.update(chatSession)
     .set({
       messageCount: 3, // system + user kickoff + assistant response
       lastMessageAt: msgNow,
@@ -1068,14 +1068,14 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
       updatedAt: msgNow,
     })
     .where(eq(chatSession.id, sessionId))
-    .run();
+    ;
 
   // Apply mapping update if one was proposed
   if (mappingUpdate) {
     // Resolve source entity/field names to IDs
-    const enriched = resolveMappingNames(mappingUpdate, workspaceId);
+    const enriched = await resolveMappingNames(mappingUpdate, workspaceId);
 
-    db.update(fieldMapping)
+    await db.update(fieldMapping)
       .set({
         status: enriched.status as string || "unreviewed",
         mappingType: enriched.mappingType as string || null,
@@ -1093,7 +1093,7 @@ async function processField(input: ProcessFieldInput): Promise<boolean> {
         updatedAt: msgNow,
       })
       .where(eq(fieldMapping.id, fieldMappingId!))
-      .run();
+      ;
 
     return true;
   }
@@ -1110,21 +1110,21 @@ function matchName(a: string, b: string): boolean {
   );
 }
 
-function resolveMappingNames(
+async function resolveMappingNames(
   update: Record<string, unknown>,
   workspaceId: string
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const enriched = { ...update };
   const entityName = update.sourceEntityName as string | undefined;
   const fieldName = update.sourceFieldName as string | undefined;
 
   if (!entityName && !fieldName) return enriched;
 
-  const sourceEntities = db
+  const sourceEntities = await db
     .select({ id: entity.id, name: entity.name, displayName: entity.displayName })
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-    .all();
+    ;
 
   let resolvedEntityId: string | null = null;
   if (entityName) {
@@ -1139,15 +1139,14 @@ function resolveMappingNames(
 
   if (fieldName) {
     const candidates = resolvedEntityId
-      ? db
+      ? await db
           .select({ id: field.id, name: field.name, entityId: field.entityId })
           .from(field)
           .where(eq(field.entityId, resolvedEntityId))
-          .all()
-      : db
+      : (await db
           .select({ id: field.id, name: field.name, entityId: field.entityId })
           .from(field)
-          .all()
+          )
           .filter((f) => sourceEntities.some((e) => e.id === f.entityId));
 
     const match = candidates.find((f) => matchName(f.name, fieldName));

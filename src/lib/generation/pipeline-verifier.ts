@@ -56,13 +56,13 @@ export async function verifyAndCorrectPipeline(
   const now = new Date().toISOString();
 
   // Load latest pipeline for entity
-  const pipeline = db
+  const pipeline = (await db
     .select()
     .from(entityPipeline)
     .where(
       and(eq(entityPipeline.entityId, entityId), eq(entityPipeline.isLatest, true)),
     )
-    .get();
+    )[0];
 
   if (!pipeline) {
     return { status: "skipped", error: "No pipeline found" };
@@ -73,10 +73,10 @@ export async function verifyAndCorrectPipeline(
   const columns = (parsed?.columns as PipelineColumn[]) ?? [];
 
   if (columns.length === 0) {
-    db.update(entityPipeline)
+    await db.update(entityPipeline)
       .set({ sqlValidationStatus: "skipped", sqlValidationAt: now, updatedAt: now })
       .where(eq(entityPipeline.id, pipeline.id))
-      .run();
+      ;
     return { status: "skipped", error: "No columns in pipeline" };
   }
 
@@ -95,7 +95,7 @@ export async function verifyAndCorrectPipeline(
     sql = renderExecutableSql(enriched, sqlConfig, 0);
   } catch (renderErr) {
     const msg = renderErr instanceof Error ? renderErr.message : String(renderErr);
-    db.update(entityPipeline)
+    await db.update(entityPipeline)
       .set({
         sqlValidationStatus: "failed",
         sqlValidationError: `Render error: ${msg}`.slice(0, 2000),
@@ -103,14 +103,14 @@ export async function verifyAndCorrectPipeline(
         updatedAt: now,
       })
       .where(eq(entityPipeline.id, pipeline.id))
-      .run();
+      ;
     return { status: "flagged", error: msg };
   }
 
   const dryResult = await dryRunQuery(bqConfig.projectId, sql);
 
   if (dryResult.valid) {
-    db.update(entityPipeline)
+    await db.update(entityPipeline)
       .set({
         sqlValidationStatus: "passed",
         sqlValidationError: null,
@@ -118,7 +118,7 @@ export async function verifyAndCorrectPipeline(
         updatedAt: now,
       })
       .where(eq(entityPipeline.id, pipeline.id))
-      .run();
+      ;
     console.log(`[verifier] SQL validation passed for "${input.entityName}"`);
     return { status: "passed" };
   }
@@ -135,7 +135,7 @@ export async function verifyAndCorrectPipeline(
   const correctable = diagnosis.type === "column_not_found" || diagnosis.type === "table_not_found";
 
   if (!correctable || !input.userId) {
-    return flagPipeline(pipeline, enriched, diagnosis, workspaceId, entityId, now);
+    return await flagPipeline(pipeline, enriched, diagnosis, workspaceId, entityId, now);
   }
 
   // ── Phase C: LLM Correction (one attempt) ─────────────────────
@@ -209,14 +209,14 @@ function buildEnrichedPipeline(
  * Flag affected mappings as needs_discussion, nullify bad columns,
  * and mark pipeline as failed.
  */
-function flagPipeline(
+async function flagPipeline(
   pipeline: typeof entityPipeline.$inferSelect,
   enriched: EntityPipelineWithColumns,
   diagnosis: ReturnType<typeof diagnoseBqError>,
   workspaceId: string,
   entityId: string,
   now: string,
-): VerifyPipelineResult {
+): Promise<VerifyPipelineResult> {
   const flaggedColumns: string[] = [];
 
   if (diagnosis.badRefs.length > 0) {
@@ -232,13 +232,13 @@ function flagPipeline(
     }
 
     // Flag affected field mappings
-    flagFieldMappings(workspaceId, entityId, flaggedColumns, diagnosis.rawError, now);
+    await flagFieldMappings(workspaceId, entityId, flaggedColumns, diagnosis.rawError, now);
 
     // Nullify bad columns in pipeline and persist
     const { pipeline: cleaned } = nullifyBadColumns(enriched, diagnosis.badRefs);
     try {
       const cleanedYaml = rebuildYamlSpec(pipeline.yamlSpec, cleaned.columns);
-      db.update(entityPipeline)
+      await db.update(entityPipeline)
         .set({
           yamlSpec: cleanedYaml,
           sqlValidationStatus: "failed",
@@ -248,10 +248,10 @@ function flagPipeline(
           updatedAt: now,
         })
         .where(eq(entityPipeline.id, pipeline.id))
-        .run();
+        ;
     } catch {
       // Just mark as failed without modifying YAML
-      db.update(entityPipeline)
+      await db.update(entityPipeline)
         .set({
           sqlValidationStatus: "failed",
           sqlValidationError: diagnosis.rawError.slice(0, 2000),
@@ -259,11 +259,11 @@ function flagPipeline(
           updatedAt: now,
         })
         .where(eq(entityPipeline.id, pipeline.id))
-        .run();
+        ;
     }
   } else {
     // Non-column errors — just mark as failed
-    db.update(entityPipeline)
+    await db.update(entityPipeline)
       .set({
         sqlValidationStatus: "failed",
         sqlValidationError: diagnosis.rawError.slice(0, 2000),
@@ -271,7 +271,7 @@ function flagPipeline(
         updatedAt: now,
       })
       .where(eq(entityPipeline.id, pipeline.id))
-      .run();
+      ;
   }
 
   return {
@@ -284,20 +284,20 @@ function flagPipeline(
 /**
  * Mark field mappings referencing broken columns as needs_discussion.
  */
-function flagFieldMappings(
+async function flagFieldMappings(
   workspaceId: string,
   entityId: string,
   targetColumnNames: string[],
   errorMessage: string,
   now: string,
-): void {
+): Promise<void> {
   if (targetColumnNames.length === 0) return;
 
-  const entityFields = db
+  const entityFields = await db
     .select({ id: field.id, name: field.name })
     .from(field)
     .where(eq(field.entityId, entityId))
-    .all();
+    ;
 
   const nameToFieldId = new Map(entityFields.map((f) => [f.name.toLowerCase(), f.id]));
 
@@ -305,7 +305,7 @@ function flagFieldMappings(
     const fieldId = nameToFieldId.get(colName.toLowerCase());
     if (!fieldId) continue;
 
-    const fm = db
+    const fm = (await db
       .select()
       .from(fieldMapping)
       .where(
@@ -315,17 +315,17 @@ function flagFieldMappings(
           eq(fieldMapping.isLatest, true),
         ),
       )
-      .get();
+      )[0];
 
     if (fm) {
-      db.update(fieldMapping)
+      await db.update(fieldMapping)
         .set({
           status: "needs_discussion",
           notes: `SQL validation error: ${errorMessage.slice(0, 200)}. ${fm.notes || ""}`.trim(),
           updatedAt: now,
         })
         .where(eq(fieldMapping.id, fm.id))
-        .run();
+        ;
     }
   }
 }
@@ -344,7 +344,7 @@ async function attemptLLMCorrection(
   const { workspaceId, entityId, userId, preferredProvider, model } = input;
   if (!userId) return null;
 
-  const { provider } = resolveProvider(userId, preferredProvider);
+  const { provider } = await resolveProvider(userId, preferredProvider);
 
   // Build a compact correction prompt
   const affectedColumns: string[] = [];
@@ -359,7 +359,7 @@ async function attemptLLMCorrection(
   }
 
   // Load source field names for the source tables in this pipeline
-  const sourceInfo = buildSourceFieldList(workspaceId, enriched);
+  const sourceInfo = await buildSourceFieldList(workspaceId, enriched);
 
   const correctionPrompt = buildCorrectionPrompt(
     pipeline.yamlSpec,
@@ -369,23 +369,23 @@ async function attemptLLMCorrection(
   );
 
   // Build resolution context from the entity's fields
-  const targetFields = db
+  const targetFields = await db
     .select()
     .from(field)
     .where(eq(field.entityId, entityId))
     .orderBy(field.sortOrder)
-    .all();
+    ;
 
-  const sourceEntities = db
+  const sourceEntities = await db
     .select()
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-    .all();
+    ;
 
-  const allSourceFields = db
+  const allSourceFields = (await db
     .select()
     .from(field)
-    .all()
+    )
     .filter((f) => sourceEntities.some((e) => e.id === f.entityId));
 
   const resolutionCtx = {
@@ -441,7 +441,7 @@ async function attemptLLMCorrection(
   // Correction succeeded — persist new pipeline version
   const now = new Date().toISOString();
 
-  persistEntityPipeline({
+  await persistEntityPipeline({
     workspaceId,
     entityId,
     yamlResult: correctedParsed,
@@ -450,16 +450,16 @@ async function attemptLLMCorrection(
   });
 
   // Update the new latest pipeline's validation status
-  const newPipeline = db
+  const newPipeline = (await db
     .select()
     .from(entityPipeline)
     .where(
       and(eq(entityPipeline.entityId, entityId), eq(entityPipeline.isLatest, true)),
     )
-    .get();
+    )[0];
 
   if (newPipeline) {
-    db.update(entityPipeline)
+    await db.update(entityPipeline)
       .set({
         sqlValidationStatus: "passed",
         sqlValidationError: null,
@@ -468,7 +468,7 @@ async function attemptLLMCorrection(
         updatedAt: now,
       })
       .where(eq(entityPipeline.id, newPipeline.id))
-      .run();
+      ;
   }
 
   return { correctedColumns: affectedColumns };
@@ -526,15 +526,15 @@ function buildCorrectionPrompt(
 /**
  * Build a compact list of available source fields for each table in the pipeline.
  */
-function buildSourceFieldList(
+async function buildSourceFieldList(
   workspaceId: string,
   enriched: EntityPipelineWithColumns,
-): string {
-  const sourceEntities = db
+): Promise<string> {
+  const sourceEntities = await db
     .select()
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-    .all();
+    ;
 
   const lines: string[] = [];
 
@@ -552,11 +552,11 @@ function buildSourceFieldList(
       continue;
     }
 
-    const fields = db
+    const fields = await db
       .select({ name: field.name, dataType: field.dataType })
       .from(field)
       .where(eq(field.entityId, match.id))
-      .all();
+      ;
 
     lines.push(`### ${tableName} (alias: ${source.alias}) — ${fields.length} fields`);
     // Show all fields compactly

@@ -64,12 +64,12 @@ export function canAutoApply(proposal: SkillRefreshProposal): boolean {
  * Only executes additions of supplementary/reference contexts.
  * Returns the changes that were applied.
  */
-export function autoApplyProposal(
+export async function autoApplyProposal(
   workspaceId: string,
   skillId: string,
   proposal: SkillRefreshProposal,
   refreshId: string,
-): { applied: boolean; changesApplied: Record<string, unknown> } {
+): Promise<{ applied: boolean; changesApplied: Record<string, unknown> }> {
   if (!canAutoApply(proposal)) {
     return { applied: false, changesApplied: {} };
   }
@@ -82,7 +82,7 @@ export function autoApplyProposal(
     if (add.role !== "supplementary" && add.role !== "reference") continue;
 
     // Check if already linked
-    const existing = db
+    const existing = (await db
       .select({ id: skillContext.id })
       .from(skillContext)
       .where(
@@ -91,11 +91,11 @@ export function autoApplyProposal(
           eq(skillContext.contextId, add.contextId),
         )
       )
-      .get();
+      )[0];
 
     if (existing) continue;
 
-    db.insert(skillContext)
+    await db.insert(skillContext)
       .values({
         skillId,
         contextId: add.contextId,
@@ -103,7 +103,7 @@ export function autoApplyProposal(
         sortOrder: 999,
         notes: `Auto-applied from skill refresh ${refreshId}`,
       })
-      .run();
+      ;
 
     appliedChanges.push({
       type: "addition",
@@ -114,14 +114,14 @@ export function autoApplyProposal(
   }
 
   // Update refresh record
-  db.update(skillRefresh)
+  await db.update(skillRefresh)
     .set({
       status: "auto_applied",
       appliedChanges: { changes: appliedChanges },
       updatedAt: now,
     })
     .where(eq(skillRefresh.id, refreshId))
-    .run();
+    ;
 
   return {
     applied: appliedChanges.length > 0,
@@ -133,19 +133,19 @@ export function autoApplyProposal(
  * Apply a human-approved proposal to a skill.
  * Handles all change types including removals and role changes.
  */
-export function applyApprovedProposal(
+export async function applyApprovedProposal(
   workspaceId: string,
   skillId: string,
   proposal: SkillRefreshProposal,
   refreshId: string,
   reviewedBy: string,
-): { changesApplied: Record<string, unknown> } {
+): Promise<{ changesApplied: Record<string, unknown> }> {
   const now = new Date().toISOString();
   const appliedChanges: Record<string, unknown>[] = [];
 
   // Apply additions
   for (const add of proposal.additions) {
-    const existing = db
+    const existing = (await db
       .select({ id: skillContext.id })
       .from(skillContext)
       .where(
@@ -154,11 +154,11 @@ export function applyApprovedProposal(
           eq(skillContext.contextId, add.contextId),
         )
       )
-      .get();
+      )[0];
 
     if (existing) continue;
 
-    db.insert(skillContext)
+    await db.insert(skillContext)
       .values({
         skillId,
         contextId: add.contextId,
@@ -166,7 +166,7 @@ export function applyApprovedProposal(
         sortOrder: 999,
         notes: `Applied from skill refresh ${refreshId}`,
       })
-      .run();
+      ;
 
     appliedChanges.push({
       type: "addition",
@@ -178,7 +178,7 @@ export function applyApprovedProposal(
 
   // Apply removals
   for (const rem of proposal.removals) {
-    const sc = db
+    const sc = (await db
       .select({ id: skillContext.id })
       .from(skillContext)
       .where(
@@ -187,12 +187,12 @@ export function applyApprovedProposal(
           eq(skillContext.contextId, rem.contextId),
         )
       )
-      .get();
+      )[0];
 
     if (sc) {
-      db.delete(skillContext)
+      await db.delete(skillContext)
         .where(eq(skillContext.id, sc.id))
-        .run();
+        ;
 
       appliedChanges.push({
         type: "removal",
@@ -204,7 +204,7 @@ export function applyApprovedProposal(
 
   // Apply role changes
   for (const rc of proposal.roleChanges) {
-    const sc = db
+    const sc = (await db
       .select({ id: skillContext.id })
       .from(skillContext)
       .where(
@@ -213,13 +213,13 @@ export function applyApprovedProposal(
           eq(skillContext.contextId, rc.contextId),
         )
       )
-      .get();
+      )[0];
 
     if (sc) {
-      db.update(skillContext)
+      await db.update(skillContext)
         .set({ role: rc.toRole })
         .where(eq(skillContext.id, sc.id))
-        .run();
+        ;
 
       appliedChanges.push({
         type: "role_change",
@@ -232,7 +232,7 @@ export function applyApprovedProposal(
   }
 
   // Update refresh record
-  db.update(skillRefresh)
+  await db.update(skillRefresh)
     .set({
       status: "approved",
       appliedChanges: { changes: appliedChanges },
@@ -240,7 +240,7 @@ export function applyApprovedProposal(
       updatedAt: now,
     })
     .where(eq(skillRefresh.id, refreshId))
-    .run();
+    ;
 
   return { changesApplied: { changes: appliedChanges } };
 }

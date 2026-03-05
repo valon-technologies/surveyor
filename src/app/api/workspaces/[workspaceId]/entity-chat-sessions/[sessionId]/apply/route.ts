@@ -44,7 +44,7 @@ export const POST = withAuth(
     const sessionId = params.sessionId;
 
     // Verify session
-    const session = db
+    const session = (await db
       .select()
       .from(chatSession)
       .where(
@@ -53,7 +53,7 @@ export const POST = withAuth(
           eq(chatSession.workspaceId, workspaceId)
         )
       )
-      .get();
+      )[0];
 
     if (!session || !session.entityId) {
       return NextResponse.json(
@@ -74,33 +74,33 @@ export const POST = withAuth(
     const { updates } = parsed.data;
 
     // Load all target fields for this entity
-    const targetFields = db
+    const targetFields = await db
       .select()
       .from(field)
       .where(eq(field.entityId, session.entityId))
-      .all();
+      ;
 
     // Load source entities + fields for name resolution
-    const sourceEntities = db
+    const sourceEntities = await db
       .select({ id: entity.id, name: entity.name, displayName: entity.displayName })
       .from(entity)
       .where(
         and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source"))
       )
-      .all();
+      ;
 
     const sourceEntityIds = sourceEntities.map((e) => e.id);
     const sourceFields =
       sourceEntityIds.length > 0
-        ? db
+        ? (await db
             .select({
               id: field.id,
               name: field.name,
               entityId: field.entityId,
             })
             .from(field)
-            .all()
-            .filter((f) => sourceEntityIds.includes(f.entityId))
+            )
+            .filter((f: { entityId: string }) => sourceEntityIds.includes(f.entityId))
         : [];
 
     const applied: string[] = [];
@@ -121,7 +121,7 @@ export const POST = withAuth(
       }
 
       // Find existing latest mapping for this target field
-      const existing = db
+      const existing = (await db
         .select()
         .from(fieldMapping)
         .where(
@@ -131,7 +131,7 @@ export const POST = withAuth(
             eq(fieldMapping.isLatest, true)
           )
         )
-        .get();
+        )[0];
 
       if (!existing) {
         errors.push(
@@ -172,7 +172,7 @@ export const POST = withAuth(
       }
 
       // Copy-on-write: atomically mark existing not-latest + insert new version
-      const newVersion = createMappingVersion(existing.id, {
+      const newVersion = await createMappingVersion(existing.id, {
         workspaceId: existing.workspaceId,
         targetFieldId: existing.targetFieldId,
         status: "accepted",
@@ -238,7 +238,7 @@ export const POST = withAuth(
 
     // Mark entity pipeline as stale
     if (applied.length > 0) {
-      db.update(entityPipeline)
+      await db.update(entityPipeline)
         .set({ isStale: true, updatedAt: new Date().toISOString() })
         .where(
           and(
@@ -246,7 +246,7 @@ export const POST = withAuth(
             eq(entityPipeline.isLatest, true)
           )
         )
-        .run();
+        ;
     }
 
     return NextResponse.json({ applied: applied.length, errors });

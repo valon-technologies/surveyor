@@ -8,43 +8,43 @@ import { eq, and } from "drizzle-orm";
 export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const { id } = await ctx.params;
 
-  const eval_ = db
+  const eval_ = (await db
     .select()
     .from(evaluation)
     .where(
       and(eq(evaluation.id, id), eq(evaluation.workspaceId, workspaceId))
     )
-    .get();
+    )[0];
 
   if (!eval_) {
     return NextResponse.json({ error: "Evaluation not found" }, { status: 404 });
   }
 
   // Enrich with question context
-  const q = db
+  const q = (await db
     .select()
     .from(question)
     .where(eq(question.id, eval_.questionId))
-    .get();
+    )[0];
 
   let entityName: string | null = null;
   let fieldName: string | null = null;
 
   if (q?.entityId) {
-    const e = db
+    const e = (await db
       .select({ name: entity.name, displayName: entity.displayName })
       .from(entity)
       .where(eq(entity.id, q.entityId))
-      .get();
+      )[0];
     entityName = e?.displayName || e?.name || null;
   }
 
   if (q?.fieldId) {
-    const f = db
+    const f = (await db
       .select({ name: field.name })
       .from(field)
       .where(eq(field.id, q.fieldId))
-      .get();
+      )[0];
     fieldName = f?.name || null;
   }
 

@@ -1,6 +1,11 @@
 import type { EntityWithStats } from "./entity";
-import type { Milestone } from "@/lib/constants";
+import type { FieldDomain, Milestone } from "@/lib/constants";
 import type { EvaluationStats } from "./evaluation";
+
+export interface DomainLeaderEntry {
+  domain: FieldDomain;
+  leaders: { userId: string; name: string | null; count: number }[];
+}
 
 export interface MilestoneStats {
   milestone: Milestone;
@@ -65,5 +70,6 @@ export interface DashboardStats {
   milestoneStats: MilestoneStats[];
   statusDistribution: Record<string, number>;
   leaderboard: LeaderboardData;
+  domainLeaders?: DomainLeaderEntry[];
   evaluationStats?: EvaluationStats;
 }

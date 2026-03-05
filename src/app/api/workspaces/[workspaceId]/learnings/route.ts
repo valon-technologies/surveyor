@@ -27,12 +27,12 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
     conditions.push(eq(learning.scope, scope));
   }
 
-  const learnings = db
+  const learnings = await db
     .select()
     .from(learning)
     .where(and(...conditions))
     .orderBy(desc(learning.createdAt))
-    .all();
+    ;
 
   return NextResponse.json({ learnings });
 });
@@ -54,7 +54,7 @@ export const POST = withAuth(
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    db.insert(learning)
+    await db.insert(learning)
       .values({
         id,
         workspaceId,
@@ -66,13 +66,13 @@ export const POST = withAuth(
         sessionId: sessionId ?? null,
         createdAt: now,
       })
-      .run();
+      ;
 
-    const created = db
+    const created = (await db
       .select()
       .from(learning)
       .where(eq(learning.id, id))
-      .get();
+      )[0];
 
     return NextResponse.json(created);
   },

@@ -82,19 +82,19 @@ function toSnapshot(
 /**
  * Resolve entity and field names from IDs.
  */
-function resolveNames(
+async function resolveNames(
   sourceEntityId: string | null,
   sourceFieldId: string | null
-): { sourceEntityName: string | null; sourceFieldName: string | null } {
+): Promise<{ sourceEntityName: string | null; sourceFieldName: string | null }> {
   let sourceEntityName: string | null = null;
   let sourceFieldName: string | null = null;
 
   if (sourceEntityId) {
-    const se = db.select().from(entity).where(eq(entity.id, sourceEntityId)).get();
+    const [se] = await db.select().from(entity).where(eq(entity.id, sourceEntityId)).limit(1);
     sourceEntityName = se?.displayName || se?.name || null;
   }
   if (sourceFieldId) {
-    const sf = db.select().from(field).where(eq(field.id, sourceFieldId)).get();
+    const [sf] = await db.select().from(field).where(eq(field.id, sourceFieldId)).limit(1);
     sourceFieldName = sf?.displayName || sf?.name || null;
   }
 
@@ -109,11 +109,11 @@ export async function generateRippleProposals(input: GenerateInput): Promise<Gen
   const { workspaceId, userId, exemplarMappingId, targetMappingIds, userInstruction } = input;
 
   // Load exemplar
-  const exemplarMapping = db
+  const exemplarMapping = (await db
     .select()
     .from(fieldMapping)
     .where(and(eq(fieldMapping.id, exemplarMappingId), eq(fieldMapping.workspaceId, workspaceId)))
-    .get();
+    )[0];
 
   if (!exemplarMapping) {
     throw new Error("Exemplar mapping not found");
@@ -121,7 +121,7 @@ export async function generateRippleProposals(input: GenerateInput): Promise<Gen
 
   // Load exemplar's parent for edit diff
   const parentMapping = exemplarMapping.parentId
-    ? db.select().from(fieldMapping).where(eq(fieldMapping.id, exemplarMapping.parentId)).get()
+    ? (await db.select().from(fieldMapping).where(eq(fieldMapping.id, exemplarMapping.parentId)).limit(1))[0]
     : null;
 
   const editDiffs = computeEditDiffs(
@@ -130,11 +130,11 @@ export async function generateRippleProposals(input: GenerateInput): Promise<Gen
   );
 
   // Resolve exemplar names
-  const exemplarField = db.select().from(field).where(eq(field.id, exemplarMapping.targetFieldId)).get();
+  const [exemplarField] = await db.select().from(field).where(eq(field.id, exemplarMapping.targetFieldId)).limit(1);
   const exemplarEntity = exemplarField
-    ? db.select().from(entity).where(eq(entity.id, exemplarField.entityId)).get()
+    ? (await db.select().from(entity).where(eq(entity.id, exemplarField.entityId)).limit(1))[0]
     : null;
-  const exemplarSourceNames = resolveNames(exemplarMapping.sourceEntityId, exemplarMapping.sourceFieldId);
+  const exemplarSourceNames = await resolveNames(exemplarMapping.sourceEntityId, exemplarMapping.sourceFieldId);
 
   const exemplarData = {
     targetFieldName: exemplarField?.displayName || exemplarField?.name || "unknown",
@@ -151,17 +151,17 @@ export async function generateRippleProposals(input: GenerateInput): Promise<Gen
   };
 
   // Load target mappings and group by entity
-  const targetMappings = db
+  const targetMappings = (await db
     .select()
     .from(fieldMapping)
     .where(and(eq(fieldMapping.workspaceId, workspaceId), eq(fieldMapping.isLatest, true)))
-    .all()
+    )
     .filter((m) => targetMappingIds.includes(m.id));
 
   // Group by entity
   const byEntity = new Map<string, typeof targetMappings>();
   for (const m of targetMappings) {
-    const targetF = db.select().from(field).where(eq(field.id, m.targetFieldId)).get();
+    const [targetF] = await db.select().from(field).where(eq(field.id, m.targetFieldId)).limit(1);
     if (!targetF) continue;
 
     const group = byEntity.get(targetF.entityId) || [];
@@ -170,19 +170,19 @@ export async function generateRippleProposals(input: GenerateInput): Promise<Gen
   }
 
   // Resolve provider
-  const { provider, providerName } = resolveProvider(userId, input.preferredProvider);
+  const { provider, providerName } = await resolveProvider(userId, input.preferredProvider);
   const tokenBudget = getTokenBudget(providerName);
 
   // Load source entities and fields for output parsing
-  const sourceEntities = db
+  const sourceEntities = await db
     .select()
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-    .all();
+    ;
 
   const sourceEntityIds = sourceEntities.map((e) => e.id);
   const sourceFields = sourceEntityIds.length > 0
-    ? db.select().from(field).all().filter((f) => sourceEntityIds.includes(f.entityId))
+    ? (await db.select().from(field)).filter((f) => sourceEntityIds.includes(f.entityId))
     : [];
 
   const proposals: RippleProposal[] = [];
@@ -190,21 +190,22 @@ export async function generateRippleProposals(input: GenerateInput): Promise<Gen
 
   // Process each entity group
   for (const [entityId, mappings] of byEntity) {
-    const targetEntity = db.select().from(entity).where(eq(entity.id, entityId)).get();
+    const [targetEntity] = await db.select().from(entity).where(eq(entity.id, entityId)).limit(1);
     if (!targetEntity) continue;
 
     const entityName = targetEntity.displayName || targetEntity.name;
 
     try {
       // Load target fields for this group
-      const targetFieldsData = mappings.map((m) => {
-        const f = db.select().from(field).where(eq(field.id, m.targetFieldId)).get();
-        const srcNames = resolveNames(m.sourceEntityId, m.sourceFieldId);
+      const targetFieldsDataRaw = await Promise.all(mappings.map(async (m) => {
+        const [f] = await db.select().from(field).where(eq(field.id, m.targetFieldId)).limit(1);
+        const srcNames = await resolveNames(m.sourceEntityId, m.sourceFieldId);
         return { mapping: m, field: f, sourceNames: srcNames };
-      }).filter((d) => d.field != null);
+      }));
+      const targetFieldsData = targetFieldsDataRaw.filter((d) => d.field != null);
 
       // Assemble context
-      const assembledCtx = assembleContext(workspaceId, targetEntity.name, tokenBudget);
+      const assembledCtx = await assembleContext(workspaceId, targetEntity.name, tokenBudget);
 
       // Build prompt
       const { systemMessage, userMessage } = buildRipplePrompt({
@@ -236,7 +237,7 @@ export async function generateRippleProposals(input: GenerateInput): Promise<Gen
       const generationId = crypto.randomUUID();
       const now = new Date().toISOString();
 
-      db.insert(generation)
+      await db.insert(generation)
         .values({
           id: generationId,
           workspaceId,
@@ -252,7 +253,7 @@ export async function generateRippleProposals(input: GenerateInput): Promise<Gen
           createdAt: now,
           updatedAt: now,
         })
-        .run();
+        ;
 
       // Call LLM
       const startTime = Date.now();
@@ -280,7 +281,7 @@ export async function generateRippleProposals(input: GenerateInput): Promise<Gen
       });
 
       // Update generation record
-      db.update(generation)
+      await db.update(generation)
         .set({
           status: "completed",
           model: response.model,
@@ -292,7 +293,7 @@ export async function generateRippleProposals(input: GenerateInput): Promise<Gen
           updatedAt: new Date().toISOString(),
         })
         .where(eq(generation.id, generationId))
-        .run();
+        ;
 
       // Build proposals from parsed output, dedup by target field
       const seenMappingIds = new Set<string>();
@@ -306,7 +307,7 @@ export async function generateRippleProposals(input: GenerateInput): Promise<Gen
         if (seenMappingIds.has(matchingData.mapping.id)) continue;
         seenMappingIds.add(matchingData.mapping.id);
 
-        const beforeSourceNames = resolveNames(
+        const beforeSourceNames = await resolveNames(
           matchingData.mapping.sourceEntityId,
           matchingData.mapping.sourceFieldId
         );
@@ -354,29 +355,29 @@ export async function generateRippleProposals(input: GenerateInput): Promise<Gen
  * Apply approved ripple proposals by creating new mapping versions
  * via copy-on-write.
  */
-export function applyRippleProposals(
+export async function applyRippleProposals(
   workspaceId: string,
   userId: string,
   proposals: RippleProposal[],
   exemplarMappingId: string
-): { applied: number; mappingIds: string[] } {
+): Promise<{ applied: number; mappingIds: string[] }> {
   const now = new Date().toISOString();
   const appliedIds: string[] = [];
 
   // Resolve exemplar field name for change summary
-  const exemplarMapping = db
+  const exemplarMapping = (await db
     .select()
     .from(fieldMapping)
     .where(eq(fieldMapping.id, exemplarMappingId))
-    .get();
+    )[0];
   const exemplarField = exemplarMapping
-    ? db.select().from(field).where(eq(field.id, exemplarMapping.targetFieldId)).get()
+    ? (await db.select().from(field).where(eq(field.id, exemplarMapping.targetFieldId)).limit(1))[0]
     : null;
   const exemplarFieldName = exemplarField?.displayName || exemplarField?.name || "unknown";
 
   for (const proposal of proposals) {
     // Verify the original mapping is still the latest version
-    const currentMapping = db
+    const currentMapping = (await db
       .select()
       .from(fieldMapping)
       .where(
@@ -386,7 +387,7 @@ export function applyRippleProposals(
           eq(fieldMapping.isLatest, true)
         )
       )
-      .get();
+      )[0];
 
     if (!currentMapping) {
       // Skip — mapping was already updated by another operation
@@ -394,14 +395,14 @@ export function applyRippleProposals(
     }
 
     // Mark old version as not latest
-    db.update(fieldMapping)
+    await db.update(fieldMapping)
       .set({ isLatest: false, updatedAt: now })
       .where(eq(fieldMapping.id, proposal.originalMappingId))
-      .run();
+      ;
 
     // Create new version
     const newId = crypto.randomUUID();
-    db.insert(fieldMapping)
+    await db.insert(fieldMapping)
       .values({
         id: newId,
         workspaceId,
@@ -425,7 +426,7 @@ export function applyRippleProposals(
         createdAt: now,
         updatedAt: now,
       })
-      .run();
+      ;
 
     appliedIds.push(newId);
 

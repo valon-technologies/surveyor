@@ -15,11 +15,11 @@ export const PATCH = withAuth(
       feedbackBetterQuestion?: string;
     };
 
-    const existing = db
+    const existing = (await db
       .select({ id: question.id, fieldMappingId: question.fieldMappingId, entityId: question.entityId })
       .from(question)
       .where(and(eq(question.id, id), eq(question.workspaceId, workspaceId)))
-      .get();
+)[0];
 
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -34,34 +34,34 @@ export const PATCH = withAuth(
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    db.update(question)
+    await db.update(question)
       .set({ ...updates, updatedAt: new Date().toISOString() })
       .where(eq(question.id, id))
-      .run();
+      ;
 
     const betterQ = body.feedbackBetterQuestion?.trim();
     if (body.feedbackHelpful === false && betterQ) {
       let entityId = existing.entityId;
       if (!entityId && existing.fieldMappingId) {
-        const fmInfo = db
+        const fmInfo = (await db
           .select({ entityId: entity.id })
           .from(fieldMapping)
           .innerJoin(field, eq(fieldMapping.targetFieldId, field.id))
           .innerJoin(entity, eq(field.entityId, entity.id))
           .where(eq(fieldMapping.id, existing.fieldMappingId))
-          .get();
+          )[0];
         entityId = fmInfo?.entityId ?? null;
       }
 
       if (entityId) {
-        db.insert(learning).values({
+        await db.insert(learning).values({
           id: crypto.randomUUID(),
           workspaceId,
           entityId,
           scope: "entity",
           source: "review",
           content: `Open question (improved): ${betterQ}`,
-        }).run();
+        });
 
         rebuildEntityKnowledge(workspaceId, entityId);
       }

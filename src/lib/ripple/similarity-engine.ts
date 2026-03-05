@@ -84,33 +84,33 @@ function buildReason(signals: SimilaritySignals, exemplar: { sourceEntityName: s
  * Find mappings similar to the given exemplar mapping.
  * Uses three weighted signals: source match, transform pattern, and context overlap.
  */
-export function findSimilarMappings(
+export async function findSimilarMappings(
   workspaceId: string,
   exemplarMappingId: string,
   options: FindSimilarOptions = {}
-): { exemplar: { id: string; targetFieldName: string; entityName: string; sourceEntityName: string | null; mappingType: string | null }; similar: SimilarityResult[] } {
+): Promise<{ exemplar: { id: string; targetFieldName: string; entityName: string; sourceEntityName: string | null; mappingType: string | null }; similar: SimilarityResult[] }> {
   const { minScore = 0.3, maxResults = 20 } = options;
 
   // Load exemplar mapping
-  const exemplarMapping = db
+  const exemplarMapping = (await db
     .select()
     .from(fieldMapping)
     .where(and(eq(fieldMapping.id, exemplarMappingId), eq(fieldMapping.workspaceId, workspaceId)))
-    .get();
+    )[0];
 
   if (!exemplarMapping) {
     throw new Error("Exemplar mapping not found");
   }
 
   // Load exemplar field and entity names
-  const exemplarField = db.select().from(field).where(eq(field.id, exemplarMapping.targetFieldId)).get();
+  const [exemplarField] = await db.select().from(field).where(eq(field.id, exemplarMapping.targetFieldId)).limit(1);
   const exemplarEntity = exemplarField
-    ? db.select().from(entity).where(eq(entity.id, exemplarField.entityId)).get()
+    ? (await db.select().from(entity).where(eq(entity.id, exemplarField.entityId)).limit(1))[0]
     : null;
 
   let exemplarSourceEntityName: string | null = null;
   if (exemplarMapping.sourceEntityId) {
-    const se = db.select().from(entity).where(eq(entity.id, exemplarMapping.sourceEntityId)).get();
+    const [se] = await db.select().from(entity).where(eq(entity.id, exemplarMapping.sourceEntityId)).limit(1);
     exemplarSourceEntityName = se?.displayName || se?.name || null;
   }
 
@@ -123,11 +123,11 @@ export function findSimilarMappings(
   };
 
   // Load all candidate mappings: isLatest=true, not accepted, not excluded, not the exemplar
-  const candidates = db
+  const candidates = (await db
     .select()
     .from(fieldMapping)
     .where(and(eq(fieldMapping.workspaceId, workspaceId), eq(fieldMapping.isLatest, true)))
-    .all()
+    )
     .filter(
       (m) =>
         m.id !== exemplarMappingId &&
@@ -140,10 +140,10 @@ export function findSimilarMappings(
   }
 
   // Batch-load all mapping contexts for the workspace
-  const allMappingContexts = db
+  const allMappingContexts = await db
     .select()
     .from(mappingContext)
-    .all();
+    ;
 
   // Build context sets per mapping
   const contextSetsMap = new Map<string, Set<string>>();
@@ -209,10 +209,10 @@ export function findSimilarMappings(
   const results: SimilarityResult[] = [];
 
   for (const { mapping, score, signals } of topResults) {
-    const targetF = db.select().from(field).where(eq(field.id, mapping.targetFieldId)).get();
+    const [targetF] = await db.select().from(field).where(eq(field.id, mapping.targetFieldId)).limit(1);
     if (!targetF) continue;
 
-    const targetE = db.select().from(entity).where(eq(entity.id, targetF.entityId)).get();
+    const [targetE] = await db.select().from(entity).where(eq(entity.id, targetF.entityId)).limit(1);
     if (!targetE) continue;
 
     results.push({

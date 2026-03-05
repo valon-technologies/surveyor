@@ -13,7 +13,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     return NextResponse.json({ error: "Missing evaluationId" }, { status: 400 });
   }
 
-  const result = db
+  const result = (await db
     .select({
       id: sotEvaluation.id,
       entityId: sotEvaluation.entityId,
@@ -37,7 +37,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
         eq(sotEvaluation.workspaceId, workspaceId),
       )
     )
-    .get();
+    )[0];
 
   if (!result) {
     return NextResponse.json({ error: "Evaluation not found" }, { status: 404 });

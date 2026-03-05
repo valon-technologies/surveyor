@@ -30,12 +30,12 @@ interface TokenUsage {
  * Get today's total token usage for a workspace by summing all generations
  * created since midnight UTC.
  */
-export function getDailyTokenUsage(workspaceId: string): TokenUsage {
+export async function getDailyTokenUsage(workspaceId: string): Promise<TokenUsage> {
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
   const todayISO = todayStart.toISOString();
 
-  const result = db
+  const result = (await db
     .select({
       totalInput: sql<number>`COALESCE(SUM(${generation.inputTokens}), 0)`,
       totalOutput: sql<number>`COALESCE(SUM(${generation.outputTokens}), 0)`,
@@ -47,7 +47,7 @@ export function getDailyTokenUsage(workspaceId: string): TokenUsage {
         gte(generation.createdAt, todayISO),
       ),
     )
-    .get()!;
+    )[0]!;
 
   const budget = getDailyTokenBudget();
   const totalTokens = result.totalInput + result.totalOutput;
@@ -71,8 +71,8 @@ interface BudgetCheckResult {
  * Check whether a workspace is within its daily token budget.
  * Call this before starting any generation or batch run.
  */
-export function checkDailyTokenBudget(workspaceId: string): BudgetCheckResult {
-  const usage = getDailyTokenUsage(workspaceId);
+export async function checkDailyTokenBudget(workspaceId: string): Promise<BudgetCheckResult> {
+  const usage = await getDailyTokenUsage(workspaceId);
 
   if (usage.totalTokens >= usage.budget) {
     const inputCost = (usage.inputTokens / 1_000_000) * 15;

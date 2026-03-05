@@ -26,7 +26,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     conditions.push(eq(question.curationStatus, "approved"));
   }
 
-  const rows = db
+  const rows = await db
     .select({
       question: question,
       entityName: entity.name,
@@ -39,7 +39,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     .leftJoin(field, eq(question.fieldId, field.id))
     .where(and(...conditions))
     .orderBy(question.createdAt)
-    .all();
+    ;
 
   // Batch-resolve schema asset IDs (no N+1)
   const allSchemaAssetIds = [
@@ -47,11 +47,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   ];
   const schemaAssetMap = new Map<string, { id: string; name: string; side: string }>();
   if (allSchemaAssetIds.length > 0) {
-    const assets = db
+    const assets = await db
       .select({ id: schemaAsset.id, name: schemaAsset.name, side: schemaAsset.side })
       .from(schemaAsset)
       .where(inArray(schemaAsset.id, allSchemaAssetIds))
-      .all();
+      ;
     for (const a of assets) schemaAssetMap.set(a.id, a);
   }
 
@@ -61,11 +61,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   ];
   const assigneeMap = new Map<string, { userId: string; name: string | null; email: string; image: string | null }>();
   if (allAssigneeIds.length > 0) {
-    const users = db
+    const users = await db
       .select({ id: user.id, name: user.name, email: user.email, image: user.image })
       .from(user)
       .where(inArray(user.id, allAssigneeIds))
-      .all();
+      ;
     for (const u of users) assigneeMap.set(u.id, { userId: u.id, name: u.name, email: u.email, image: u.image });
   }
 
@@ -94,7 +94,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
 
   const input = parsed.data;
 
-  const [created] = db
+  const [created] = await db
     .insert(question)
     .values({
       workspaceId,
@@ -111,7 +111,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
       curationStatus: "pending_review", // Hidden until reviewer submits review
     })
     .returning()
-    .all();
+    ;
 
   return NextResponse.json(created, { status: 201 });
 }, { requiredRole: "editor" });

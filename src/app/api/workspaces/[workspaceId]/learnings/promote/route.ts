@@ -23,7 +23,7 @@ export const POST = withAuth(
     }
 
     try {
-      const { id } = promoteToWorkspaceRule(
+      const { id } = await promoteToWorkspaceRule(
         workspaceId,
         parsed.data.content,
         "review",

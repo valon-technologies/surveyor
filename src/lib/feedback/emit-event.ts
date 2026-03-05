@@ -8,15 +8,15 @@ export type FeedbackEventType =
   | "context_assembled"
   | "sot_evaluated";
 
-export function emitFeedbackEvent(input: {
+export async function emitFeedbackEvent(input: {
   workspaceId: string;
   entityId: string;
   fieldMappingId?: string;
   eventType: FeedbackEventType;
   payload: Record<string, unknown>;
   correlationId?: string;
-}): string {
-  const [row] = db
+}): Promise<string> {
+  const [row] = await db
     .insert(feedbackEvent)
     .values({
       workspaceId: input.workspaceId,
@@ -27,7 +27,7 @@ export function emitFeedbackEvent(input: {
       correlationId: input.correlationId ?? null,
     })
     .returning({ id: feedbackEvent.id })
-    .all();
+    ;
 
   return row.id;
 }

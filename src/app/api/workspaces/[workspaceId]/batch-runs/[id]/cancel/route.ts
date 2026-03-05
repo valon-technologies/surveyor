@@ -9,11 +9,11 @@ export const POST = withAuth(
     const params = await ctx.params;
     const id = params.id;
 
-    const run = db
+    const run = (await db
       .select()
       .from(batchRun)
       .where(and(eq(batchRun.id, id), eq(batchRun.workspaceId, workspaceId)))
-      .get();
+      )[0];
 
     if (!run) {
       return NextResponse.json({ error: "Batch run not found" }, { status: 404 });
@@ -23,10 +23,10 @@ export const POST = withAuth(
       return NextResponse.json({ error: "Batch run is not active" }, { status: 400 });
     }
 
-    db.update(batchRun)
+    await db.update(batchRun)
       .set({ status: "cancelled", updatedAt: new Date().toISOString() })
       .where(eq(batchRun.id, id))
-      .run();
+      ;
 
     return NextResponse.json({ status: "cancelled" });
   },

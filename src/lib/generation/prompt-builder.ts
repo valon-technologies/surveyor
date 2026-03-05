@@ -174,7 +174,7 @@ PRODUCTION MAPPING REFERENCE: When a "Production Mapping Reference" section is p
 - hash_id column choices for primary keys
 Do NOT blindly copy — target fields may differ. Learn the patterns and apply them to new fields. Entity Knowledge corrections take precedence over production mappings when they conflict.`;
 
-export function buildPrompt(input: PromptInput): { systemMessage: string; userMessage: string } {
+export async function buildPrompt(input: PromptInput): Promise<{ systemMessage: string; userMessage: string }> {
   const { entityName, entityDescription, targetFields, assembledContext, sourceSchema, workspaceRules } = input;
 
   const parts: string[] = [];
@@ -249,7 +249,7 @@ export function buildPrompt(input: PromptInput): { systemMessage: string; userMe
   let systemMessage = SYSTEM_MESSAGE + renderWorkspaceRulesSection(workspaceRules);
 
   if (input.workspaceId) {
-    const bundle = getSystemContextBundle(input.workspaceId);
+    const bundle = await getSystemContextBundle(input.workspaceId);
     if (bundle.totalTokens > 0) {
       systemMessage += renderSystemContextSection(bundle);
     }
@@ -409,7 +409,7 @@ PRODUCTION MAPPING REFERENCE: When a "Production Mapping Reference" section is p
 - hash_id column choices for primary keys
 Do NOT blindly copy — target fields may differ. Learn the patterns and apply them to new fields. Entity Knowledge corrections take precedence over production mappings when they conflict.`;
 
-export function buildYamlPrompt(input: PromptInput): { systemMessage: string; userMessage: string } {
+export async function buildYamlPrompt(input: PromptInput): Promise<{ systemMessage: string; userMessage: string }> {
   const { entityName, entityDescription, targetFields, assembledContext, sourceSchema, workspaceRules } = input;
 
   const parts: string[] = [];
@@ -484,7 +484,7 @@ export function buildYamlPrompt(input: PromptInput): { systemMessage: string; us
   let systemMessage = YAML_SYSTEM_MESSAGE + renderWorkspaceRulesSection(workspaceRules);
 
   if (input.workspaceId) {
-    const bundle = getSystemContextBundle(input.workspaceId);
+    const bundle = await getSystemContextBundle(input.workspaceId);
     if (bundle.totalTokens > 0) {
       systemMessage += renderSystemContextSection(bundle);
     }

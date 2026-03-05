@@ -40,7 +40,7 @@ export const POST = withAuth(
     const sessionId = params.sessionId;
 
     // Verify forge session exists
-    const session = db
+    const session = (await db
       .select()
       .from(chatSession)
       .where(
@@ -50,7 +50,7 @@ export const POST = withAuth(
           eq(chatSession.sessionType, "forge")
         )
       )
-      .get();
+      )[0];
 
     if (!session) {
       return NextResponse.json(
@@ -73,11 +73,11 @@ export const POST = withAuth(
     // Validate all context IDs exist
     const validContextIds = new Set<string>();
     for (const pc of proposedContexts) {
-      const ctx = db
+      const ctx = (await db
         .select({ id: context.id })
         .from(context)
         .where(eq(context.id, pc.contextId))
-        .get();
+        )[0];
       if (ctx) {
         validContextIds.add(pc.contextId);
       }
@@ -109,7 +109,7 @@ export const POST = withAuth(
       // ── Update existing skill ────────────────────────────────────
 
       // Update skill metadata
-      db.update(skill)
+      await db.update(skill)
         .set({
           name,
           description: description || null,
@@ -118,14 +118,14 @@ export const POST = withAuth(
           updatedAt: now,
         })
         .where(eq(skill.id, existingSkillId))
-        .run();
+        ;
 
       // Load current context assignments
-      const currentScs = db
+      const currentScs = await db
         .select()
         .from(skillContext)
         .where(eq(skillContext.skillId, existingSkillId))
-        .all();
+        ;
 
       const currentMap = new Map(
         currentScs.map((sc) => [sc.contextId, sc])
@@ -142,9 +142,9 @@ export const POST = withAuth(
       // Remove contexts no longer in proposal
       for (const sc of currentScs) {
         if (!proposedMap.has(sc.contextId)) {
-          db.delete(skillContext)
+          await db.delete(skillContext)
             .where(eq(skillContext.id, sc.id))
-            .run();
+            ;
           removed++;
         }
       }
@@ -167,15 +167,15 @@ export const POST = withAuth(
             changed = true;
           }
           if (changed) {
-            db.update(skillContext)
+            await db.update(skillContext)
               .set(updates)
               .where(eq(skillContext.id, existing.id))
-              .run();
+              ;
             if (updates.role || updates.notes) updated++;
           }
         } else {
           // Add new context
-          db.insert(skillContext)
+          await db.insert(skillContext)
             .values({
               skillId: existingSkillId,
               contextId: pc.contextId,
@@ -184,7 +184,7 @@ export const POST = withAuth(
               notes: pc.summary || null,
               createdAt: now,
             })
-            .run();
+            ;
           added++;
         }
       }
@@ -200,7 +200,7 @@ export const POST = withAuth(
       // ── Create new skill ─────────────────────────────────────────
       const skillId = crypto.randomUUID();
 
-      db.insert(skill)
+      await db.insert(skill)
         .values({
           id: skillId,
           workspaceId,
@@ -212,12 +212,12 @@ export const POST = withAuth(
           createdAt: now,
           updatedAt: now,
         })
-        .run();
+        ;
 
       // Batch insert context assignments
       for (let i = 0; i < validProposed.length; i++) {
         const pc = validProposed[i];
-        db.insert(skillContext)
+        await db.insert(skillContext)
           .values({
             skillId,
             contextId: pc.contextId,
@@ -226,14 +226,14 @@ export const POST = withAuth(
             notes: pc.summary || null,
             createdAt: now,
           })
-          .run();
+          ;
       }
 
       // Link session to new skill
-      db.update(chatSession)
+      await db.update(chatSession)
         .set({ skillId })
         .where(eq(chatSession.id, sessionId))
-        .run();
+        ;
 
       result = {
         action: "created",

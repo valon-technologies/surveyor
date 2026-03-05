@@ -10,7 +10,7 @@ export const GET = withAuth(
     const searchParams = req.nextUrl.searchParams;
     const status = searchParams.get("status") || "draft";
 
-    const rows = db
+    const rows = await db
       .select({
         question: question,
         entityName: entity.name,
@@ -26,10 +26,10 @@ export const GET = withAuth(
         )
       )
       .orderBy(question.createdAt)
-      .all();
+      ;
 
     // For each draft question, find similar approved questions for dedup
-    const result = rows.map((r) => {
+    const result = await Promise.all(rows.map(async (r) => {
       // Simple keyword dedup: find approved questions with overlapping words
       const words = r.question.question
         .toLowerCase()
@@ -39,7 +39,7 @@ export const GET = withAuth(
 
       let similarQuestions: { id: string; question: string }[] = [];
       if (words.length > 0) {
-        const approved = db
+        const approved = await db
           .select({ id: question.id, question: question.question })
           .from(question)
           .where(
@@ -48,7 +48,7 @@ export const GET = withAuth(
               eq(question.curationStatus, "approved"),
             )
           )
-          .all();
+          ;
 
         similarQuestions = approved
           .filter((aq) => {
@@ -65,7 +65,7 @@ export const GET = withAuth(
         fieldName: r.fieldName,
         similarQuestions,
       };
-    });
+    }));
 
     return NextResponse.json(result);
   },
@@ -90,13 +90,13 @@ export const PATCH = withAuth(
       );
     }
 
-    const existing = db
+    const existing = (await db
       .select()
       .from(question)
       .where(
         and(eq(question.id, questionId), eq(question.workspaceId, workspaceId))
       )
-      .get();
+      )[0];
 
     if (!existing) {
       return NextResponse.json({ error: "Question not found" }, { status: 404 });
@@ -114,12 +114,12 @@ export const PATCH = withAuth(
       if (editedQuestion) {
         updates.question = editedQuestion;
       }
-      db.update(question)
+      await db.update(question)
         .set(updates)
         .where(eq(question.id, questionId))
-        .run();
+        ;
     } else if (action === "reject") {
-      db.update(question)
+      await db.update(question)
         .set({
           curationStatus: "rejected",
           curatedBy: userId,
@@ -127,9 +127,9 @@ export const PATCH = withAuth(
           updatedAt: now,
         })
         .where(eq(question.id, questionId))
-        .run();
+        ;
     } else if (action === "duplicate") {
-      db.update(question)
+      await db.update(question)
         .set({
           curationStatus: "duplicate",
           curatedBy: userId,
@@ -138,7 +138,7 @@ export const PATCH = withAuth(
           updatedAt: now,
         })
         .where(eq(question.id, questionId))
-        .run();
+        ;
     }
 
     return NextResponse.json({ success: true, action });

@@ -13,12 +13,12 @@ import { MAPPING_STATUSES } from "@/lib/constants";
 import { checkDailyTokenBudget } from "@/lib/generation/cost-guardrails";
 
 export const GET = withAuth(async (req, ctx, { workspaceId }) => {
-  const runs = db
+  const runs = await db
     .select()
     .from(batchRun)
     .where(eq(batchRun.workspaceId, workspaceId))
     .orderBy(batchRun.createdAt)
-    .all();
+    ;
 
   return NextResponse.json(runs);
 });
@@ -37,7 +37,7 @@ export const POST = withAuth(
     const mode = parsed.data.mode || "single-shot";
 
     // Guard: check daily token budget before spending on LLM calls
-    const budgetCheck = checkDailyTokenBudget(workspaceId);
+    const budgetCheck = await checkDailyTokenBudget(workspaceId);
     if (!budgetCheck.allowed) {
       return NextResponse.json(
         { error: budgetCheck.message },
@@ -46,7 +46,7 @@ export const POST = withAuth(
     }
 
     // Guard: prevent concurrent batch runs (avoids duplicate LLM spend)
-    const activeBatch = db
+    const activeBatch = (await db
       .select({ id: batchRun.id })
       .from(batchRun)
       .where(
@@ -55,7 +55,7 @@ export const POST = withAuth(
           inArray(batchRun.status, ["pending", "running"]),
         ),
       )
-      .get();
+      )[0];
 
     if (activeBatch) {
       return NextResponse.json(
@@ -71,7 +71,7 @@ export const POST = withAuth(
     try {
       if (mode === "chat") {
         // RAG chat mode: per-field sessions with tool use
-        const { batchRunId, entities, totalFields } = createBulkChatRun({
+        const { batchRunId, entities, totalFields } = await createBulkChatRun({
           workspaceId,
           userId,
           entityIds: parsed.data.entityIds,
@@ -101,7 +101,7 @@ export const POST = withAuth(
         });
       } else {
         // Legacy single-shot mode
-        const { batchRunId, entities, totalFields } = createBatchRun({
+        const { batchRunId, entities, totalFields } = await createBatchRun({
           workspaceId,
           userId,
           preferredProvider: parsed.data.preferredProvider,

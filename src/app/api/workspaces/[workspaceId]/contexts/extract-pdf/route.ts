@@ -11,7 +11,7 @@ export const POST = withAuth(async (req, _ctx, { userId }) => {
     return NextResponse.json({ error: "base64Content is required" }, { status: 400 });
   }
 
-  const { provider } = resolveProvider(userId, "claude");
+  const { provider } = await resolveProvider(userId, "claude");
   const result = await extractPDFText(base64Content, name || "document.pdf", provider);
 
   return NextResponse.json({ content: result.content });

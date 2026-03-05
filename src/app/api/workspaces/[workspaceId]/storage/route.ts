@@ -1,29 +1,25 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
-import { getSqliteDb } from "@/lib/db";
+import { db } from "@/lib/db";
+import { sql } from "drizzle-orm";
 
 export const GET = withAuth(
   async () => {
-    const sqlite = getSqliteDb();
-
-    // Get per-table sizes via dbstat virtual table
-    const tableSizes = sqlite
-      .prepare(
-        `SELECT name, SUM(pgsize) as size_bytes
-         FROM dbstat
-         GROUP BY name
-         ORDER BY size_bytes DESC`
-      )
-      .all() as { name: string; size_bytes: number }[];
+    // Get per-table sizes via Postgres system catalog
+    const tableSizes = await db.execute<{ name: string; size_bytes: number }>(sql`
+      SELECT relname as name,
+             pg_total_relation_size(c.oid)::bigint as size_bytes
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relkind = 'r'
+      ORDER BY size_bytes DESC
+    `);
 
     // Get total DB size
-    const pageCount = sqlite.prepare("PRAGMA page_count").get() as {
-      page_count: number;
-    };
-    const pageSize = sqlite.prepare("PRAGMA page_size").get() as {
-      page_size: number;
-    };
-    const totalSizeBytes = pageCount.page_count * pageSize.page_size;
+    const [dbSize] = await db.execute<{ total_size_bytes: number }>(sql`
+      SELECT pg_database_size(current_database())::bigint as total_size_bytes
+    `);
+    const totalSizeBytes = Number(dbSize?.total_size_bytes ?? 0);
 
     // Get row counts for key tables
     const keyTables = [
@@ -44,18 +40,19 @@ export const GET = withAuth(
     const rowCounts: Record<string, number> = {};
     for (const table of keyTables) {
       try {
-        const result = sqlite
-          .prepare(`SELECT COUNT(*) as count FROM "${table}"`)
-          .get() as { count: number };
-        rowCounts[table] = result.count;
+        const [result] = await db.execute<{ count: number }>(
+          sql.raw(`SELECT COUNT(*)::int as count FROM "${table}"`)
+        );
+        rowCounts[table] = Number(result?.count ?? 0);
       } catch {
-        // Table may not exist yet
         rowCounts[table] = 0;
       }
     }
 
     // Merge sizes with row counts
-    const sizeMap = new Map(tableSizes.map((t) => [t.name, t.size_bytes]));
+    const sizeMap = new Map(
+      (tableSizes as { name: string; size_bytes: number }[]).map((t) => [t.name, Number(t.size_bytes)])
+    );
 
     const tables = keyTables.map((name) => ({
       name,
@@ -64,12 +61,12 @@ export const GET = withAuth(
     }));
 
     // Add any other tables with significant size that aren't in keyTables
-    for (const t of tableSizes) {
-      if (!keyTables.includes(t.name) && t.size_bytes > 0) {
+    for (const t of tableSizes as { name: string; size_bytes: number }[]) {
+      if (!keyTables.includes(t.name) && Number(t.size_bytes) > 0) {
         tables.push({
           name: t.name,
           rows: 0,
-          sizeBytes: t.size_bytes,
+          sizeBytes: Number(t.size_bytes),
         });
       }
     }

@@ -70,32 +70,32 @@ export async function generateAiReview(
   mappingId: string,
 ): Promise<ReviewResult | null> {
   // Load mapping with field and entity info
-  const mapping = db.select().from(fieldMapping)
-    .where(eq(fieldMapping.id, mappingId)).get();
+  const [mapping] = await db.select().from(fieldMapping)
+    .where(eq(fieldMapping.id, mappingId)).limit(1);
   if (!mapping) return null;
 
-  const targetField = db.select().from(field)
-    .where(eq(field.id, mapping.targetFieldId)).get();
+  const [targetField] = await db.select().from(field)
+    .where(eq(field.id, mapping.targetFieldId)).limit(1);
   if (!targetField) return null;
 
-  const targetEntity = db.select().from(entity)
-    .where(eq(entity.id, targetField.entityId)).get();
+  const [targetEntity] = await db.select().from(entity)
+    .where(eq(entity.id, targetField.entityId)).limit(1);
   if (!targetEntity) return null;
 
   // Resolve source names
   let sourceEntityName: string | null = null;
   let sourceFieldName: string | null = null;
   if (mapping.sourceEntityId) {
-    const se = db.select().from(entity).where(eq(entity.id, mapping.sourceEntityId)).get();
+    const [se] = await db.select().from(entity).where(eq(entity.id, mapping.sourceEntityId)).limit(1);
     sourceEntityName = se?.name ?? null;
   }
   if (mapping.sourceFieldId) {
-    const sf = db.select().from(field).where(eq(field.id, mapping.sourceFieldId)).get();
+    const [sf] = await db.select().from(field).where(eq(field.id, mapping.sourceFieldId)).limit(1);
     sourceFieldName = sf?.name ?? null;
   }
 
   // Get sibling mappings for context
-  const siblings = db.select({
+  const siblings = await db.select({
     fieldName: field.name,
     sourceEntityId: fieldMapping.sourceEntityId,
     sourceFieldId: fieldMapping.sourceFieldId,
@@ -107,30 +107,29 @@ export async function generateAiReview(
     .where(and(
       eq(field.entityId, targetField.entityId),
       eq(fieldMapping.isLatest, true),
-    ))
-    .all();
+    ));
 
   // Resolve sibling source names
   const siblingLines = siblings
     .filter(s => s.sourceEntityId)
-    .map(s => {
-      const se = db.select({ name: entity.name }).from(entity).where(eq(entity.id, s.sourceEntityId!)).get();
+    .map(async s => {
+      const [se] = await db.select({ name: entity.name }).from(entity).where(eq(entity.id, s.sourceEntityId!)).limit(1);
       const sf = s.sourceFieldId
-        ? db.select({ name: field.name }).from(field).where(eq(field.id, s.sourceFieldId)).get()
+        ? (await db.select({ name: field.name }).from(field).where(eq(field.id, s.sourceFieldId)).limit(1))[0]
         : null;
       return `  ${s.fieldName}: ${se?.name || "?"}.${sf?.name || "?"} (${s.confidence || "?"}) ${s.transform ? `transform: ${s.transform.slice(0, 80)}` : ""}`;
     })
     .join("\n");
 
   // Get entity knowledge
-  const ek = db.select({ id: context.id, name: context.name, content: context.content })
+  const [ek] = await db.select({ id: context.id, name: context.name, content: context.content })
     .from(context)
     .where(and(
       eq(context.workspaceId, workspaceId),
       eq(context.subcategory, "entity_knowledge"),
       eq(context.entityId, targetField.entityId),
     ))
-    .get();
+    .limit(1);
 
   // Collect context references used for this review
   const reviewContextUsed: { id: string; name: string }[] = [];
@@ -139,14 +138,13 @@ export async function generateAiReview(
   }
 
   // Include contexts linked to this mapping from generation
-  const linkedContexts = db.select({
+  const linkedContexts = await db.select({
     contextId: mappingContext.contextId,
     contextName: context.name,
   })
     .from(mappingContext)
     .leftJoin(context, eq(context.id, mappingContext.contextId))
-    .where(eq(mappingContext.fieldMappingId, mappingId))
-    .all();
+    .where(eq(mappingContext.fieldMappingId, mappingId));
 
   for (const lc of linkedContexts) {
     if (lc.contextId && lc.contextName && !reviewContextUsed.some((c) => c.id === lc.contextId)) {
@@ -209,10 +207,10 @@ Analyze and propose corrections if needed.`;
   };
 
   // Store on the mapping
-  db.update(fieldMapping)
+  await db.update(fieldMapping)
     .set({ aiReview: result, updatedAt: new Date().toISOString() })
     .where(eq(fieldMapping.id, mappingId))
-    .run();
+    ;
 
   return result;
 }
@@ -227,14 +225,13 @@ export async function generateEntityAiReviews(
 ): Promise<{ reviewed: number; errors: number }> {
   const parallel = options?.parallel ?? 3;
 
-  const mappings = db.select({ id: fieldMapping.id, targetFieldId: fieldMapping.targetFieldId })
+  const mappings = await db.select({ id: fieldMapping.id, targetFieldId: fieldMapping.targetFieldId })
     .from(fieldMapping)
     .innerJoin(field, eq(field.id, fieldMapping.targetFieldId))
     .where(and(
       eq(field.entityId, entityId),
       eq(fieldMapping.isLatest, true),
-    ))
-    .all();
+    ));
 
   let reviewed = 0;
   let errors = 0;

@@ -49,11 +49,11 @@ export interface EmitSignalInput {
  * Emit a skill signal. Signals accumulate and trigger skill refreshes
  * when their weighted score exceeds the threshold.
  */
-export function emitSignal(input: EmitSignalInput): string {
+export async function emitSignal(input: EmitSignalInput): Promise<string> {
   const now = new Date().toISOString();
   const weight = SIGNAL_WEIGHTS[input.signalType] ?? 1;
 
-  const [signal] = db
+  const [signal] = await db
     .insert(skillSignal)
     .values({
       workspaceId: input.workspaceId,
@@ -69,7 +69,7 @@ export function emitSignal(input: EmitSignalInput): string {
       updatedAt: now,
     })
     .returning({ id: skillSignal.id })
-    .all();
+    ;
 
   return signal.id;
 }
@@ -84,12 +84,12 @@ export interface SignalEvaluation {
  * Evaluate accumulated signals for an entity to determine if its
  * skill should be refreshed.
  */
-export function evaluateSignals(
+export async function evaluateSignals(
   workspaceId: string,
   entityId: string,
-): SignalEvaluation {
+): Promise<SignalEvaluation> {
   // Check if there's an active batch run — debounce during batch processing
-  const activeBatch = db
+  const activeBatch = (await db
     .select({ id: batchRun.id })
     .from(batchRun)
     .where(
@@ -98,14 +98,14 @@ export function evaluateSignals(
         eq(batchRun.status, "running"),
       )
     )
-    .get();
+    )[0];
 
   if (activeBatch) {
     return { score: 0, signals: [], shouldRefresh: false };
   }
 
   // Load unprocessed signals for this entity
-  const signals = db
+  const signals = await db
     .select()
     .from(skillSignal)
     .where(
@@ -116,7 +116,7 @@ export function evaluateSignals(
       )
     )
     .orderBy(desc(skillSignal.createdAt))
-    .all();
+    ;
 
   const score = signals.reduce((sum, s) => sum + (s.weight ?? 0), 0);
 
@@ -145,11 +145,11 @@ export interface SignalQueueEntry {
 /**
  * Get the signal queue for a workspace — entities grouped by accumulated score.
  */
-export function getSignalQueueForWorkspace(
+export async function getSignalQueueForWorkspace(
   workspaceId: string,
-): SignalQueueEntry[] {
+): Promise<SignalQueueEntry[]> {
   // Aggregate unprocessed signals by entity
-  const rows = db
+  const rows = await db
     .select({
       entityId: skillSignal.entityId,
       totalWeight: sql<number>`SUM(${skillSignal.weight})`,
@@ -166,18 +166,17 @@ export function getSignalQueueForWorkspace(
     )
     .groupBy(skillSignal.entityId)
     .orderBy(sql`SUM(${skillSignal.weight}) DESC`)
-    .all();
+    ;
 
   // Resolve entity names
-  return rows
-    .filter((r) => r.entityId)
-    .map((r) => {
+  const filteredRows = rows.filter((r) => r.entityId);
+  return await Promise.all(filteredRows.map(async (r) => {
       // Load entity name
-      const entityRow = db
+      const entityRow = (await db
         .select({ name: sql<string>`COALESCE(display_name, name)` })
         .from(sql`entity`)
         .where(sql`id = ${r.entityId}`)
-        .get();
+        )[0];
 
       return {
         entityId: r.entityId!,
@@ -187,21 +186,21 @@ export function getSignalQueueForWorkspace(
         latestSignal: r.latestCreatedAt ?? "",
         shouldRefresh: (r.totalWeight ?? 0) >= REFRESH_THRESHOLD,
       };
-    });
+    }));
 }
 
 /**
  * Mark signals as processed (e.g., after a skill refresh).
  */
-export function markSignalsProcessed(signalIds: string[]): void {
+export async function markSignalsProcessed(signalIds: string[]): Promise<void> {
   if (signalIds.length === 0) return;
 
   const now = new Date().toISOString();
 
   for (const id of signalIds) {
-    db.update(skillSignal)
+    await db.update(skillSignal)
       .set({ processed: true, processedAt: now, updatedAt: now })
       .where(eq(skillSignal.id, id))
-      .run();
+      ;
   }
 }

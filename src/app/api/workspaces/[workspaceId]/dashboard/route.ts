@@ -11,7 +11,7 @@ import {
   evaluation,
 } from "@/lib/db/schema";
 import { eq, and, sql, count, notInArray, inArray } from "drizzle-orm";
-import { MILESTONES } from "@/lib/constants";
+import { MILESTONES, ENTITY_DOMAIN_MAP, FIELD_DOMAINS, type FieldDomain } from "@/lib/constants";
 import type {
   LeaderboardEntry,
   AssignedFieldItem,
@@ -25,7 +25,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
   // ─── My Work Tab ──────────────────────────────────────────
   if (tab === "my-work") {
     // Assigned fields: latest mappings assigned to current user, not yet closed
-    const assignedFields: AssignedFieldItem[] = db
+    const assignedFields: AssignedFieldItem[] = await db
       .select({
         fieldMappingId: fieldMapping.id,
         targetFieldId: fieldMapping.targetFieldId,
@@ -51,10 +51,10 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
         )
       )
       .orderBy(entity.sortOrder, field.sortOrder)
-      .all();
+      ;
 
     // My questions: open questions I created or am assigned to
-    const allOpenQuestions = db
+    const allOpenQuestions = await db
       .select({
         id: question.id,
         question: question.question,
@@ -81,7 +81,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
         sql`CASE ${question.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END`,
         question.createdAt
       )
-      .all();
+      ;
 
     // Filter to questions the user created or is assigned to
     const myQuestions: MyQuestionItem[] = [];
@@ -94,11 +94,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       // Look up field name if fieldId exists
       let fieldName: string | null = null;
       if (q.fieldId) {
-        const f = db
+        const f = (await db
           .select({ name: field.name })
           .from(field)
           .where(eq(field.id, q.fieldId))
-          .get();
+          )[0];
         fieldName = f?.name ?? null;
       }
 
@@ -122,12 +122,12 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
   // ─── Overview Tab (default) ───────────────────────────────
 
   // Get all target entities with field counts and mapping stats
-  const entities = db
+  const entities = await db
     .select()
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "target")))
     .orderBy(entity.sortOrder)
-    .all();
+    ;
 
   // Identify assembly parent entities (those that have child entities)
   // Assembly parents don't have direct field mappings — stats derive from children
@@ -139,14 +139,14 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
   }
 
   // Get field counts and mapping stats per entity
-  const entityStats = entities.map((e) => {
+  const entityStats = await Promise.all(entities.map(async (e) => {
     // Assembly parents: zero out field stats (component aggregates from children)
     if (assemblyParentIds.has(e.id)) {
-      const openQs = db
+      const openQs = (await db
         .select({ cnt: count() })
         .from(question)
         .where(and(eq(question.entityId, e.id), eq(question.status, "open")))
-        .get();
+        )[0];
       return {
         id: e.id,
         name: e.name,
@@ -162,17 +162,17 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       };
     }
 
-    const fields = db
+    const fields = await db
       .select({ id: field.id })
       .from(field)
       .where(eq(field.entityId, e.id))
-      .all();
+      ;
 
     const fieldIds = fields.map((f) => f.id);
     const statusCounts: Record<string, number> = {};
 
     if (fieldIds.length > 0) {
-      const mappings = db
+      const mappings = await db
         .select({
           status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
           cnt: count(),
@@ -192,7 +192,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
           )})`
         )
         .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
-        .all();
+        ;
 
       for (const m of mappings) {
         statusCounts[m.status] = m.cnt;
@@ -201,11 +201,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
 
     const mappedCount = (statusCounts["accepted"] || 0) + (statusCounts["excluded"] || 0);
 
-    const openQs = db
+    const openQs = (await db
       .select({ cnt: count() })
       .from(question)
       .where(and(eq(question.entityId, e.id), eq(question.status, "open")))
-      .get();
+      )[0];
 
     return {
       id: e.id,
@@ -223,11 +223,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       openQuestions: openQs?.cnt || 0,
       statusBreakdown: statusCounts,
     };
-  });
+  }));
 
   // Milestone stats
-  const milestoneStats = MILESTONES.map((m) => {
-    const rows = db
+  const milestoneStats = await Promise.all(MILESTONES.map(async (m) => {
+    const rows = await db
       .select({
         status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
         cnt: count(),
@@ -252,7 +252,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
         )
       )
       .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
-      .all();
+      ;
 
     const statusBreakdown: Record<string, number> = {};
     let total = 0;
@@ -270,14 +270,14 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       coveragePercent: total > 0 ? Math.round((mapped / total) * 100) : 0,
       statusBreakdown,
     };
-  });
+  }));
 
   // Aggregate stats
   const totalFields = entityStats.reduce((sum, e) => sum + e.fieldCount, 0);
   const mappedFields = entityStats.reduce((sum, e) => sum + e.mappedCount, 0);
 
   // Status distribution
-  const allFieldStatuses = db
+  const allFieldStatuses = await db
     .select({
       status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
       cnt: count(),
@@ -301,25 +301,25 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       )
     )
     .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
-    .all();
+    ;
 
   const statusDistribution: Record<string, number> = {};
   for (const r of allFieldStatuses) {
     statusDistribution[r.status] = r.cnt;
   }
 
-  const openQuestions = db
+  const openQuestions = (await db
     .select({ cnt: count() })
     .from(question)
     .where(
       and(eq(question.workspaceId, workspaceId), eq(question.status, "open"))
     )
-    .get();
+    )[0];
 
   // ─── Leaderboard Queries ────────────────────────────────────
 
   // Most Mapped: accepted + isLatest, grouped by assigneeId
-  const mostMapped: LeaderboardEntry[] = db
+  const mostMapped = await db
     .select({
       userId: fieldMapping.assigneeId,
       name: user.name,
@@ -338,11 +338,10 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
     )
     .groupBy(fieldMapping.assigneeId, user.name, user.image)
     .orderBy(sql`count(*) DESC`)
-    .limit(10)
-    .all() as LeaderboardEntry[];
+    .limit(10) as LeaderboardEntry[];
 
   // Most Questions Answered: resolved questions grouped by resolvedBy
-  const mostQuestionsAnswered: LeaderboardEntry[] = db
+  const mostQuestionsAnswered = await db
     .select({
       userId: question.resolvedBy,
       name: user.name,
@@ -360,11 +359,10 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
     )
     .groupBy(question.resolvedBy, user.name, user.image)
     .orderBy(sql`count(*) DESC`)
-    .limit(10)
-    .all() as LeaderboardEntry[];
+    .limit(10) as LeaderboardEntry[];
 
   // Most Bot Collaborations: chat sessions grouped by createdBy
-  const mostBotCollaborations: LeaderboardEntry[] = db
+  const mostBotCollaborations = await db
     .select({
       userId: chatSession.createdBy,
       name: user.name,
@@ -376,11 +374,10 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
     .where(eq(chatSession.workspaceId, workspaceId))
     .groupBy(chatSession.createdBy, user.name, user.image)
     .orderBy(sql`count(*) DESC`)
-    .limit(10)
-    .all() as LeaderboardEntry[];
+    .limit(10) as LeaderboardEntry[];
 
   // ─── Evaluation Stats ─────────────────────────────────────
-  const evalStats = db
+  const evalStats = (await db
     .select({
       totalEvaluations: sql<number>`COUNT(*)`,
       avgJudgeScore: sql<number | null>`AVG(${evaluation.judgeScore})`,
@@ -393,7 +390,68 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
         eq(evaluation.status, "completed")
       )
     )
-    .get();
+    )[0];
+
+  // ─── Domain Leaders ─────────────────────────────────────
+  // Top 3 reviewers per domain by volume of accepted/excluded mappings
+  const domainMappings = await db
+    .select({
+      assigneeId: fieldMapping.assigneeId,
+      assigneeName: user.name,
+      targetFieldId: fieldMapping.targetFieldId,
+    })
+    .from(fieldMapping)
+    .innerJoin(user, eq(user.id, fieldMapping.assigneeId))
+    .where(
+      and(
+        eq(fieldMapping.workspaceId, workspaceId),
+        inArray(fieldMapping.status, ["accepted", "excluded"]),
+        eq(fieldMapping.isLatest, true),
+        sql`${fieldMapping.assigneeId} IS NOT NULL`,
+      ),
+    );
+
+  // Resolve field → domain
+  const domainFieldIds = [...new Set(domainMappings.map((m) => m.targetFieldId))];
+  const fieldDomainLookup = new Map<string, FieldDomain | null>();
+  if (domainFieldIds.length > 0) {
+    for (let i = 0; i < domainFieldIds.length; i += 500) {
+      const chunk = domainFieldIds.slice(i, i + 500);
+      const rows = await db
+        .select({ fieldId: field.id, entityName: entity.name, domainTag: field.domainTag })
+        .from(field)
+        .innerJoin(entity, eq(field.entityId, entity.id))
+        .where(inArray(field.id, chunk));
+      for (const r of rows) {
+        fieldDomainLookup.set(
+          r.fieldId,
+          (r.domainTag as FieldDomain) ?? ENTITY_DOMAIN_MAP[r.entityName]?.[0] ?? null,
+        );
+      }
+    }
+  }
+
+  // Aggregate: domain → assignee → count
+  const domainAssigneeCounts = new Map<string, Map<string, { name: string | null; count: number }>>();
+  for (const m of domainMappings) {
+    const domain = fieldDomainLookup.get(m.targetFieldId);
+    if (!domain) continue;
+    if (!domainAssigneeCounts.has(domain)) domainAssigneeCounts.set(domain, new Map());
+    const assigneeMap = domainAssigneeCounts.get(domain)!;
+    const cur = assigneeMap.get(m.assigneeId!) || { name: m.assigneeName, count: 0 };
+    cur.count++;
+    assigneeMap.set(m.assigneeId!, cur);
+  }
+
+  const domainLeaders = FIELD_DOMAINS.map((d) => {
+    const assigneeMap = domainAssigneeCounts.get(d);
+    if (!assigneeMap) return { domain: d, leaders: [] };
+    const leaders = [...assigneeMap.entries()]
+      .map(([userId, { name, count: c }]) => ({ userId, name, count: c }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+    return { domain: d, leaders };
+  }).filter((d) => d.leaders.length > 0);
 
   return NextResponse.json({
     totalEntities: entities.length,
@@ -410,6 +468,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       mostQuestionsAnswered,
       mostBotCollaborations,
     },
+    domainLeaders,
     evaluationStats: {
       totalEvaluations: evalStats?.totalEvaluations || 0,
       avgJudgeScore: evalStats?.avgJudgeScore

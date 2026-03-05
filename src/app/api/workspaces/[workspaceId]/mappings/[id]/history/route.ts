@@ -9,18 +9,18 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const { id } = params;
 
   // Get the mapping to find its targetFieldId
-  const mapping = db
+  const mapping = (await db
     .select()
     .from(fieldMapping)
     .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!mapping) {
     return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
   }
 
   // Get all versions for the same targetFieldId
-  const history = db
+  const history = await db
     .select({
       id: fieldMapping.id,
       version: fieldMapping.version,
@@ -41,7 +41,7 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
       )
     )
     .orderBy(desc(fieldMapping.version))
-    .all();
+    ;
 
   return NextResponse.json(history);
 });

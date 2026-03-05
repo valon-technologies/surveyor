@@ -12,7 +12,7 @@ export const GET = withAuth(
     const searchParams = req.nextUrl.searchParams;
     const status = searchParams.get("status") || "pending";
 
-    const rows = db
+    const rows = await db
       .select({
         learning: learning,
         entityName: entity.name,
@@ -26,7 +26,7 @@ export const GET = withAuth(
         )
       )
       .orderBy(learning.createdAt)
-      .all();
+      ;
 
     return NextResponse.json(
       rows.map((r) => ({
@@ -54,13 +54,13 @@ export const PATCH = withAuth(
       );
     }
 
-    const existing = db
+    const existing = (await db
       .select()
       .from(learning)
       .where(
         and(eq(learning.id, learningId), eq(learning.workspaceId, workspaceId))
       )
-      .get();
+      )[0];
 
     if (!existing) {
       return NextResponse.json({ error: "Learning not found" }, { status: 404 });
@@ -69,14 +69,14 @@ export const PATCH = withAuth(
     const now = new Date().toISOString();
 
     if (action === "validate") {
-      db.update(learning)
+      await db.update(learning)
         .set({
           validationStatus: "validated",
           validatedBy: userId,
           validatedAt: now,
         })
         .where(eq(learning.id, learningId))
-        .run();
+        ;
 
       // NOW rebuild Entity Knowledge — the validated correction enters EK
       if (existing.entityId) {
@@ -98,14 +98,14 @@ export const PATCH = withAuth(
         });
       }
     } else {
-      db.update(learning)
+      await db.update(learning)
         .set({
           validationStatus: "rejected",
           validatedBy: userId,
           validatedAt: now,
         })
         .where(eq(learning.id, learningId))
-        .run();
+        ;
     }
 
     return NextResponse.json({ success: true, action });

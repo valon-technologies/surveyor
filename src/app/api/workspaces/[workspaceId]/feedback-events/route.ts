@@ -12,7 +12,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     return NextResponse.json({ error: "entityId required" }, { status: 400 });
   }
 
-  const events = db
+  const events = await db
     .select()
     .from(feedbackEvent)
     .where(
@@ -23,7 +23,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     )
     .orderBy(desc(feedbackEvent.createdAt))
     .limit(200)
-    .all();
+    ;
 
   return NextResponse.json({ events });
 });

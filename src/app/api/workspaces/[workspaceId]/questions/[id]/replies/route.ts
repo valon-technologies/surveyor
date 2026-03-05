@@ -9,22 +9,22 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const { id } = await ctx.params;
 
   // Verify question exists in workspace
-  const q = db
+  const q = (await db
     .select({ id: question.id })
     .from(question)
     .where(and(eq(question.id, id), eq(question.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!q) {
     return NextResponse.json({ error: "Question not found" }, { status: 404 });
   }
 
-  const replies = db
+  const replies = await db
     .select()
     .from(questionReply)
     .where(eq(questionReply.questionId, id))
     .orderBy(asc(questionReply.createdAt))
-    .all();
+    ;
 
   return NextResponse.json(replies);
 });
@@ -39,25 +39,25 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
   }
 
   // Verify question exists in workspace
-  const q = db
+  const q = (await db
     .select({ id: question.id, replyCount: question.replyCount })
     .from(question)
     .where(and(eq(question.id, id), eq(question.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!q) {
     return NextResponse.json({ error: "Question not found" }, { status: 404 });
   }
 
   // Look up author name
-  const u = db
+  const u = (await db
     .select({ name: user.name })
     .from(user)
     .where(eq(user.id, userId))
-    .get();
+    )[0];
   const authorName = u?.name || "User";
 
-  const [created] = db
+  const [created] = await db
     .insert(questionReply)
     .values({
       questionId: id,
@@ -67,16 +67,16 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
       body: parsed.data.body,
     })
     .returning()
-    .all();
+    ;
 
   // Atomic increment — avoids stale read-modify-write under concurrency
-  db.update(question)
+  await db.update(question)
     .set({
       replyCount: sql`${question.replyCount} + 1`,
       updatedAt: new Date().toISOString(),
     })
     .where(eq(question.id, id))
-    .run();
+    ;
 
   return NextResponse.json(created, { status: 201 });
 }, { requiredRole: "editor" });

@@ -10,17 +10,17 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
   const params = await ctx.params;
   const { id } = params;
 
-  const scs = db
+  const scs = await db
     .select()
     .from(skillContext)
     .where(eq(skillContext.skillId, id))
     .orderBy(skillContext.sortOrder)
-    .all();
+    ;
 
-  const withDetail = scs.map((sc) => {
-    const ctxRow = db.select().from(context).where(eq(context.id, sc.contextId)).get();
+  const withDetail = await Promise.all(scs.map(async (sc) => {
+    const [ctxRow] = await db.select().from(context).where(eq(context.id, sc.contextId)).limit(1);
     return { ...sc, context: ctxRow };
-  });
+  }));
 
   return NextResponse.json(withDetail);
 });
@@ -37,7 +37,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
 
   const input = parsed.data;
 
-  const [created] = db
+  const [created] = await db
     .insert(skillContext)
     .values({
       skillId: id,
@@ -47,10 +47,10 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId, role }) => 
       notes: input.notes,
     })
     .returning()
-    .all();
+    ;
 
   // Return with context detail
-  const ctxRow = db.select().from(context).where(eq(context.id, input.contextId)).get();
+  const [ctxRow] = await db.select().from(context).where(eq(context.id, input.contextId)).limit(1);
 
   invalidateWorkspaceContextCache(workspaceId);
   return NextResponse.json({ ...created, context: ctxRow }, { status: 201 });

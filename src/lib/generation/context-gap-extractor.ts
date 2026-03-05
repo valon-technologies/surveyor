@@ -23,7 +23,7 @@ function stripCodeBlocks(text: string): string {
  *   **CONTEXT GAP IDENTIFIED**: ...
  *   **CONTEXT GAP DETECTED**: ...
  */
-export function extractAndPersistContextGaps(
+export async function extractAndPersistContextGaps(
   fullContent: string,
   context: {
     workspaceId: string;
@@ -32,7 +32,7 @@ export function extractAndPersistContextGaps(
     fieldMappingId?: string | null;
     chatSessionId: string;
   }
-): ContextGap[] {
+): Promise<ContextGap[]> {
   const gaps: ContextGap[] = [];
 
   // Strip code blocks so we don't match inside JSON notes
@@ -48,7 +48,7 @@ export function extractAndPersistContextGaps(
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    db.insert(question)
+    await db.insert(question)
       .values({
         id,
         workspaceId: context.workspaceId,
@@ -64,7 +64,7 @@ export function extractAndPersistContextGaps(
         createdAt: now,
         updatedAt: now,
       })
-      .run();
+      ;
 
     gaps.push({ description, questionId: id });
   }

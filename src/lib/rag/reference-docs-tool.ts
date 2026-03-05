@@ -73,32 +73,32 @@ export function getReferenceDocsToolDefinition(): ToolDefinition {
 
 // ─── Executor ──────────────────────────────────────────────────
 
-export function executeReferenceDocRetrieval(
+export async function executeReferenceDocRetrieval(
   input: ReferenceDocsInput,
   workspaceId: string
-): ReferenceDocsResult {
+): Promise<ReferenceDocsResult> {
   const { query, category, subcategory, maxTokens: rawMaxTokens } = input;
   const tokenCap = Math.min(rawMaxTokens || 4000, 8000);
 
   // Count total active contexts for stats
-  const allContexts = db
+  const allContexts = await db
     .select({ id: context.id })
     .from(context)
     .where(and(eq(context.workspaceId, workspaceId), eq(context.isActive, true)))
-    .all();
+    ;
 
   // Use FTS5 for ranked retrieval (falls back gracefully if table doesn't exist)
-  const ftsResults = searchContextsFts(workspaceId, query, 10);
+  const ftsResults = await searchContextsFts(workspaceId, query, 10);
 
   // Load full context records for FTS matches
   let topDocs: ScoredDoc[] = [];
   if (ftsResults.length > 0) {
     const ftsIds = ftsResults.map((r) => r.contextId);
-    const ftsContexts = db
+    const ftsContexts = await db
       .select()
       .from(context)
       .where(inArray(context.id, ftsIds))
-      .all();
+      ;
 
     // Build a rank map for ordering
     const rankMap = new Map(ftsResults.map((r) => [r.contextId, r.rank]));

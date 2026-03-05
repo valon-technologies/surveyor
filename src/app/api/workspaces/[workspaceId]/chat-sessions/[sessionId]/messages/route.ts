@@ -97,7 +97,7 @@ export const POST = withAuth(
     }
 
     // Verify session exists and belongs to workspace
-    const session = db
+    const session = (await db
       .select()
       .from(chatSession)
       .where(
@@ -105,7 +105,7 @@ export const POST = withAuth(
           eq(chatSession.id, sessionId),
           eq(chatSession.workspaceId, workspaceId)
         )
-      ).get();
+      ))[0];
 
     if (!session) {
       return NextResponse.json(
@@ -121,22 +121,22 @@ export const POST = withAuth(
     if (parsed.data.voiceInput) userMeta.voiceInput = true;
     if (parsed.data.kickoff) userMeta.kickoff = true;
 
-    db.insert(chatMessage)
+    await db.insert(chatMessage)
       .values({
         sessionId,
         role: "user",
         content: parsed.data.content,
         metadata: Object.keys(userMeta).length > 0 ? userMeta : null,
         createdAt: now,
-      }).run();
+      });
 
     // Load full message history
-    const allMessages = db
+    const allMessages = await db
       .select()
       .from(chatMessage)
       .where(eq(chatMessage.sessionId, sessionId))
       .orderBy(chatMessage.createdAt)
-      .all();
+      ;
 
     // Separate system message from conversation
     let systemMsg = allMessages.find((m) => m.role === "system");
@@ -150,10 +150,10 @@ export const POST = withAuth(
     // Inject pre-generated AI review as prior assistant context on first user message
     const isFirstUserMessage = conversationMessages.filter((m) => m.role === "user").length === 1;
     if (isFirstUserMessage && session.fieldMappingId) {
-      const mappingWithReview = db.select({ aiReview: fieldMapping.aiReview })
+      const [mappingWithReview] = await db.select({ aiReview: fieldMapping.aiReview })
         .from(fieldMapping)
         .where(eq(fieldMapping.id, session.fieldMappingId))
-        .get();
+        .limit(1);
       const aiReview = mappingWithReview?.aiReview as { reviewText?: string; proposedUpdate?: Record<string, unknown> } | null;
       if (aiReview?.reviewText) {
         const reviewContext = aiReview.proposedUpdate
@@ -171,26 +171,26 @@ export const POST = withAuth(
     if (parsed.data.kickoff && systemMsg && session.fieldMappingId) {
       try {
         // Resolve source entity/field names from the mapping
-        const mapping = db.select().from(fieldMapping)
-          .where(eq(fieldMapping.id, session.fieldMappingId)).get();
+        const [mapping] = await db.select().from(fieldMapping)
+          .where(eq(fieldMapping.id, session.fieldMappingId)).limit(1);
 
         let sourceEntityName: string | undefined;
         let sourceFieldName: string | undefined;
         if (mapping?.sourceEntityId) {
-          const se = db.select({ name: entity.name, displayName: entity.displayName })
-            .from(entity).where(eq(entity.id, mapping.sourceEntityId)).get();
+          const [se] = await db.select({ name: entity.name, displayName: entity.displayName })
+            .from(entity).where(eq(entity.id, mapping.sourceEntityId)).limit(1);
           sourceEntityName = se?.displayName || se?.name || undefined;
         }
         if (mapping?.sourceFieldId) {
-          const sf = db.select({ name: field.name, displayName: field.displayName })
-            .from(field).where(eq(field.id, mapping.sourceFieldId)).get();
+          const [sf] = await db.select({ name: field.name, displayName: field.displayName })
+            .from(field).where(eq(field.id, mapping.sourceFieldId)).limit(1);
           sourceFieldName = sf?.displayName || sf?.name || undefined;
         }
 
         if (sourceEntityName) {
           // Load BQ config
-          const ws = db.select({ settings: workspace.settings })
-            .from(workspace).where(eq(workspace.id, workspaceId)).get();
+          const [ws] = await db.select({ settings: workspace.settings })
+            .from(workspace).where(eq(workspace.id, workspaceId)).limit(1);
           const bqCfg = (ws?.settings as Record<string, unknown> | null)?.bigquery as BigQueryConfig | undefined;
 
           if (bqCfg) {
@@ -215,7 +215,7 @@ export const POST = withAuth(
                 : updatedContent + restrictiveInstructions;
 
               // Update system message in DB
-              db.update(chatMessage)
+              await db.update(chatMessage)
                 .set({ content: finalContent })
                 .where(
                   and(
@@ -223,7 +223,7 @@ export const POST = withAuth(
                     eq(chatMessage.role, "system")
                   )
                 )
-                .run();
+                ;
 
               // Update in-memory reference
               systemMsg = { ...systemMsg, content: finalContent };
@@ -239,7 +239,7 @@ export const POST = withAuth(
     let provider;
     let providerName: string;
     try {
-      const resolved = resolveProvider(userId);
+      const resolved = await resolveProvider(userId);
       provider = resolved.provider;
       providerName = resolved.providerName;
     } catch (error) {
@@ -257,11 +257,11 @@ export const POST = withAuth(
     let bqConfig: BigQueryConfig | undefined;
     let ragEnabled = true;
     try {
-      const ws = db
+      const ws = (await db
         .select({ settings: workspace.settings })
         .from(workspace)
         .where(eq(workspace.id, workspaceId))
-        .get();
+        )[0];
       const wsSettings = ws?.settings as Record<string, unknown> | null;
       bqConfig = wsSettings?.bigquery as BigQueryConfig | undefined;
       ragEnabled = wsSettings?.ragMode !== false;
@@ -354,17 +354,17 @@ export const POST = withAuth(
 
                       // Lazy-load source data for name→ID resolution
                       if (!sourceDataLoaded) {
-                        cachedSourceEntities = db
+                        cachedSourceEntities = await db
                           .select({ id: entity.id, name: entity.name })
                           .from(entity)
                           .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-                          .all();
+                          ;
                         const seIds = cachedSourceEntities.map((e) => e.id);
                         cachedSourceFields = seIds.length > 0
-                          ? db
+                          ? (await db
                               .select({ id: field.id, name: field.name, entityId: field.entityId })
                               .from(field)
-                              .all()
+                              )
                               .filter((f) => seIds.includes(f.entityId))
                           : [];
                         sourceDataLoaded = true;
@@ -412,17 +412,17 @@ export const POST = withAuth(
 
                       // Lazy-load source data for name→ID resolution
                       if (!sourceDataLoaded) {
-                        cachedSourceEntities = db
+                        cachedSourceEntities = await db
                           .select({ id: entity.id, name: entity.name })
                           .from(entity)
                           .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-                          .all();
+                          ;
                         const seIds = cachedSourceEntities.map((e) => e.id);
                         cachedSourceFields = seIds.length > 0
-                          ? db
+                          ? (await db
                               .select({ id: field.id, name: field.name, entityId: field.entityId })
                               .from(field)
-                              .all()
+                              )
                               .filter((f) => seIds.includes(f.entityId))
                           : [];
                         sourceDataLoaded = true;
@@ -546,7 +546,7 @@ export const POST = withAuth(
                 fullContent += `\n\n---\n**BigQuery**: ${result.purpose}\n\`\`\`sql\n${result.sql}\n\`\`\`\nResult: ${statusLabel}\n---\n\n`;
 
               } else if (tc.name === "search_source_schema") {
-                const result = executeSourceSchemaSearch(
+                const result = await executeSourceSchemaSearch(
                   tc.input as unknown as SourceSchemaInput,
                   workspaceId
                 );
@@ -575,7 +575,7 @@ export const POST = withAuth(
                 });
 
               } else if (tc.name === "get_reference_docs") {
-                const result = executeReferenceDocRetrieval(
+                const result = await executeReferenceDocRetrieval(
                   tc.input as unknown as ReferenceDocsInput,
                   workspaceId
                 );
@@ -604,7 +604,7 @@ export const POST = withAuth(
                 });
 
               } else if (tc.name === "get_sibling_mappings") {
-                const result = executeSiblingMappingLookup(
+                const result = await executeSiblingMappingLookup(
                   tc.input as unknown as SiblingMappingsInput,
                   workspaceId,
                   sessionEntityId,
@@ -635,7 +635,7 @@ export const POST = withAuth(
                 });
 
               } else if (tc.name === "get_mapping_examples") {
-                const result = executeMappingExampleSearch(
+                const result = await executeMappingExampleSearch(
                   tc.input as unknown as MappingExamplesInput,
                   workspaceId,
                   sessionEntityId
@@ -702,17 +702,17 @@ export const POST = withAuth(
             ...(pipelineStructureUpdate ? { pipelineStructureUpdate } : {}),
             ...(allToolCalls.length > 0 ? { toolCalls: allToolCalls } : {}),
           };
-          db.insert(chatMessage)
+          await db.insert(chatMessage)
             .values({
               sessionId,
               role: "assistant",
               content: fullContent,
               metadata: msgMetadata as typeof chatMessage.$inferInsert.metadata,
               createdAt: msgNow,
-            }).run();
+            });
 
           // Extract and persist CONTEXT GAP flags
-          const contextGaps = extractAndPersistContextGaps(fullContent, {
+          const contextGaps = await extractAndPersistContextGaps(fullContent, {
             workspaceId,
             entityId: session.entityId || "",
             fieldId: session.targetFieldId || undefined,
@@ -729,14 +729,14 @@ export const POST = withAuth(
           }
 
           // Update session
-          db.update(chatSession)
+          await db.update(chatSession)
             .set({
               messageCount: allMessages.length + 1,
               lastMessageAt: msgNow,
               updatedAt: msgNow,
             })
             .where(eq(chatSession.id, sessionId))
-            .run();
+            ;
 
           controller.enqueue(
             encoder.encode(

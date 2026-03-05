@@ -7,7 +7,7 @@ import { eq, and, count, isNull } from "drizzle-orm";
 export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   const { id } = await ctx.params;
 
-  const asset = db
+  const asset = (await db
     .select({
       id: schemaAsset.id,
       workspaceId: schemaAsset.workspaceId,
@@ -22,29 +22,29 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
     })
     .from(schemaAsset)
     .where(and(eq(schemaAsset.id, id), eq(schemaAsset.workspaceId, workspaceId)))
-    .get();
+    )[0];
 
   if (!asset) {
     return NextResponse.json({ error: "Schema asset not found" }, { status: 404 });
   }
 
   // Get top-level entities (exclude child/component entities)
-  const entities = db
+  const entities = await db
     .select()
     .from(entity)
     .where(and(eq(entity.schemaAssetId, id), isNull(entity.parentEntityId)))
     .orderBy(entity.sortOrder)
-    .all();
+    ;
 
-  const entitiesWithFields = entities.map((ent) => {
-    const fieldCount = db
+  const entitiesWithFields = await Promise.all(entities.map(async (ent) => {
+    const fieldCount = (await db
       .select({ cnt: count() })
       .from(field)
       .where(eq(field.entityId, ent.id))
-      .get();
+      )[0];
 
     return { ...ent, fieldCount: fieldCount?.cnt || 0 };
-  });
+  }));
 
   return NextResponse.json({ ...asset, entities: entitiesWithFields });
 });
@@ -52,9 +52,9 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
 export const DELETE = withAuth(async (_req, ctx, { workspaceId }) => {
   const { id } = await ctx.params;
 
-  db.delete(schemaAsset)
+  await db.delete(schemaAsset)
     .where(and(eq(schemaAsset.id, id), eq(schemaAsset.workspaceId, workspaceId)))
-    .run();
+    ;
 
   return NextResponse.json({ success: true });
 }, { requiredRole: "editor" });

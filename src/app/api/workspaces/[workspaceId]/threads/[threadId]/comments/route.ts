@@ -17,17 +17,17 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
   }
 
   // Verify thread exists
-  const thread = db
+  const thread = (await db
     .select()
     .from(commentThread)
     .where(and(eq(commentThread.id, threadId), eq(commentThread.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!thread) {
     return NextResponse.json({ error: "Thread not found" }, { status: 404 });
   }
 
-  const [created] = db
+  const [created] = await db
     .insert(comment)
     .values({
       threadId,
@@ -36,16 +36,16 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
       bodyFormat: parsed.data.bodyFormat || "markdown",
     })
     .returning()
-    .all();
+    ;
 
   // Atomic increment — avoids stale read-modify-write under concurrency
-  db.update(commentThread)
+  await db.update(commentThread)
     .set({
       commentCount: sql`${commentThread.commentCount} + 1`,
       updatedAt: new Date().toISOString(),
     })
     .where(eq(commentThread.id, threadId))
-    .run();
+    ;
 
   logActivity({
     workspaceId,

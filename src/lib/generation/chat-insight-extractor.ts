@@ -40,18 +40,18 @@ export async function extractChatInsights(
   sessionId: string,
 ): Promise<ExtractionResult> {
   // Load session
-  const session = db
+  const session = (await db
     .select()
     .from(chatSession)
     .where(eq(chatSession.id, sessionId))
-    .get();
+    )[0];
 
   if (!session) {
     throw new Error(`Chat session ${sessionId} not found`);
   }
 
   // Load messages
-  const messages = db
+  const messages = await db
     .select({
       role: chatMessage.role,
       content: chatMessage.content,
@@ -60,7 +60,7 @@ export async function extractChatInsights(
     .from(chatMessage)
     .where(eq(chatMessage.sessionId, sessionId))
     .orderBy(asc(chatMessage.createdAt))
-    .all();
+    ;
 
   // Skip sessions that are too short
   const nonSystemMessages = messages.filter((m) => m.role !== "system");
@@ -71,14 +71,14 @@ export async function extractChatInsights(
   // Resolve entity name for signal context
   let entityName: string | null = null;
   if (session.entityId) {
-    const ent = db
+    const ent = (await db
       .select({
         name: entity.name,
         displayName: entity.displayName,
       })
       .from(entity)
       .where(eq(entity.id, session.entityId))
-      .get();
+      )[0];
     entityName = ent?.displayName || ent?.name || null;
   }
 

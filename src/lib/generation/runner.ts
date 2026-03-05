@@ -77,13 +77,13 @@ interface PreparedGeneration {
  * Sync setup: validates, loads data, assembles context, creates generation record.
  * Returns with generation metadata + prepared data for async execution.
  */
-export function startGeneration(
+export async function startGeneration(
   input: RunGenerationInput
-): { startResult: GenerationStartResult; prepared: PreparedGeneration } {
+): Promise<{ startResult: GenerationStartResult; prepared: PreparedGeneration }> {
   const { workspaceId, userId, entityId, fieldIds, preferredProvider } = input;
 
   // 1. Check for concurrent generation on this entity (inside transaction to close TOCTOU)
-  const running = db
+  const running = (await db
     .select()
     .from(generation)
     .where(
@@ -93,7 +93,7 @@ export function startGeneration(
         eq(generation.status, "running")
       )
     )
-    .get();
+    )[0];
 
   if (running) {
     throw new Error(
@@ -102,29 +102,29 @@ export function startGeneration(
   }
 
   // 2. Load target entity
-  const targetEntity = db
+  const targetEntity = (await db
     .select()
     .from(entity)
     .where(and(eq(entity.id, entityId), eq(entity.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!targetEntity) {
     throw new Error("Entity not found");
   }
 
   // 3. Load target fields
-  let targetFields = db
+  let targetFields = await db
     .select()
     .from(field)
     .where(eq(field.entityId, entityId))
     .orderBy(field.sortOrder)
-    .all();
+    ;
 
   if (fieldIds?.length) {
     const idSet = new Set(fieldIds);
     targetFields = targetFields.filter((f) => idSet.has(f.id));
   } else {
-    const existingMappings = db
+    const existingMappings = await db
       .select({ targetFieldId: fieldMapping.targetFieldId })
       .from(fieldMapping)
       .where(
@@ -133,7 +133,7 @@ export function startGeneration(
           eq(fieldMapping.isLatest, true)
         )
       )
-      .all();
+      ;
 
     const mappedIds = new Set(existingMappings.map((m) => m.targetFieldId));
     targetFields = targetFields.filter((f) => !mappedIds.has(f.id));
@@ -144,17 +144,17 @@ export function startGeneration(
   }
 
   // 4. Load source entities and fields — pre-filter to relevant tables
-  const allSourceEntities = db
+  const allSourceEntities = await db
     .select()
     .from(entity)
     .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
-    .all();
+    ;
 
   // Identify relevant source tables from pipeline + existing mappings
   const relevantSourceIds = new Set<string>();
 
   // Signal 1: entity pipeline declared sources
-  const pipeline = db
+  const pipeline = (await db
     .select()
     .from(entityPipeline)
     .where(
@@ -163,7 +163,7 @@ export function startGeneration(
         eq(entityPipeline.isLatest, true)
       )
     )
-    .get();
+    )[0];
 
   if (pipeline?.sources) {
     const pipelineSources = pipeline.sources as { name: string; alias: string; table: string }[];
@@ -181,15 +181,15 @@ export function startGeneration(
 
   // Signal 2: existing sibling mappings' source entities (same entity only)
   // Collect all field IDs for this entity to scope the lookup
-  const entityFieldIds = db
+  const entityFieldIds = (await db
     .select({ id: field.id })
     .from(field)
     .where(eq(field.entityId, entityId))
-    .all()
+    )
     .map((f) => f.id);
 
   const siblingMappings = entityFieldIds.length > 0
-    ? db
+    ? await db
         .select({ sourceEntityId: fieldMapping.sourceEntityId })
         .from(fieldMapping)
         .where(
@@ -199,7 +199,6 @@ export function startGeneration(
             inArray(fieldMapping.targetFieldId, entityFieldIds)
           )
         )
-        .all()
     : [];
 
   for (const sm of siblingMappings) {
@@ -211,25 +210,25 @@ export function startGeneration(
   // table names from primary context docs (e.g. "ServiceMac > Tables > LoanInfo").
   if (relevantSourceIds.size === 0) {
     const SM_TABLE_PREFIX = "ServiceMac > Tables > ";
-    const matched = matchSkills(workspaceId, targetEntity.name);
+    const matched = await matchSkills(workspaceId, targetEntity.name);
     if (matched.length > 0) {
       const seenContextIds = new Set<string>();
       for (const s of matched) {
-        const scs = db
+        const scs = await db
           .select({ contextId: skillContextTable.contextId })
           .from(skillContextTable)
           .where(and(eq(skillContextTable.skillId, s.id), eq(skillContextTable.role, "primary")))
-          .all();
+          ;
 
         for (const sc of scs) {
           if (seenContextIds.has(sc.contextId)) continue;
           seenContextIds.add(sc.contextId);
 
-          const ctx = db
+          const ctx = (await db
             .select({ name: contextTable.name })
             .from(contextTable)
             .where(eq(contextTable.id, sc.contextId))
-            .get();
+            )[0];
 
           if (ctx?.name?.startsWith(SM_TABLE_PREFIX)) {
             const tableName = ctx.name.slice(SM_TABLE_PREFIX.length);
@@ -253,16 +252,16 @@ export function startGeneration(
   // descriptions; the rest get compact name+type only.
   const sourceEntities = allSourceEntities;
 
-  const allSourceFields = db
+  const allSourceFields = (await db
     .select()
     .from(field)
-    .all()
+    )
     .filter((f) => allSourceEntities.some((e) => e.id === f.entityId));
 
   const sourceFields = allSourceFields;
 
   // 5. Resolve provider
-  const { provider, providerName } = resolveProvider(userId, preferredProvider);
+  const { provider, providerName } = await resolveProvider(userId, preferredProvider);
 
   // 6. Assemble context
   // Pass source table names from the previous generation's YAML output so their
@@ -271,7 +270,7 @@ export function startGeneration(
   const tokenBudget = getTokenBudget(providerName);
   let yamlSourceTableNames: string[] | undefined;
 
-  const lastCompletedGen = db
+  const lastCompletedGen = (await db
     .select({ outputParsed: generation.outputParsed })
     .from(generation)
     .where(
@@ -281,7 +280,7 @@ export function startGeneration(
       )
     )
     .orderBy(desc(generation.createdAt))
-    .get();
+    )[0];
 
   if (lastCompletedGen?.outputParsed) {
     try {
@@ -295,7 +294,7 @@ export function startGeneration(
     } catch { /* ignore parse errors */ }
   }
 
-  const assembledCtx = assembleContext(
+  const assembledCtx = await assembleContext(
     workspaceId, targetEntity.name, tokenBudget, undefined,
     yamlSourceTableNames?.length ? yamlSourceTableNames : undefined,
     targetEntity.name,
@@ -309,7 +308,7 @@ export function startGeneration(
   const promptBuilder = outputFormat === "yaml" ? buildYamlPrompt : buildPrompt;
 
   // Load workspace-scoped rules from the learning table
-  const workspaceRules = db
+  const workspaceRules = (await db
     .select({ content: learning.content })
     .from(learning)
     .where(
@@ -320,7 +319,7 @@ export function startGeneration(
     )
     .orderBy(desc(learning.createdAt))
     .limit(20)
-    .all()
+    )
     .map((l) => l.content);
 
   // Include descriptions for relevant (skill-matched) tables; name+type only for others
@@ -372,7 +371,7 @@ export function startGeneration(
     }
   }
 
-  const { systemMessage, userMessage } = promptBuilder({
+  const { systemMessage, userMessage } = await promptBuilder({
     entityName: targetEntity.displayName || targetEntity.name,
     entityDescription: targetEntity.description,
     targetFields: targetFields.map((f) => ({
@@ -424,9 +423,9 @@ WHEN TO USE TOOLS:
   const generationId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  withTransaction(() => {
+  await withTransaction(async () => {
     // Re-check inside transaction — the early check above is just for fast-fail
-    const concurrent = db
+    const concurrent = (await db
       .select()
       .from(generation)
       .where(
@@ -436,7 +435,7 @@ WHEN TO USE TOOLS:
           eq(generation.status, "running"),
         ),
       )
-      .get();
+      )[0];
 
     if (concurrent) {
       throw new Error(
@@ -451,7 +450,7 @@ WHEN TO USE TOOLS:
       ...assembledCtx.supplementaryContexts,
     ];
 
-    db.insert(generation)
+    await db.insert(generation)
       .values({
         id: generationId,
         workspaceId,
@@ -469,7 +468,7 @@ WHEN TO USE TOOLS:
         createdAt: now,
         updatedAt: now,
       })
-      .run();
+      ;
   });
 
   return {
@@ -520,13 +519,13 @@ WHEN TO USE TOOLS:
  * Persist an entityPipeline record from a parsed YAML result.
  * Marks any existing latest pipeline for this entity as not latest.
  */
-export function persistEntityPipeline(opts: {
+export async function persistEntityPipeline(opts: {
   workspaceId: string;
   entityId: string;
   yamlResult: YamlParseResult;
   generationId: string;
   batchRunId?: string;
-}): void {
+}): Promise<void> {
   const { workspaceId, entityId, yamlResult, generationId, batchRunId } = opts;
   const parsed = yamlResult.yamlParsed;
   if (!parsed) return; // schema validation failed, nothing to persist
@@ -534,7 +533,7 @@ export function persistEntityPipeline(opts: {
   const now = new Date().toISOString();
 
   // Find existing latest pipeline version for this entity
-  const existing = db
+  const existing = (await db
     .select()
     .from(entityPipeline)
     .where(
@@ -543,7 +542,7 @@ export function persistEntityPipeline(opts: {
         eq(entityPipeline.isLatest, true)
       )
     )
-    .get();
+    )[0];
 
   // Extract sources with resolved table names
   const sources = parsed.sources.map((s) => ({
@@ -598,9 +597,9 @@ export function persistEntityPipeline(opts: {
 
   if (existing) {
     // Atomic copy-on-write: mark old not-latest + insert new
-    createPipelineVersion(existing.id, pipelineValues);
+    await createPipelineVersion(existing.id, pipelineValues);
   } else {
-    db.insert(entityPipeline).values(pipelineValues).run();
+    await db.insert(entityPipeline).values(pipelineValues);
   }
 }
 
@@ -677,13 +676,13 @@ async function executeGenerationWithTools(
         );
         resultContent = formatToolResultForLLM(result);
       } else if (tc.name === "search_source_schema" && workspaceId) {
-        const result = executeSourceSchemaSearch(
+        const result = await executeSourceSchemaSearch(
           tc.input as unknown as SourceSchemaInput,
           workspaceId,
         );
         resultContent = formatSourceSchemaForLLM(result);
       } else if (tc.name === "get_reference_docs" && workspaceId) {
-        const result = executeReferenceDocRetrieval(
+        const result = await executeReferenceDocRetrieval(
           tc.input as unknown as ReferenceDocsInput,
           workspaceId,
         );
@@ -811,7 +810,7 @@ export async function executeGeneration(prepared: PreparedGeneration): Promise<v
       }
     }
 
-    db.update(generation)
+    await db.update(generation)
       .set({
         status: "completed",
         model: finalResponse.model,
@@ -825,7 +824,7 @@ export async function executeGeneration(prepared: PreparedGeneration): Promise<v
         updatedAt: new Date().toISOString(),
       })
       .where(eq(generation.id, generationId))
-      .run();
+      ;
 
     // Persist entity pipeline if YAML format
     if (outputFormat === "yaml") {
@@ -833,9 +832,9 @@ export async function executeGeneration(prepared: PreparedGeneration): Promise<v
         const yamlResult = finalParsedOutput as unknown as YamlParseResult;
         if (yamlResult.yamlParsed) {
           // Read the generation to get workspaceId
-          const gen = db.select().from(generation).where(eq(generation.id, generationId)).get();
+          const [gen] = await db.select().from(generation).where(eq(generation.id, generationId)).limit(1);
           if (gen?.entityId) {
-            persistEntityPipeline({
+            await persistEntityPipeline({
               workspaceId: gen.workspaceId,
               entityId: gen.entityId,
               yamlResult,
@@ -852,7 +851,7 @@ export async function executeGeneration(prepared: PreparedGeneration): Promise<v
     const errorMessage =
       error instanceof Error ? error.message : String(error);
 
-    db.update(generation)
+    await db.update(generation)
       .set({
         status: "failed",
         error: errorMessage,
@@ -860,7 +859,7 @@ export async function executeGeneration(prepared: PreparedGeneration): Promise<v
         updatedAt: new Date().toISOString(),
       })
       .where(eq(generation.id, generationId))
-      .run();
+      ;
   }
 }
 
@@ -871,16 +870,16 @@ export async function executeGeneration(prepared: PreparedGeneration): Promise<v
 export async function runGeneration(
   input: RunGenerationInput
 ): Promise<RunGenerationResult> {
-  const { startResult, prepared } = startGeneration(input);
+  const { startResult, prepared } = await startGeneration(input);
 
   await executeGeneration(prepared);
 
   // Read the completed record from DB
-  const gen = db
+  const gen = (await db
     .select()
     .from(generation)
     .where(eq(generation.id, startResult.generationId))
-    .get();
+    )[0];
 
   if (!gen) {
     throw new Error("Generation record not found after execution");

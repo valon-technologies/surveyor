@@ -21,11 +21,11 @@ const providers: Provider[] = [
         const email = credentials.email as string;
         const password = credentials.password as string;
 
-        const found = db
+        const found = (await db
           .select()
           .from(user)
           .where(eq(user.email, email))
-          .get();
+          )[0];
 
         if (!found?.passwordHash) return null;
 
@@ -56,7 +56,7 @@ if (process.env.MICROSOFT_ENTRA_ID_CLIENT_ID && process.env.MICROSOFT_ENTRA_ID_C
       // "organizations" allows any Azure AD tenant (multi-tenant)
       // Use a specific tenant ID to restrict to one org
       tenantId: process.env.MICROSOFT_ENTRA_ID_TENANT_ID || "organizations",
-    })
+    } as Parameters<typeof MicrosoftEntraID>[0])
   );
 }
 
@@ -75,17 +75,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       // For OAuth sign-ins, find or create the user record
       if (account && account.provider !== "credentials" && authUser?.email) {
-        const existing = db
+        const existing = (await db
           .select()
           .from(user)
           .where(eq(user.email, authUser.email))
-          .get();
+          )[0];
 
         if (existing) {
           token.id = existing.id;
         } else {
           // Create user + default workspace for OAuth sign-ups
-          const [newUser] = db
+          const [newUser] = await db
             .insert(user)
             .values({
               name: authUser.name || authUser.email,
@@ -93,7 +93,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               image: authUser.image,
             })
             .returning()
-            .all();
+            ;
 
           token.id = newUser.id;
           createDefaultWorkspace(newUser.id, newUser.name || "My Workspace");
@@ -111,8 +111,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 });
 
-function createDefaultWorkspace(userId: string, userName: string) {
-  const [ws] = db
+async function createDefaultWorkspace(userId: string, userName: string) {
+  const [ws] = await db
     .insert(workspace)
     .values({
       name: `${userName}'s Workspace`,
@@ -120,9 +120,9 @@ function createDefaultWorkspace(userId: string, userName: string) {
       settings: { defaultProvider: "claude" },
     })
     .returning()
-    .all();
+    ;
 
-  db.insert(userWorkspace)
+  await db.insert(userWorkspace)
     .values({ userId, workspaceId: ws.id, role: "owner" })
-    .run();
+    ;
 }

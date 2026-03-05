@@ -7,11 +7,11 @@ import { eq, and } from "drizzle-orm";
 export const POST = withAuth(async (req, ctx, { workspaceId }) => {
   const { id } = await ctx.params;
 
-  const q = db
+  const q = (await db
     .select({ id: question.id, status: question.status })
     .from(question)
     .where(and(eq(question.id, id), eq(question.workspaceId, workspaceId)))
-    .get();
+)[0];
 
   if (!q) {
     return NextResponse.json({ error: "Question not found" }, { status: 404 });
@@ -21,7 +21,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
     return NextResponse.json({ error: "Question is already open" }, { status: 400 });
   }
 
-  const [updated] = db
+  const [updated] = await db
     .update(question)
     .set({
       status: "open",
@@ -35,7 +35,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
     })
     .where(eq(question.id, id))
     .returning()
-    .all();
+    ;
 
   return NextResponse.json(updated);
 }, { requiredRole: "editor" });

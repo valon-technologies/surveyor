@@ -12,7 +12,7 @@ import { emitSignal } from "@/lib/generation/skill-signals";
 
 export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
   // Exclude rawContent from list response (can be huge)
-  const assets = db
+  const assets = await db
     .select({
       id: schemaAsset.id,
       workspaceId: schemaAsset.workspaceId,
@@ -28,24 +28,24 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
     .from(schemaAsset)
     .where(eq(schemaAsset.workspaceId, workspaceId))
     .orderBy(schemaAsset.createdAt)
-    .all();
+    ;
 
   // Get top-level entity counts per asset (exclude child/component entities)
-  const result = assets.map((asset) => {
-    const entityCount = db
+  const result = await Promise.all(assets.map(async (asset) => {
+    const entityCount = (await db
       .select({ cnt: count() })
       .from(entity)
       .where(and(eq(entity.schemaAssetId, asset.id), isNull(entity.parentEntityId)))
-      .get();
+      )[0];
 
     return { ...asset, entityCount: entityCount?.cnt || 0 };
-  });
+  }));
 
   return NextResponse.json(result);
 });
 
 /** Insert parsed entities + fields into the DB for a given schema asset. */
-function insertEntities(
+async function insertEntities(
   parsedEntities: ParsedEntity[],
   assetId: string,
   workspaceId: string,
@@ -54,7 +54,7 @@ function insertEntities(
   for (let i = 0; i < parsedEntities.length; i++) {
     const pe = parsedEntities[i];
 
-    const [ent] = db
+    const [ent] = await db
       .insert(entity)
       .values({
         workspaceId,
@@ -66,7 +66,7 @@ function insertEntities(
         sortOrder: i,
       })
       .returning()
-      .all();
+      ;
 
     if (pe.fields.length > 0) {
       const fieldValues = pe.fields.map((f, j) => ({
@@ -83,7 +83,7 @@ function insertEntities(
         sortOrder: j,
       }));
 
-      db.insert(field).values(fieldValues).run();
+      await db.insert(field).values(fieldValues);
     }
   }
 }
@@ -108,8 +108,8 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
       });
 
       // Transaction: create asset + insert all entities/fields atomically
-      asset = withTransaction(() => {
-        const [a] = db
+      asset = await withTransaction(async () => {
+        const [a] = await db
           .insert(schemaAsset)
           .values({
             workspaceId,
@@ -121,14 +121,14 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
             rawContent: input.rawContent,
           })
           .returning()
-          .all();
+          ;
 
-        insertEntities(parsedEntities, a.id, workspaceId, input.side);
+        await insertEntities(parsedEntities, a.id, workspaceId, input.side);
         return a;
       });
     } catch (err) {
       // Parsing failed — still save the asset with rawContent
-      const [fallbackAsset] = db
+      const [fallbackAsset] = await db
         .insert(schemaAsset)
         .values({
           workspaceId,
@@ -140,7 +140,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
           rawContent: input.rawContent,
         })
         .returning()
-        .all();
+        ;
 
       return NextResponse.json(
         { ...fallbackAsset, parseError: (err as Error).message },
@@ -151,7 +151,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
 
   // Parse PDF via Claude extraction (async — can't be in sync transaction)
   else if (input.format === "pdf") {
-    [asset] = db
+    [asset] = await db
       .insert(schemaAsset)
       .values({
         workspaceId,
@@ -163,14 +163,14 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
         rawContent: input.rawContent,
       })
       .returning()
-      .all();
+      ;
 
     try {
-      const { provider } = resolveProvider(userId, "claude");
+      const { provider } = await resolveProvider(userId, "claude");
       const result = await parsePDFSchema(input.rawContent, input.name, provider);
 
       // Replace base64 rawContent with readable extracted text
-      db.update(schemaAsset)
+      await db.update(schemaAsset)
         .set({
           rawContent: result.extractedText,
           metadata: {
@@ -184,9 +184,9 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
           },
         })
         .where(eq(schemaAsset.id, asset.id))
-        .run();
+        ;
 
-      insertEntities(result.entities, asset.id, workspaceId, input.side);
+      await insertEntities(result.entities, asset.id, workspaceId, input.side);
     } catch (err) {
       return NextResponse.json(
         { ...asset, parseError: (err as Error).message },
@@ -195,7 +195,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
     }
   } else {
     // Unknown format — just create the asset
-    [asset] = db
+    [asset] = await db
       .insert(schemaAsset)
       .values({
         workspaceId,
@@ -207,7 +207,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
         rawContent: input.rawContent,
       })
       .returning()
-      .all();
+      ;
   }
 
   // Mark all scaffolds as stale since source/target schemas changed

@@ -17,12 +17,12 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   if (fieldMappingId) conditions.push(eq(commentThread.fieldMappingId, fieldMappingId));
   if (status) conditions.push(eq(commentThread.status, status));
 
-  const threads = db
+  const threads = await db
     .select()
     .from(commentThread)
     .where(and(...conditions))
     .orderBy(commentThread.createdAt)
-    .all();
+    ;
 
   return NextResponse.json(threads);
 });
@@ -38,7 +38,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
   const { createdBy, body: commentBody, bodyFormat, entityId, fieldMappingId, subject } = parsed.data;
 
   // Create thread + first comment atomically
-  const [thread] = db
+  const [thread] = await db
     .insert(commentThread)
     .values({
       workspaceId,
@@ -49,9 +49,9 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
       commentCount: 1,
     })
     .returning()
-    .all();
+    ;
 
-  const [firstComment] = db
+  const [firstComment] = await db
     .insert(comment)
     .values({
       threadId: thread.id,
@@ -60,7 +60,7 @@ export const POST = withAuth(async (req, ctx, { userId, workspaceId }) => {
       bodyFormat: bodyFormat || "markdown",
     })
     .returning()
-    .all();
+    ;
 
   // Log thread_created activity
   logActivity({

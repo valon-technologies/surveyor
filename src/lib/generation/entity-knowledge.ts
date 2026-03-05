@@ -46,23 +46,23 @@ interface ThreadDecision {
  * The doc is linked to matching skills as "reference" so it flows through
  * the normal RAG retrieval path.
  */
-export function rebuildEntityKnowledge(
+export async function rebuildEntityKnowledge(
   workspaceId: string,
   entityId: string,
   correlationId?: string,
-): { contextId: string; created: boolean } | null {
+): Promise<{ contextId: string; created: boolean } | null> {
   // Resolve entity name
-  const e = db
+  const e = (await db
     .select({ name: entity.name, displayName: entity.displayName })
     .from(entity)
     .where(eq(entity.id, entityId))
-    .get();
+    )[0];
 
   if (!e) return null;
   const entityName = e.displayName || e.name;
 
   // Gather only VALIDATED learning records for this entity
-  const learnings = db
+  const learnings = await db
     .select({
       fieldName: learning.fieldName,
       content: learning.content,
@@ -76,10 +76,10 @@ export function rebuildEntityKnowledge(
       eq(learning.validationStatus, "validated"),
     ))
     .orderBy(desc(learning.createdAt))
-    .all();
+    ;
 
   // Gather all resolved questions for this entity
-  const resolvedQuestions = db
+  const resolvedQuestions = await db
     .select({
       fieldId: question.fieldId,
       questionText: question.question,
@@ -96,31 +96,31 @@ export function rebuildEntityKnowledge(
       ),
     )
     .orderBy(desc(question.resolvedAt))
-    .all();
+    ;
 
   // Resolve field names for questions
   const fieldNameCache = new Map<string, string>();
-  const resolveFieldName = (fieldId: string | null): string | null => {
+  const resolveFieldName = async (fieldId: string | null): Promise<string | null> => {
     if (!fieldId) return null;
     if (fieldNameCache.has(fieldId)) return fieldNameCache.get(fieldId)!;
-    const f = db.select({ name: field.name }).from(field).where(eq(field.id, fieldId)).get();
+    const [f] = await db.select({ name: field.name }).from(field).where(eq(field.id, fieldId)).limit(1);
     const name = f?.name || null;
     if (name) fieldNameCache.set(fieldId, name);
     return name;
   };
 
-  const questions: ResolvedQuestion[] = resolvedQuestions
+  const questions: ResolvedQuestion[] = await Promise.all(resolvedQuestions
     .filter((q) => q.answer)
-    .map((q) => ({
-      fieldName: resolveFieldName(q.fieldId),
+    .map(async (q) => ({
+      fieldName: await resolveFieldName(q.fieldId),
       question: q.questionText,
       answer: q.answer!,
       resolvedByName: q.resolvedByName,
       resolvedAt: q.resolvedAt,
-    }));
+    })));
 
   // Gather resolved comment threads for this entity — human decisions made in discussion
-  const resolvedThreads = db
+  const resolvedThreads = await db
     .select({
       id: commentThread.id,
       subject: commentThread.subject,
@@ -136,24 +136,24 @@ export function rebuildEntityKnowledge(
       ),
     )
     .orderBy(desc(commentThread.resolvedAt))
-    .all();
+    ;
 
-  const threadDecisions: ThreadDecision[] = resolvedThreads.map((t) => {
+  const threadDecisions: ThreadDecision[] = await Promise.all(resolvedThreads.map(async (t) => {
     // Resolve field name from the linked mapping
     let fieldName: string | null = null;
     if (t.fieldMappingId) {
-      const fm = db.select({ targetFieldId: fieldMapping.targetFieldId })
-        .from(fieldMapping).where(eq(fieldMapping.id, t.fieldMappingId)).get();
-      if (fm) fieldName = resolveFieldName(fm.targetFieldId);
+      const [fm] = await db.select({ targetFieldId: fieldMapping.targetFieldId })
+        .from(fieldMapping).where(eq(fieldMapping.id, t.fieldMappingId)).limit(1);
+      if (fm) fieldName = await resolveFieldName(fm.targetFieldId);
     }
 
     // Get the last few comments (most recent = likely the decision)
-    const threadComments = db
+    const threadComments = (await db
       .select({ body: comment.body, authorName: comment.authorName })
       .from(comment)
       .where(eq(comment.threadId, t.id))
       .orderBy(desc(comment.createdAt))
-      .all()
+      )
       .slice(0, 3)
       .reverse();
 
@@ -163,11 +163,11 @@ export function rebuildEntityKnowledge(
       comments: threadComments.map((c) => `${c.authorName}: ${c.body}`),
       resolvedAt: t.resolvedAt,
     };
-  });
+  }));
 
   // Nothing to write — clean up any existing doc
   if (learnings.length === 0 && questions.length === 0 && threadDecisions.length === 0) {
-    deactivateExisting(workspaceId, entityId);
+    await deactivateExisting(workspaceId, entityId);
     return null;
   }
 
@@ -175,7 +175,7 @@ export function rebuildEntityKnowledge(
   const content = renderDocument(entityName, learnings, questions, threadDecisions);
 
   // Upsert the context doc
-  const { contextId, created } = upsertContext(workspaceId, entityId, entityName, content);
+  const { contextId, created } = await upsertContext(workspaceId, entityId, entityName, content);
 
   // Emit feedback event for pipeline tracing
   const correctionLearnings = learnings.filter((l) => l.source === "review");
@@ -202,7 +202,7 @@ export function rebuildEntityKnowledge(
   });
 
   // Link to matching skills
-  linkToMatchingSkills(workspaceId, contextId, entityName);
+  await linkToMatchingSkills(workspaceId, contextId, entityName);
 
   // Invalidate cache
   invalidateWorkspaceContextCache(workspaceId);
@@ -303,16 +303,16 @@ function renderDocument(
  * Find or create the Entity Knowledge context doc.
  * Always replaces the content (not append).
  */
-function upsertContext(
+async function upsertContext(
   workspaceId: string,
   entityId: string,
   entityName: string,
   content: string,
-): { contextId: string; created: boolean } {
+): Promise<{ contextId: string; created: boolean }> {
   const now = new Date().toISOString();
   const tokenCount = estimateTokens(content);
 
-  const existing = db
+  const existing = (await db
     .select()
     .from(context)
     .where(
@@ -323,17 +323,17 @@ function upsertContext(
         eq(context.entityId, entityId),
       ),
     )
-    .get();
+    )[0];
 
   if (existing) {
-    db.update(context)
+    await db.update(context)
       .set({ content, tokenCount, isActive: true, updatedAt: now })
       .where(eq(context.id, existing.id))
-      .run();
+      ;
     return { contextId: existing.id, created: false };
   }
 
-  const [inserted] = db
+  const [inserted] = await db
     .insert(context)
     .values({
       workspaceId,
@@ -350,7 +350,7 @@ function upsertContext(
       updatedAt: now,
     })
     .returning()
-    .all();
+    ;
 
   return { contextId: inserted.id, created: true };
 }
@@ -358,8 +358,8 @@ function upsertContext(
 /**
  * Deactivate an existing Entity Knowledge doc when there's nothing to show.
  */
-function deactivateExisting(workspaceId: string, entityId: string): void {
-  db.update(context)
+async function deactivateExisting(workspaceId: string, entityId: string): Promise<void> {
+  await db.update(context)
     .set({ isActive: false, updatedAt: new Date().toISOString() })
     .where(
       and(
@@ -369,30 +369,30 @@ function deactivateExisting(workspaceId: string, entityId: string): void {
         eq(context.entityId, entityId),
       ),
     )
-    .run();
+    ;
 }
 
 /**
  * Link the Entity Knowledge context to all matching skills as "reference".
  */
-function linkToMatchingSkills(
+async function linkToMatchingSkills(
   workspaceId: string,
   contextId: string,
   entityName: string,
-): void {
-  const matched = matchSkills(workspaceId, entityName);
+): Promise<void> {
+  const matched = await matchSkills(workspaceId, entityName);
 
   for (const s of matched) {
-    const exists = db
+    const exists = (await db
       .select({ id: skillContext.id })
       .from(skillContext)
       .where(
         and(eq(skillContext.skillId, s.id), eq(skillContext.contextId, contextId)),
       )
-      .get();
+      )[0];
 
     if (!exists) {
-      db.insert(skillContext)
+      await db.insert(skillContext)
         .values({
           skillId: s.id,
           contextId,
@@ -400,7 +400,7 @@ function linkToMatchingSkills(
           sortOrder: 100,
           notes: "Auto-linked entity knowledge",
         })
-        .run();
+        ;
     }
   }
 }

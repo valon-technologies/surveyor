@@ -21,13 +21,13 @@ export const POST = withAuth(
       // Empty body or invalid JSON — proceed with no reason
     }
 
-    const mapping = db
+    const mapping = (await db
       .select()
       .from(fieldMapping)
       .where(
         and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId))
       )
-      .get();
+      )[0];
 
     if (!mapping) {
       return NextResponse.json(
@@ -38,14 +38,14 @@ export const POST = withAuth(
 
     const now = new Date().toISOString();
 
-    db.update(fieldMapping)
+    await db.update(fieldMapping)
       .set({
         status: "excluded",
         excludeReason: reason || null,
         updatedAt: now,
       })
       .where(eq(fieldMapping.id, id))
-      .run();
+      ;
 
     logActivity({
       workspaceId,
@@ -57,11 +57,11 @@ export const POST = withAuth(
       detail: { reviewAction: "excluded", reason: reason || undefined },
     });
 
-    const updated = db
+    const updated = (await db
       .select()
       .from(fieldMapping)
       .where(eq(fieldMapping.id, id))
-      .get();
+      )[0];
 
     return NextResponse.json(updated);
   },

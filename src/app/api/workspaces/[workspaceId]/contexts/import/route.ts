@@ -16,7 +16,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
   for (const c of body.contexts) {
     if (!c.name || !c.category || !c.content) continue;
 
-    const [item] = db
+    const [item] = await db
       .insert(context)
       .values({
         workspaceId,
@@ -31,7 +31,7 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
         importSource: c.importSource,
       })
       .returning()
-      .all();
+      ;
 
     created.push(item);
   }

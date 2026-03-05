@@ -33,11 +33,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 25, 1), 200);
 
   // 1. Load workspace BQ config
-  const wsRow = db
+  const wsRow = (await db
     .select({ settings: workspace.settings })
     .from(workspace)
     .where(eq(workspace.id, workspaceId))
-    .get();
+    )[0];
 
   const settings = (wsRow?.settings || {}) as { bigquery?: BigQueryConfig };
   const bqConfig = settings.bigquery;
@@ -55,18 +55,18 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   };
 
   // 2. Load the entity (used for name + existence check)
-  const targetEntity = db
+  const targetEntity = (await db
     .select()
     .from(entityTable)
     .where(eq(entityTable.id, entityId))
-    .get();
+    )[0];
 
   if (!targetEntity) {
     return NextResponse.json({ error: "Entity not found" }, { status: 404 });
   }
 
   // 3. Load the entity's latest pipeline (auto-synthesize if missing)
-  let pipeline = db
+  let pipeline = (await db
     .select()
     .from(entityPipeline)
     .where(
@@ -76,10 +76,10 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
         eq(entityPipeline.isLatest, true)
       )
     )
-    .get();
+    )[0];
 
   if (!pipeline) {
-    const hasMappings = !!db
+    const hasMappings = !!(await db
       .select({ id: fieldMapping.id })
       .from(fieldMapping)
       .innerJoin(field, eq(fieldMapping.targetFieldId, field.id))
@@ -91,16 +91,16 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
         )
       )
       .limit(1)
-      .get();
+      )[0];
 
     if (hasMappings) {
       try {
-        synthesizePipelineFromMappings({
+        await synthesizePipelineFromMappings({
           workspaceId,
           entityId,
           entityName: targetEntity.displayName || targetEntity.name,
         });
-        pipeline = db
+        pipeline = (await db
           .select()
           .from(entityPipeline)
           .where(
@@ -110,7 +110,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
               eq(entityPipeline.isLatest, true)
             )
           )
-          .get();
+          )[0];
       } catch (err) {
         console.warn("[sample-data] Auto-synthesis failed:", err);
       }
@@ -128,11 +128,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
   if (pipeline.isStale) {
     try {
       rebuildPipelineYaml(pipeline.id);
-      const updated = db
+      const updated = (await db
         .select()
         .from(entityPipeline)
         .where(eq(entityPipeline.id, pipeline.id))
-        .get();
+        )[0];
       if (updated) pipeline = updated;
     } catch (err) {
       console.warn("[sample-data] Rebuild failed, using stale pipeline:", err);
@@ -164,11 +164,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
       const componentAliases = pipelineWithCols.concat.sources;
 
       // Load child entities for this assembly
-      const childEntities = db
+      const childEntities = await db
         .select()
         .from(entityTable)
         .where(eq(entityTable.parentEntityId, entityId))
-        .all();
+        ;
 
       const componentResults = await Promise.allSettled(
         componentAliases.map(async (alias) => {
@@ -182,7 +182,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
           // Try to load the child entity's own pipeline for real table references
           let childPipeline: typeof pipeline | undefined;
           if (childEntity) {
-            childPipeline = db
+            childPipeline = (await db
               .select()
               .from(entityPipeline)
               .where(
@@ -192,7 +192,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
                   eq(entityPipeline.isLatest, true)
                 )
               )
-              .get();
+              )[0];
           }
 
           let tableName: string;

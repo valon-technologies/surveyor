@@ -361,10 +361,10 @@ export function injectBaselineData(
   return existingContextMessage + "\n" + rendered;
 }
 
-export function buildChatPrompt(input: ChatPromptInput): {
+export async function buildChatPrompt(input: ChatPromptInput): Promise<{
   systemMessage: string;
   contextMessage: string;
-} {
+}> {
   const { entityName, entityDescription, targetField, currentMapping, assembledContext, sourceSchema, sourceDataPreview, priorDiscussionSummary, entityLearnings, crossEntityLearnings, siblingFields, bigqueryAvailable, bigqueryDataset, baselineDataPreloaded, entityStructure, ragEnabled, sourceSchemaStats } = input;
 
   const parts: string[] = [];
@@ -717,7 +717,7 @@ export function buildChatPrompt(input: ChatPromptInput): {
   systemMessage += renderWorkspaceRulesSection(input.workspaceRules);
 
   if (input.workspaceId) {
-    const bundle = getSystemContextBundle(input.workspaceId);
+    const bundle = await getSystemContextBundle(input.workspaceId);
     if (bundle.totalTokens > 0) {
       systemMessage += renderSystemContextSection(bundle);
     }

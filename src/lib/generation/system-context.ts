@@ -53,14 +53,14 @@ const bundleCache = new Map<string, CacheEntry>();
 /**
  * Load the universal context bundle for a workspace, with 10-minute TTL cache.
  */
-export function getSystemContextBundle(workspaceId: string): SystemContextBundle {
+export async function getSystemContextBundle(workspaceId: string): Promise<SystemContextBundle> {
   const cached = bundleCache.get(workspaceId);
   if (cached && Date.now() - cached.createdAt < TTL_MS) {
     return cached.bundle;
   }
 
-  const loadContent = (name: string): string | null => {
-    const row = db
+  const loadContent = async (name: string): Promise<string | null> => {
+    const row = (await db
       .select({ content: context.content })
       .from(context)
       .where(
@@ -70,7 +70,7 @@ export function getSystemContextBundle(workspaceId: string): SystemContextBundle
           eq(context.isActive, true),
         )
       )
-      .get();
+      )[0];
     return row?.content ?? null;
   };
 
@@ -80,13 +80,13 @@ export function getSystemContextBundle(workspaceId: string): SystemContextBundle
     return content.slice(0, maxChars).trimEnd() + "\n\n[... condensed for brevity]";
   };
 
-  const criticalRulesAndWorkflow = loadContent("Mapping > Critical Rules and Workflow");
-  const mappingPatterns = loadContent("Mapping > Patterns");
-  const tableRelationships = loadContent("ServiceMac > TABLE RELATIONSHIPS");
+  const criticalRulesAndWorkflow = await loadContent("Mapping > Critical Rules and Workflow");
+  const mappingPatterns = await loadContent("Mapping > Patterns");
+  const tableRelationships = await loadContent("ServiceMac > TABLE RELATIONSHIPS");
 
-  const vdsOverview = condenseOverview(loadContent("VDS > Overview"));
-  const smOverview = condenseOverview(loadContent("ServiceMac > Overview"));
-  const mortgageOverview = condenseOverview(loadContent("Mortgage Servicing > Overview"));
+  const vdsOverview = condenseOverview(await loadContent("VDS > Overview"));
+  const smOverview = condenseOverview(await loadContent("ServiceMac > Overview"));
+  const mortgageOverview = condenseOverview(await loadContent("Mortgage Servicing > Overview"));
 
   // Combine domain overviews into a single brief section
   const overviewParts: string[] = [];

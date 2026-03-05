@@ -15,11 +15,11 @@ export async function POST(
 
   const { id } = await params;
 
-  const invite = db
+  const invite = (await db
     .select()
     .from(workspaceInvite)
     .where(eq(workspaceInvite.id, id))
-    .get();
+    )[0];
 
   if (!invite) {
     return NextResponse.json({ error: "Invite not found" }, { status: 404 });
@@ -44,7 +44,7 @@ export async function POST(
   }
 
   // Check if user is already a member
-  const existing = db
+  const existing = (await db
     .select()
     .from(userWorkspace)
     .where(
@@ -53,39 +53,39 @@ export async function POST(
         eq(userWorkspace.workspaceId, invite.workspaceId)
       )
     )
-    .get();
+    )[0];
 
   if (existing) {
     // Mark invite as accepted but don't create duplicate membership
-    db.update(workspaceInvite)
+    await db.update(workspaceInvite)
       .set({
         status: "accepted",
         acceptedBy: session.user.id,
         acceptedAt: new Date().toISOString(),
       })
       .where(eq(workspaceInvite.id, id))
-      .run();
+      ;
 
     return NextResponse.json({ workspaceId: invite.workspaceId, alreadyMember: true });
   }
 
   // Accept: create membership + update invite
-  db.insert(userWorkspace)
+  await db.insert(userWorkspace)
     .values({
       userId: session.user.id,
       workspaceId: invite.workspaceId,
       role: invite.role,
     })
-    .run();
+    ;
 
-  db.update(workspaceInvite)
+  await db.update(workspaceInvite)
     .set({
       status: "accepted",
       acceptedBy: session.user.id,
       acceptedAt: new Date().toISOString(),
     })
     .where(eq(workspaceInvite.id, id))
-    .run();
+    ;
 
   return NextResponse.json({ workspaceId: invite.workspaceId });
 }
