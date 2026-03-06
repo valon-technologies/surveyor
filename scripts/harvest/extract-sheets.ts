@@ -63,39 +63,57 @@ interface ColumnMap {
   notesCols: number[];
 }
 
+/**
+ * Find the actual header row in the CSV. The M1/M2 trackers have a summary row
+ * before the real header. We detect the header by looking for a row that contains
+ * "population" (case-insensitive) — that's always in the real header.
+ */
+function findHeaderRow(rows: string[][]): number {
+  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+    const joined = rows[i].join(" ").toLowerCase();
+    if (joined.includes("population") || joined.includes("vds entity") || joined.includes("vds field")) {
+      return i;
+    }
+  }
+  return 0; // fallback to first row
+}
+
 function findColumns(headers: string[], milestone: "M1" | "M2"): ColumnMap {
-  const lowerHeaders = headers.map((h) => h.toLowerCase());
+  const lowerHeaders = headers.map((h) => h.toLowerCase().trim());
 
-  // Entity / table column: contains "vds table" or just "table"
-  const entityCol = lowerHeaders.findIndex(
-    (h) => h.includes("vds table") || (h.includes("table") && !h.includes("population")),
-  );
+  // Entity column: "vds entity name", "vds table", "combined for vlookup" (entity.field combo)
+  let entityCol = lowerHeaders.findIndex((h) => h.includes("vds entity name"));
+  if (entityCol === -1) entityCol = lowerHeaders.findIndex((h) => h.includes("vds table"));
+  // Fallback: "combined for vlookup" contains entity.field — we'll split on "." later
+  if (entityCol === -1) entityCol = lowerHeaders.findIndex((h) => h.includes("combined for vlookup"));
 
-  // Field column: contains "vds field" or "field name"
-  const fieldCol = lowerHeaders.findIndex(
-    (h) => h.includes("vds field") || h.includes("field name"),
-  );
+  // Field column: "vds field name"
+  let fieldCol = lowerHeaders.findIndex((h) => h.includes("vds field name"));
+  if (fieldCol === -1) fieldCol = lowerHeaders.findIndex((h) => h === "field name");
 
-  // Population column: milestone-specific
+  // Population column
   let populationCol: number;
   if (milestone === "M1") {
     populationCol = lowerHeaders.findIndex((h) => h.includes("m1") && h.includes("population"));
-    // Fallback: any column containing "population"
-    if (populationCol === -1) {
-      populationCol = lowerHeaders.findIndex((h) => h.includes("population"));
-    }
+    if (populationCol === -1) populationCol = lowerHeaders.findIndex((h) => h.includes("population"));
   } else {
     populationCol = lowerHeaders.findIndex((h) => h.includes("m2") && h.includes("population"));
-    if (populationCol === -1) {
-      populationCol = lowerHeaders.findIndex((h) => h.includes("population"));
-    }
+    if (populationCol === -1) populationCol = lowerHeaders.findIndex((h) => h.includes("population"));
   }
 
-  // Notes columns: anything containing note, comment, logic, mapping, question, answer, description
-  const notesPatterns = ["note", "comment", "logic", "mapping", "question", "answer", "description"];
+  // Notes columns: rich set of patterns matching the actual tracker columns
+  const notesPatterns = [
+    "note", "comment", "logic", "mapping", "question", "answer",
+    "response from servicemac", "implementation", "sql logic",
+    "acdc", "blocked", "follow up", "internal thread",
+    "review comment", "commentary",
+  ];
   const notesCols = lowerHeaders
     .map((h, i) => ({ h, i }))
-    .filter(({ h }) => notesPatterns.some((p) => h.includes(p)))
+    .filter(({ h, i }) =>
+      h && i !== entityCol && i !== fieldCol && i !== populationCol &&
+      notesPatterns.some((p) => h.includes(p)),
+    )
     .map(({ i }) => i);
 
   return { entityCol, fieldCol, populationCol, notesCols };
@@ -120,8 +138,16 @@ function buildBatches(
 
   for (const row of data) {
     // Skip rows with no entity or field
-    const rawEntity = cols.entityCol >= 0 ? (row[cols.entityCol] ?? "").trim() : "";
-    const rawField = cols.fieldCol >= 0 ? (row[cols.fieldCol] ?? "").trim() : "";
+    let rawEntity = cols.entityCol >= 0 ? (row[cols.entityCol] ?? "").trim() : "";
+    let rawField = cols.fieldCol >= 0 ? (row[cols.fieldCol] ?? "").trim() : "";
+
+    // Handle "Combined for Vlookup" format: "entity.field"
+    if (rawEntity && !rawField && rawEntity.includes(".")) {
+      const dotIdx = rawEntity.indexOf(".");
+      rawField = rawEntity.slice(dotIdx + 1);
+      rawEntity = rawEntity.slice(0, dotIdx);
+    }
+
     if (!rawEntity && !rawField) continue;
 
     // Apply population filter
@@ -186,8 +212,10 @@ async function main() {
       continue;
     }
 
-    const headers = rows[0];
-    const dataRows = rows.slice(1);
+    const headerIdx = findHeaderRow(rows);
+    const headers = rows[headerIdx];
+    const dataRows = rows.slice(headerIdx + 1);
+    console.log(`  Header row: ${headerIdx + 1} (0-indexed: ${headerIdx})`);
     const cols = findColumns(headers, spec.milestone);
 
     console.log(`  Entity column: ${cols.entityCol >= 0 ? headers[cols.entityCol] : "NOT FOUND"}`);
