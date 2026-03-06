@@ -21,6 +21,6 @@ export function saveClaims(filename: string, claims: HarvestedClaim[]): void {
 
 export function loadAllClaims(): HarvestedClaim[] {
   ensureDir();
-  const files = ["slack-claims.json", "sheets-claims.json", "linear-claims.json"];
+  const files = ["slack-claims.json", "sheets-claims.json", "sheet-comments-claims.json", "linear-claims.json"];
   return files.flatMap((f) => loadClaims(f));
 }
