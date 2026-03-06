@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 
 import { join } from "path";
 import { randomUUID } from "crypto";
 import Anthropic from "@anthropic-ai/sdk";
-import { fetchChannelHistory, SlackMessage } from "../../src/lib/slack/gestalt-slack-client";
+import { fetchChannelHistory, sendSlackMessage, SlackMessage } from "../../src/lib/slack/gestalt-slack-client";
 import { linearGql } from "../../src/lib/linear/gestalt-linear-client";
 import { getOrRefreshFileIndex } from "./file-index";
 import type { FeedbackBrief, AgentState, AgentConfig } from "./types";
@@ -40,8 +40,9 @@ async function fetchNewSlackMessages(state: AgentState): Promise<SlackMessage[]>
   // Prefer channel ID from config to avoid list_channels API call
   const channelRef = (config as any).slack_channel_id || config.slack_channel;
   const messages = await fetchChannelHistory(channelRef, oldest);
-  // Filter out bot messages and very short messages
-  return messages.filter((m: any) => !m.bot_id && m.text && m.text.length > 10);
+  const notifyUser = (config as any).notify_slack_user;
+  // Filter out bot messages, very short messages, and your own replies (fixes, not feedback)
+  return messages.filter((m: any) => !m.bot_id && m.text && m.text.length > 10 && m.user !== notifyUser);
 }
 
 interface LinearComment {
@@ -154,8 +155,34 @@ async function triageItem(
     messages: [{ role: "user", content: item.text }],
   });
 
-  const text = response.content[0].type === "text" ? response.content[0].text : "";
-  const parsed = JSON.parse(text);
+  const rawText = response.content[0].type === "text" ? response.content[0].text : "";
+  // Strip markdown fences if present (```json ... ```)
+  const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const text = jsonMatch ? jsonMatch[1].trim() : rawText.trim();
+  let parsed: any;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    // If model returned prose instead of JSON, treat as non-actionable
+    console.warn(`  Non-JSON response, skipping: "${rawText.slice(0, 60)}..."`);
+    return {
+      id: randomUUID(),
+      created_at: new Date().toISOString(),
+      status: "pending",
+      source: item.source,
+      category: "question" as const,
+      priority: "low" as const,
+      confidence: 0,
+      summary: rawText.slice(0, 100),
+      suggested_approach: "",
+      relevant_files: [],
+      original_messages: {
+        slack: item.slack ? { ts: item.slack.ts, text: item.slack.text, user: item.slack.user, permalink: item.slack.permalink } : undefined,
+        linear: item.linear ? { id: item.linear.id, identifier: item.linear.identifier, title: item.linear.title, url: item.linear.url } : undefined,
+      },
+      resolved_at: null,
+    };
+  }
 
   return {
     id: randomUUID(),
@@ -207,12 +234,14 @@ async function main() {
   console.log(`  ${items.length} items after deduplication`);
 
   // Triage each item
+  const triaged: FeedbackBrief[] = [];
   for (const item of items) {
     try {
       const brief = await triageItem(anthropic, item, fileIndex);
       const briefPath = join(briefsDir, `${brief.id}.json`);
       writeFileSync(briefPath, JSON.stringify(brief, null, 2));
       console.log(`  Triaged: [${brief.priority}] ${brief.summary}`);
+      triaged.push(brief);
     } catch (err) {
       console.error(`  Failed to triage item:`, err);
     }
@@ -227,6 +256,26 @@ async function main() {
     state.processed_linear_ids.push(...linearIssues.map((i) => i.id));
   }
   saveState(state);
+
+  // Notify via Slack DM
+  const notifyUser = (config as any).notify_slack_user;
+  const actionable = triaged.filter((b) => b.confidence >= 0.1);
+  if (notifyUser && actionable.length > 0) {
+    const priorityEmoji = { high: "🔴", medium: "🟡", low: "🟢" } as const;
+    const lines = actionable
+      .sort((a, b) => {
+        const order = { high: 0, medium: 1, low: 2 };
+        return order[a.priority] - order[b.priority];
+      })
+      .map((b) => `${priorityEmoji[b.priority]} [${b.category}] ${b.summary}`);
+    const msg = `*Feedback Agent:* ${actionable.length} new item${actionable.length > 1 ? "s" : ""}\n\n${lines.join("\n")}\n\nRun \`/feedback\` in Claude Code to action these.`;
+    try {
+      await sendSlackMessage(notifyUser, msg);
+      console.log(`  Notified ${notifyUser} via Slack DM`);
+    } catch (err) {
+      console.error(`  Failed to send Slack notification:`, err);
+    }
+  }
 
   console.log(`[${new Date().toISOString()}] Done.`);
 }

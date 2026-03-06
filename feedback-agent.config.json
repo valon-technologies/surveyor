@@ -6,5 +6,6 @@
   "poll_interval_minutes": 30,
   "triage_model": "claude-haiku-4-5-20251001",
   "queue_dir": "~/.claude/feedback-queue",
-  "file_index_refresh_days": 7
+  "file_index_refresh_days": 7,
+  "notify_slack_user": "U09D2KJ6W79"
 }
