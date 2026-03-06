@@ -41,8 +41,10 @@ async function fetchNewSlackMessages(state: AgentState): Promise<SlackMessage[]>
   const channelRef = (config as any).slack_channel_id || config.slack_channel;
   const messages = await fetchChannelHistory(channelRef, oldest);
   const notifyUser = (config as any).notify_slack_user;
-  // Filter out bot messages, very short messages, and your own replies (fixes, not feedback)
-  return messages.filter((m: any) => !m.bot_id && m.text && m.text.length > 10 && m.user !== notifyUser);
+  // Filter out bot messages, very short messages, and own replies (fixes, not feedback)
+  return messages.filter((m: any) =>
+    !m.bot_id && !m.subtype && m.text && m.text.length > 10 && m.user !== notifyUser
+  );
 }
 
 interface LinearComment {
@@ -257,10 +259,10 @@ async function main() {
   }
   saveState(state);
 
-  // Notify via Slack DM
-  const notifyUser = (config as any).notify_slack_user;
+  // Notify in the feedback channel
+  const notifyChannel = (config as any).slack_channel_id || config.slack_channel;
   const actionable = triaged.filter((b) => b.confidence >= 0.1);
-  if (notifyUser && actionable.length > 0) {
+  if (actionable.length > 0) {
     const priorityEmoji = { high: "🔴", medium: "🟡", low: "🟢" } as const;
     const lines = actionable
       .sort((a, b) => {
@@ -268,10 +270,10 @@ async function main() {
         return order[a.priority] - order[b.priority];
       })
       .map((b) => `${priorityEmoji[b.priority]} [${b.category}] ${b.summary}`);
-    const msg = `*Feedback Agent:* ${actionable.length} new item${actionable.length > 1 ? "s" : ""}\n\n${lines.join("\n")}\n\nRun \`/feedback\` in Claude Code to action these.`;
+    const msg = `🤖 *Feedback Agent:* ${actionable.length} new item${actionable.length > 1 ? "s" : ""}\n\n${lines.join("\n")}`;
     try {
-      await sendSlackMessage(notifyUser, msg);
-      console.log(`  Notified ${notifyUser} via Slack DM`);
+      await sendSlackMessage(notifyChannel, msg);
+      console.log(`  Posted summary to ${notifyChannel}`);
     } catch (err) {
       console.error(`  Failed to send Slack notification:`, err);
     }
