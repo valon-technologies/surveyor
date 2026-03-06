@@ -25,20 +25,27 @@ interface SlackHistoryResponse {
   response_metadata?: { next_cursor?: string };
 }
 
+/** Build a GET URL with query params */
+function gestaltGet(path: string, params: Record<string, string | number>): string {
+  const url = new URL(`${GESTALT_BASE}${path}`);
+  for (const [k, v] of Object.entries(params)) {
+    url.searchParams.set(k, String(v));
+  }
+  return url.toString();
+}
+
+const authHeaders = () => ({ Authorization: `Bearer ${getApiKey()}` });
+
 /** Fetch channel history from Slack via Gestalt */
 export async function fetchChannelHistory(
   channelName: string,
   oldest?: string,
 ): Promise<SlackMessage[]> {
   // First, resolve channel name to ID
-  const channelsRes = await fetch(`${GESTALT_BASE}/slack/list_channels`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${getApiKey()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ limit: 200 }),
-  });
+  const channelsRes = await fetch(
+    gestaltGet("/slack/list_channels", { limit: 200 }),
+    { headers: authHeaders() },
+  );
   if (!channelsRes.ok) throw new Error(`Gestalt Slack list_channels failed: ${await channelsRes.text()}`);
   const channelsData = await channelsRes.json();
   const channel = channelsData.channels?.find(
@@ -47,17 +54,13 @@ export async function fetchChannelHistory(
   if (!channel) throw new Error(`Channel ${channelName} not found`);
 
   // Fetch history
-  const params: Record<string, unknown> = { channel: channel.id, limit: 100 };
+  const params: Record<string, string | number> = { channel: channel.id, limit: 100 };
   if (oldest) params.oldest = oldest;
 
-  const historyRes = await fetch(`${GESTALT_BASE}/slack/get_channel_history`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${getApiKey()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(params),
-  });
+  const historyRes = await fetch(
+    gestaltGet("/slack/get_channel_history", params),
+    { headers: authHeaders() },
+  );
   if (!historyRes.ok) throw new Error(`Gestalt Slack history failed: ${await historyRes.text()}`);
   const data: SlackHistoryResponse = await historyRes.json();
   return data.messages || [];
@@ -74,10 +77,7 @@ export async function sendSlackMessage(
 
   const res = await fetch(`${GESTALT_BASE}/slack/send_message`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${getApiKey()}`,
-      "Content-Type": "application/json",
-    },
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(params),
   });
   if (!res.ok) throw new Error(`Gestalt Slack send_message failed: ${await res.text()}`);
