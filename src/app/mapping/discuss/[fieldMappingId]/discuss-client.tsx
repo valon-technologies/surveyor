@@ -193,6 +193,14 @@ export function DiscussClient() {
     }
   }, [effectiveUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-resolve question decision when there's no linked question and no AI suggestion
+  // This unblocks submit for transfer mappings and fields without questions
+  useEffect(() => {
+    if (!linkedQuestion && !effectiveUpdate?.question && !questionDecision) {
+      setQuestionDecision(true);
+    }
+  }, [linkedQuestion, effectiveUpdate, questionDecision]);
+
   // Fetch entity data for sibling field navigation
   const entityId = mapping?.targetField?.entityId;
   const { data: entityData } = useEntity(entityId);
@@ -290,7 +298,11 @@ export function DiscussClient() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => router.push("/mapping")}
+            onClick={() => {
+              // Navigate back to transfer review queue if this is a transfer mapping
+              const tid = mapping?.transferId;
+              router.push(tid ? `/transfers/${tid}/review` : "/mapping");
+            }}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -324,7 +336,10 @@ export function DiscussClient() {
           variant="outline"
           onClick={() =>
             excludeMutation.mutate({ mappingId: activeMappingId }, {
-              onSuccess: () => router.push("/mapping"),
+              onSuccess: () => {
+                const tid = mapping?.transferId;
+                router.push(tid ? `/transfers/${tid}/review` : "/mapping");
+              },
             })
           }
           disabled={excludeMutation.isPending}
@@ -588,7 +603,8 @@ export function DiscussClient() {
                         if (next?.mappingId) {
                           router.push(`/mapping/discuss/${next.mappingId}`);
                         } else {
-                          router.push("/mapping");
+                          const tid = mapping?.transferId;
+                          router.push(tid ? `/transfers/${tid}/review` : "/mapping");
                         }
                       },
                     }
