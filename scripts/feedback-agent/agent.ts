@@ -209,6 +209,67 @@ async function triageItem(
   };
 }
 
+// --- Linear issue management ---
+
+async function createLinearIssue(brief: FeedbackBrief): Promise<{ id: string; identifier: string; url: string } | null> {
+  const teamId = (config as any).linear_team_id;
+  const stateId = (config as any).linear_bug_state_id;
+  const projectId = config.linear_project_id;
+  if (!teamId) return null;
+
+  const description = [
+    `**Category:** ${brief.category}`,
+    `**Priority:** ${brief.priority}`,
+    `**Source:** ${brief.source}`,
+    "",
+    "## Suggested Approach",
+    brief.suggested_approach,
+    "",
+    "## Relevant Files",
+    ...(brief.relevant_files.map((f) => `- \`${f}\``)),
+    "",
+    "## Original Feedback",
+    brief.original_messages.slack ? `> ${brief.original_messages.slack.text}` : "",
+    "",
+    "_Created by Feedback Agent_",
+  ].join("\n");
+
+  const mutation = `mutation {
+    issueCreate(input: {
+      teamId: "${teamId}"
+      title: "[${brief.category}] ${brief.summary.replace(/"/g, '\\"')}"
+      description: ${JSON.stringify(description)}
+      ${stateId ? `stateId: "${stateId}"` : ""}
+      ${projectId ? `projectId: "${projectId}"` : ""}
+      priority: ${brief.priority === "high" ? 1 : brief.priority === "medium" ? 2 : 3}
+    }) {
+      success
+      issue { id identifier url }
+    }
+  }`;
+
+  type Resp = { issueCreate: { success: boolean; issue: { id: string; identifier: string; url: string } } };
+  const data = await linearGql<Resp>(mutation);
+  if (data.issueCreate.success) {
+    return data.issueCreate.issue;
+  }
+  return null;
+}
+
+async function resolveLinearIssue(issueId: string): Promise<boolean> {
+  const doneStateId = (config as any).linear_done_state_id;
+  if (!doneStateId) return false;
+
+  const mutation = `mutation {
+    issueUpdate(id: "${issueId}", input: { stateId: "${doneStateId}" }) {
+      success
+    }
+  }`;
+  type Resp = { issueUpdate: { success: boolean } };
+  const data = await linearGql<Resp>(mutation);
+  return data.issueUpdate.success;
+}
+
 // --- Main ---
 
 async function main() {
@@ -249,6 +310,23 @@ async function main() {
     }
   }
 
+  // Create Linear issues for bugs (high/medium priority, category=bug)
+  const bugs = triaged.filter((b) => b.category === "bug" && b.confidence >= 0.5 && (b.priority === "high" || b.priority === "medium"));
+  for (const bug of bugs) {
+    try {
+      const issue = await createLinearIssue(bug);
+      if (issue) {
+        // Store Linear issue ID on the brief for later resolution
+        bug.original_messages.linear = { id: issue.id, identifier: issue.identifier, title: bug.summary, url: issue.url };
+        const briefPath = join(briefsDir, `${bug.id}.json`);
+        writeFileSync(briefPath, JSON.stringify(bug, null, 2));
+        console.log(`  Created Linear issue: ${issue.identifier} — ${bug.summary}`);
+      }
+    } catch (err) {
+      console.error(`  Failed to create Linear issue:`, err);
+    }
+  }
+
   // Update state
   if (slackMessages.length > 0) {
     state.last_slack_ts = slackMessages[slackMessages.length - 1].ts;
@@ -259,23 +337,26 @@ async function main() {
   }
   saveState(state);
 
-  // Notify in the feedback channel
-  const notifyChannel = (config as any).slack_channel_id || config.slack_channel;
+  // Notify via Slack DM only
+  const notifyUser = (config as any).notify_slack_user;
   const actionable = triaged.filter((b) => b.confidence >= 0.1);
-  if (actionable.length > 0) {
+  if (notifyUser && actionable.length > 0) {
     const priorityEmoji = { high: "🔴", medium: "🟡", low: "🟢" } as const;
     const lines = actionable
       .sort((a, b) => {
         const order = { high: 0, medium: 1, low: 2 };
         return order[a.priority] - order[b.priority];
       })
-      .map((b) => `${priorityEmoji[b.priority]} [${b.category}] ${b.summary}`);
+      .map((b) => {
+        const linearRef = b.original_messages.linear ? ` (<${b.original_messages.linear.url}|${b.original_messages.linear.identifier}>)` : "";
+        return `${priorityEmoji[b.priority]} [${b.category}] ${b.summary}${linearRef}`;
+      });
     const msg = `🤖 *Feedback Agent:* ${actionable.length} new item${actionable.length > 1 ? "s" : ""}\n\n${lines.join("\n")}`;
     try {
-      await sendSlackMessage(notifyChannel, msg);
-      console.log(`  Posted summary to ${notifyChannel}`);
+      await sendSlackMessage(notifyUser, msg);
+      console.log(`  Sent DM to ${notifyUser}`);
     } catch (err) {
-      console.error(`  Failed to send Slack notification:`, err);
+      console.error(`  Failed to send DM:`, err);
     }
   }
 

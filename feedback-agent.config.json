@@ -7,5 +7,8 @@
   "triage_model": "claude-haiku-4-5-20251001",
   "queue_dir": "~/.claude/feedback-queue",
   "file_index_refresh_days": 7,
-  "notify_slack_user": "U09D2KJ6W79"
+  "notify_slack_user": "U09D2KJ6W79",
+  "linear_team_id": "6506fc68-25a5-4568-8a00-234bb9cb5ef6",
+  "linear_bug_state_id": "a59222fa-e93c-4911-9d65-b3c1fddf804b",
+  "linear_done_state_id": "54f4a7b9-f445-414d-97a2-501e5dd8aaff"
 }
