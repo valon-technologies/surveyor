@@ -58,7 +58,7 @@ interface IssuesResponse {
 // ---------------------------------------------------------------------------
 
 const ISSUES_QUERY = `
-query ($teamId: String!, $after: String) {
+query ($teamId: ID!, $after: String) {
   issues(
     filter: { team: { id: { eq: $teamId } } }
     first: 50

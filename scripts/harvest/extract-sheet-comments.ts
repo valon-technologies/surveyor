@@ -19,7 +19,7 @@ for (const line of readFileSync(".env.local", "utf-8").split("\n")) {
   process.env[line.slice(0, idx).trim()] = line.slice(idx + 1).trim().replace(/\r$/, "");
 }
 
-import * as AdmZip from "adm-zip";
+import AdmZip from "adm-zip";
 import { gestaltGet } from "./lib/gestalt-client";
 import { extractClaims } from "./lib/claim-extractor";
 import { resolveEntity, resolveField, getEntityNames } from "./lib/entity-resolver";
@@ -130,8 +130,9 @@ interface CommentThread {
 function parseThreadedComments(xml: string): ThreadedComment[] {
   const comments: ThreadedComment[] = [];
 
-  // Match each <threadedComment ...>...</threadedComment>
-  const tagRe = /<threadedComment\s([^>]+)>([\s\S]*?)<\/threadedComment>/g;
+  // Match each <threadedComment .../> or <threadedComment ...>...</threadedComment>
+  // Handle optional XML namespace prefix (e.g., x18tc:threadedComment)
+  const tagRe = /<(?:\w+:)?threadedComment\s([^>]+?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?threadedComment>)/g;
   let m: RegExpExecArray | null;
 
   while ((m = tagRe.exec(xml)) !== null) {
@@ -145,8 +146,8 @@ function parseThreadedComments(xml: string): ThreadedComment[] {
 
     if (!ref || !id) continue;
 
-    // Extract <text> content
-    const textMatch = body.match(/<text[^>]*>([\s\S]*?)<\/text>/);
+    // Extract <text> content (may be namespaced, e.g. <x18tc:text>)
+    const textMatch = (body || "").match(/<(?:\w+:)?text[^>]*>([\s\S]*?)<\/(?:\w+:)?text>/);
     const text = textMatch ? textMatch[1].trim() : "";
 
     comments.push({
@@ -326,11 +327,18 @@ interface SheetInfo {
 
 function parseWorkbook(workbookXml: string): SheetInfo[] {
   const sheets: SheetInfo[] = [];
-  const re = /<sheet\s+name="([^"]+)"\s+sheetId="(\d+)"\s+(?:state="[^"]*"\s+)?r:id="([^"]+)"/g;
-  let m: RegExpExecArray | null;
+  // Match <sheet .../> elements — attributes can appear in any order
+  const tagRe = /<sheet\s+([^/]*?)\/>/g;
+  let tagMatch: RegExpExecArray | null;
 
-  while ((m = re.exec(workbookXml)) !== null) {
-    sheets.push({ name: m[1], sheetId: m[2], rId: m[3] });
+  while ((tagMatch = tagRe.exec(workbookXml)) !== null) {
+    const attrs = tagMatch[1];
+    const name = attrs.match(/name="([^"]+)"/)?.[1];
+    const sheetId = attrs.match(/sheetId="(\d+)"/)?.[1];
+    const rId = attrs.match(/r:id="([^"]+)"/)?.[1];
+    if (name && sheetId && rId) {
+      sheets.push({ name, sheetId, rId });
+    }
   }
 
   return sheets;

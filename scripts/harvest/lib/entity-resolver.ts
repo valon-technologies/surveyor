@@ -25,8 +25,8 @@ function normalize(s: string): string {
 async function loadFromDb(): Promise<void> {
   if (cachedEntities && cachedFields) return;
 
-  const { db } = await import("../../src/lib/db");
-  const { entity, field } = await import("../../src/lib/db/schema");
+  const { db } = await import("../../../src/lib/db");
+  const { entity, field } = await import("../../../src/lib/db/schema");
   const { eq } = await import("drizzle-orm");
 
   cachedEntities = await db
