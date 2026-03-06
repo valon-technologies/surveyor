@@ -33,6 +33,7 @@ export interface FieldMapping {
     reviewText: string;
     generatedAt: string;
   } | null;
+  transferId: string | null;
 }
 
 export interface FieldMappingCreateInput {

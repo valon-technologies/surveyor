@@ -19,13 +19,31 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
     return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
   }
 
-  // Get all versions for the same targetFieldId
+  // Get all versions for the same targetFieldId + transferId scope
+  const transferFilter = mapping.transferId
+    ? eq(fieldMapping.transferId, mapping.transferId)
+    : undefined;
+
+  const conditions = [
+    eq(fieldMapping.targetFieldId, mapping.targetFieldId),
+    eq(fieldMapping.workspaceId, workspaceId),
+  ];
+  if (transferFilter) conditions.push(transferFilter);
+
   const history = await db
     .select({
       id: fieldMapping.id,
       version: fieldMapping.version,
       status: fieldMapping.status,
       mappingType: fieldMapping.mappingType,
+      confidence: fieldMapping.confidence,
+      transform: fieldMapping.transform,
+      reasoning: fieldMapping.reasoning,
+      notes: fieldMapping.notes,
+      sourceVerdict: fieldMapping.sourceVerdict,
+      sourceVerdictNotes: fieldMapping.sourceVerdictNotes,
+      transformVerdict: fieldMapping.transformVerdict,
+      transformVerdictNotes: fieldMapping.transformVerdictNotes,
       assigneeId: fieldMapping.assigneeId,
       editedBy: fieldMapping.editedBy,
       changeSummary: fieldMapping.changeSummary,
@@ -34,12 +52,7 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
       createdAt: fieldMapping.createdAt,
     })
     .from(fieldMapping)
-    .where(
-      and(
-        eq(fieldMapping.targetFieldId, mapping.targetFieldId),
-        eq(fieldMapping.workspaceId, workspaceId)
-      )
-    )
+    .where(and(...conditions))
     .orderBy(desc(fieldMapping.version))
     ;
 

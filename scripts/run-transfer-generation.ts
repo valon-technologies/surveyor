@@ -28,9 +28,10 @@ import {
   context,
   skill,
   skillContext,
+  learning,
   userWorkspace,
 } from "../src/lib/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull, desc } from "drizzle-orm";
 import { resolveProvider } from "../src/lib/generation/provider-resolver";
 import {
   buildTransferPrompt,
@@ -218,6 +219,94 @@ async function main() {
   const corrections = await loadCorrections(transferId!);
   console.log(`Corrections: ${corrections.totalOverrides} overrides, ${corrections.totalInjections} injections`);
 
+  // 5b. Load context: foundational docs (distilled learnings, prioritized by token budget)
+  // Cap at 8K tokens — the distilled-learnings doc (~4.4K) is the most valuable;
+  // remaining budget fills with domain knowledge docs sorted by size (smaller = more focused)
+  const FOUNDATIONAL_TOKEN_BUDGET = 8000;
+  const foundationalDocs = await db
+    .select({ name: context.name, content: context.content, tokenCount: context.tokenCount })
+    .from(context)
+    .where(
+      and(
+        eq(context.workspaceId, t.workspaceId),
+        eq(context.category, "foundational"),
+        eq(context.isActive, true),
+      )
+    );
+
+  // Prioritize: docs with "learning" or "distill" in name first, then smallest docs
+  const sorted = foundationalDocs.sort((a, b) => {
+    const aIsLearning = /learn|distill/i.test(a.name) ? 0 : 1;
+    const bIsLearning = /learn|distill/i.test(b.name) ? 0 : 1;
+    if (aIsLearning !== bIsLearning) return aIsLearning - bIsLearning;
+    return (a.tokenCount || 0) - (b.tokenCount || 0);
+  });
+
+  let learningsTokens = 0;
+  const selectedDocs: string[] = [];
+  for (const d of sorted) {
+    const tokens = d.tokenCount || Math.ceil((d.content?.length || 0) / 4);
+    if (learningsTokens + tokens > FOUNDATIONAL_TOKEN_BUDGET && selectedDocs.length > 0) break;
+    selectedDocs.push(d.content);
+    learningsTokens += tokens;
+  }
+  const learningsText = selectedDocs.join("\n\n---\n\n");
+  console.log(`Foundational context: ${selectedDocs.length}/${foundationalDocs.length} docs (~${learningsTokens} tokens, budget ${FOUNDATIONAL_TOKEN_BUDGET})`);
+
+  // 5c. Load VDS entity skill docs (per-entity documentation)
+  // Build a map: entityName → assembled skill text
+  const entitySkillText = new Map<string, string>();
+  const allSkills = await db
+    .select({ id: skill.id, name: skill.name, applicability: skill.applicability })
+    .from(skill)
+    .where(and(eq(skill.workspaceId, t.workspaceId), eq(skill.isActive, true)));
+
+  for (const s of allSkills) {
+    const patterns = (s.applicability as { entityPatterns?: string[] })?.entityPatterns || [];
+    // Load skill's primary + reference contexts
+    const skillContexts = await db
+      .select({ content: context.content, name: context.name, role: skillContext.role })
+      .from(skillContext)
+      .innerJoin(context, eq(skillContext.contextId, context.id))
+      .where(
+        and(
+          eq(skillContext.skillId, s.id),
+          eq(context.isActive, true),
+        )
+      )
+      .orderBy(skillContext.sortOrder);
+
+    if (skillContexts.length === 0) continue;
+
+    const text = skillContexts
+      .filter(sc => sc.role === "primary" || sc.role === "reference")
+      .map(sc => sc.content)
+      .join("\n\n");
+
+    // Map to each matching entity pattern
+    for (const pattern of patterns) {
+      const existing = entitySkillText.get(pattern) || "";
+      entitySkillText.set(pattern, existing + (existing ? "\n\n---\n\n" : "") + text);
+    }
+  }
+  console.log(`Entity skills loaded: ${entitySkillText.size} entity patterns`);
+
+  // 5d. Load workspace-scope learnings (validated corrections from reviews)
+  const workspaceRules = await db
+    .select({ content: learning.content })
+    .from(learning)
+    .where(
+      and(
+        eq(learning.workspaceId, t.workspaceId),
+        eq(learning.scope, "workspace"),
+      )
+    )
+    .orderBy(desc(learning.createdAt))
+    .limit(20);
+  if (workspaceRules.length > 0) {
+    console.log(`Workspace rules: ${workspaceRules.length}`);
+  }
+
   // 6. Filter domains
   let domainsToRun: string[] = [];
   if (domainFilter) {
@@ -284,13 +373,34 @@ async function main() {
       batch.entities,
     );
 
+    // Assemble entity skill docs for this domain's entities (cap at 20K tokens)
+    const SKILL_TOKEN_BUDGET = 20000;
+    const domainSkillParts: string[] = [];
+    let skillTokensUsed = 0;
+    for (const entityName of batch.entities) {
+      const skillText = entitySkillText.get(entityName);
+      if (skillText) {
+        const tokens = Math.ceil(skillText.length / 4);
+        if (skillTokensUsed + tokens > SKILL_TOKEN_BUDGET && domainSkillParts.length > 0) break;
+        domainSkillParts.push(skillText);
+        skillTokensUsed += tokens;
+      }
+    }
+    const domainSkillsText = domainSkillParts.join("\n\n---\n\n");
+
+    // Combine learnings + workspace rules
+    const fullLearningsText = [
+      learningsText,
+      ...workspaceRules.map(r => r.content),
+    ].filter(Boolean).join("\n\n---\n\n");
+
     // Build prompt
     const prompt = buildTransferPrompt({
       domain,
       vdsFields: fieldsForLLM,
       sourceFields,
-      skillsText: "", // TODO: load from context docs
-      learningsText: "", // TODO: load foundational context
+      skillsText: domainSkillsText,
+      learningsText: fullLearningsText,
       correctionsContext: corrContext,
       clientName: t.clientName || t.name,
     });
@@ -497,7 +607,13 @@ async function main() {
 }
 
 /**
- * Save resolved mappings to field_mapping table.
+ * Save resolved mappings to field_mapping table with copy-on-write versioning.
+ *
+ * If a prior mapping exists for the same targetFieldId + transferId:
+ * - The old mapping is marked isLatest=false (preserving its verdicts/feedback)
+ * - The new mapping gets version=old+1, parentId=old.id
+ *
+ * This preserves the full history: v1 (no context) → v2 (with context + corrections) → etc.
  */
 async function saveMappings(
   resolved: ReturnType<typeof resolveTransferMappings>,
@@ -506,8 +622,32 @@ async function saveMappings(
   model: string | null,
 ): Promise<number> {
   let created = 0;
+  let retired = 0;
+
   for (const r of resolved) {
     if (!r.targetFieldId) continue; // skip unresolved
+
+    // Check for existing mapping (same target field + transfer)
+    const [existing] = await db
+      .select({ id: fieldMapping.id, version: fieldMapping.version })
+      .from(fieldMapping)
+      .where(
+        and(
+          eq(fieldMapping.targetFieldId, r.targetFieldId),
+          eq(fieldMapping.transferId, transferId),
+          eq(fieldMapping.isLatest, true),
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      // Retire old version (preserves verdicts, notes, feedback)
+      await db
+        .update(fieldMapping)
+        .set({ isLatest: false })
+        .where(eq(fieldMapping.id, existing.id));
+      retired++;
+    }
 
     await db.insert(fieldMapping).values({
       workspaceId,
@@ -522,9 +662,14 @@ async function saveMappings(
       notes: r.contextUsed || null,
       createdBy: r.corrected ? "import" : "llm",
       isLatest: true,
-      version: 1,
+      version: existing ? existing.version + 1 : 1,
+      parentId: existing?.id || null,
     });
     created++;
+  }
+
+  if (retired > 0) {
+    console.log(`    Retired ${retired} prior mappings (preserved with verdicts)`);
   }
   return created;
 }

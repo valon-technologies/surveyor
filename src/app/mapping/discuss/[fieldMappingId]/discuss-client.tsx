@@ -17,6 +17,7 @@ import { SourceVerdictCard } from "@/components/review/source-verdict-card";
 import { TransformVerdictCard } from "@/components/review/transform-verdict-card";
 import { QuestionFeedbackCard } from "@/components/review/question-feedback-card";
 import { CreateQuestionCard } from "@/components/review/create-question-card";
+import { MappingHistoryPanel } from "@/components/transfer/mapping-history-panel";
 import { useFieldMappingQuestion, useResolveQuestion } from "@/queries/question-queries";
 import type { ReviewCardData } from "@/types/review";
 import { MAPPING_TYPES, CONFIDENCE_LEVELS, type MappingStatus } from "@/lib/constants";
@@ -606,6 +607,14 @@ export function DiscussClient() {
             </div>
           );
         })()}
+
+        {/* Mapping version history (shows prior generations with verdicts) */}
+        <div className="shrink-0">
+          <MappingHistoryPanel
+            mappingId={activeMappingId}
+            transferId={mapping?.transferId ?? null}
+          />
+        </div>
 
         {/* Bottom: Prior sessions */}
         <div className="shrink-0">

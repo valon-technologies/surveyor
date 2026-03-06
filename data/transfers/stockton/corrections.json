@@ -1,0 +1,177 @@
+{
+  "metadata": {
+    "source_file": "feedback_vds-stockton-coverage_2026-02-23_1745.xlsx",
+    "reviewed_by": "human",
+    "reviewed_date": "2026-02-23",
+    "total_reviewed": 112,
+    "total_corrections": 31,
+    "scope": "stockton-only"
+  },
+  "hard_overrides": {
+    "loan.effective_transfer_date": {
+      "has_mapping": true,
+      "stockton_field": "Loan Date Closing Date",
+      "stockton_position": 58,
+      "transformation": "identity(timestamp)",
+      "confidence": "HIGH",
+      "reasoning": "Human review: For flow servicing transfers, set effective transfer date equal to closing date. ETD is set to closing date when SaaS client is named at closing table as first servicer.",
+      "context_used": "Human feedback 2026-02-23: 'For purposes of this mapping exercise, let's set this as equal to the closing date.'"
+    },
+    "loan_to_portfolio.effective_transfer_date": {
+      "has_mapping": true,
+      "stockton_field": "Loan Date Closing Date",
+      "stockton_position": 58,
+      "transformation": "identity(timestamp)",
+      "confidence": "HIGH",
+      "reasoning": "Human review: Same as loan.effective_transfer_date — ETD equals closing date for flow servicing transfers.",
+      "context_used": "Human feedback 2026-02-23: same rationale as loan.effective_transfer_date"
+    },
+    "loan.fannie_loan_number": {
+      "has_mapping": true,
+      "stockton_field": "Investor Loan Number",
+      "stockton_position": 2,
+      "transformation": "expression: Parse Loan Program [344]; if value contains 'FNMA', set equal to Investor Loan Number [2]; else set to blank",
+      "confidence": "HIGH",
+      "reasoning": "Human review: Conditional on Loan Program field containing 'FNMA'. Uses Investor Loan Number as source when condition met.",
+      "context_used": "Human feedback 2026-02-23; Stockton [344] Loan Program (sample: 'Select (FNMA) Conforming 30 Yr Fixed...')"
+    },
+    "loan.freddie_loan_number": {
+      "has_mapping": true,
+      "stockton_field": "Investor Loan Number",
+      "stockton_position": 2,
+      "transformation": "expression: Parse Loan Program [344]; if value contains 'FHLMC', set equal to Investor Loan Number [2]; else set to blank",
+      "confidence": "HIGH",
+      "reasoning": "Human review: Conditional on Loan Program field containing 'FHLMC'. Uses Investor Loan Number as source when condition met.",
+      "context_used": "Human feedback 2026-02-23"
+    },
+    "loan.investor_type": {
+      "has_mapping": true,
+      "stockton_field": "Loan Program",
+      "stockton_position": 344,
+      "transformation": "expression: Parse Loan Program [344]; if contains 'FNMA' set to 'FANNIE'; if contains 'FHLMC' set to 'FREDDIE'; if contains any of 'FHA','VA','USDA','RHS','PIH','GNMA' set to 'GINNIE'; else set to 'PRIVATE_ASSET'",
+      "confidence": "HIGH",
+      "reasoning": "Human review: Derive investor type from keyword parsing of Loan Program descriptive string.",
+      "context_used": "Human feedback 2026-02-23"
+    },
+    "loan.iregistration_indicator": {
+      "has_mapping": true,
+      "stockton_field": "MERS Mortgage ID Number Registration Flag",
+      "stockton_position": 303,
+      "transformation": "expression: If value is 'Y' then true, else false",
+      "confidence": "HIGH",
+      "reasoning": "Human review: Simple boolean derivation from MERS registration flag field.",
+      "context_used": "Human feedback 2026-02-23"
+    },
+    "loan.is_actively_serviced": {
+      "has_mapping": true,
+      "stockton_field": "",
+      "stockton_position": -1,
+      "transformation": "literal: true",
+      "confidence": "HIGH",
+      "reasoning": "Human review: For Servicing Transfer Flow conversions, all new loans coming over are to be transferred/active in Valon's system. Literal true for all rows.",
+      "context_used": "Human feedback 2026-02-23: 'this value should be set to true in all cases'"
+    },
+    "loan.government_insuring_agency": {
+      "has_mapping": true,
+      "stockton_field": "Lo Type",
+      "stockton_position": 10,
+      "transformation": "expression: Derive government insuring agency from Lo Type [10] code values per ACDC code breakers. NOT Hi Type — Hi Type [9] is lien position (0=construction, 1=first lien, 3=second lien).",
+      "confidence": "MEDIUM",
+      "reasoning": "Human review: Hi Type is lien position, not government agency. Lo Type contains the government program type codes. Exact enum mapping requires ACDC code breaker lookup for Lo Type values.",
+      "context_used": "Human feedback 2026-02-23: 'Hi Type field is referring to the lien position... Generally, the Lo Type field would contain what we're looking for here'"
+    },
+    "loan.other_agency_type": {
+      "has_mapping": true,
+      "stockton_field": "Loan Program",
+      "stockton_position": 344,
+      "transformation": "expression: First check Loan Program [344] — if contains any of 'FNMA','FHLMC','FHA','VA','USDA','RHS','PIH','GNMA' then set to blank (agency loan). Otherwise, check product_type derivation: if FRM/IOFRM/ARM/IOARM then 'OTHER'; if HELOC then 'HELOC'; else 'OTHER'",
+      "confidence": "HIGH",
+      "reasoning": "Human review: Two-step logic — first exclude agency loans, then derive from product type for non-agency loans.",
+      "context_used": "Human feedback 2026-02-23; depends on loan.product_type derivation using ARM Plan ID [179], Interest Only Flag [251], ELOC Plan Code [213]"
+    },
+    "loan_at_origination_info.original_product_type": {
+      "has_mapping": true,
+      "stockton_field": "ARM Plan ID",
+      "stockton_position": 179,
+      "transformation": "expression: Derive from multiple fields — if ARM Plan ID [179] is populated and Interest Only Flag [251] == 'Y' then 'IOARM'; if ARM Plan ID [179] is populated then 'ARM'; if Interest Only Flag [251] == 'Y' then 'IOFRM'; if ELOC Plan Code [213] is populated then 'HELOC'; otherwise 'FRM'",
+      "confidence": "HIGH",
+      "reasoning": "Human review: Should use same derivation as loan.product_type. Multi-field conditional logic.",
+      "context_used": "Human feedback 2026-02-23: 'This should be the same mapping that was used for capturing loan.product_type'"
+    },
+    "loan.prior_servicer_id": {
+      "has_mapping": false,
+      "stockton_field": "",
+      "stockton_position": -1,
+      "transformation": "",
+      "confidence": "",
+      "reasoning": "Human review: Requires per-setup tokens — could be client name, originator, seller, or interim servicer. Cannot map from source file alone. Leave blank until tokens are defined.",
+      "context_used": "Human feedback 2026-02-23: 'This answer has to be determined with each new set-up, but can't easily be mapped from the source file.'"
+    },
+    "loan.prior_servicer_name": {
+      "has_mapping": false,
+      "stockton_field": "",
+      "stockton_position": -1,
+      "transformation": "",
+      "confidence": "",
+      "reasoning": "Human review: Same as prior_servicer_id — requires per-setup tokens. Cannot determine from flat file alone.",
+      "context_used": "Human feedback 2026-02-23"
+    },
+    "loan_to_portfolio.portfolio_id": {
+      "has_mapping": false,
+      "stockton_field": "",
+      "stockton_position": -1,
+      "transformation": "",
+      "confidence": "",
+      "reasoning": "Human review: Requires client identity + prime_conforming_agency_type + Fannie Holding Type (portfolio/MBS/MRS) to determine correct portfolio code. Cannot map from Stockton file alone — leave blank until tokens available.",
+      "context_used": "Human feedback 2026-02-23: 'I don't actually think we can map this right now using this file, as we don't have enough info.'"
+    }
+  },
+  "prompt_injections": {
+    "loan_id_fk_caveat": {
+      "applies_to": [
+        "balloon_loan_info.loan_id",
+        "loan.loan_number",
+        "loan_at_data_transfer_info.loan_id",
+        "loan_at_origination_info.loan_id",
+        "loan_document.loan_id",
+        "loan_to_portfolio.loan_id",
+        "loan_to_property.loan_id"
+      ],
+      "note": "IMPORTANT: For servicing transfers of flow loans, the loan_id/loan_number FK may need to use a Valon-generated loan number rather than the Lakeview Loan Number from the file. During flow transfers, Valon is creating a new loan that hasn't existed before, and the loan number is often created from scratch during boarding. Map to Lakeview Loan Number as the default but set confidence to MEDIUM and note that the source of the loan identifier must be confirmed with the client during boarding setup."
+    },
+    "lien_position_enum": {
+      "applies_to": ["loan_to_property.lien_position"],
+      "note": "CORRECTION: Hi Type [9] in ACDC/MSP/Black Knight data represents LIEN POSITION, not a sequential ordinal. Code values: 0=construction loan (treat as FIRST_LIEN), 1=FIRST_LIEN, 3=SECOND_LIEN. Do NOT use a sequential 1/2/3/4 enum mapping."
+    },
+    "mers_id_scientific_notation": {
+      "applies_to": ["loan.mers_id_number"],
+      "note": "CORRECTION: If the MERS Mortgage ID Number [301] value contains the letter 'e' (indicating scientific notation from Excel export), the original 18-digit value is irrecoverable and MUST be set to blank/null. Only use values that are clean numeric strings without scientific notation. The sample value '1.00274213002007e+17' is an example of a corrupted value."
+    },
+    "enote_hybrid": {
+      "applies_to": ["loan.is_electronic_mortgage"],
+      "note": "CORRECTION: A 'Hybrid' eNote is NOT an electronic mortgage. 'Hybrid' means some closing documents were signed electronically but the promissory note itself was wet-signed on paper. For is_electronic_mortgage: only set to true when the eNote type is exactly 'eNote' (full electronic). 'Hybrid' must map to false. Also check the adjacent 'eNote' field [348] — if populated, it may be a more definitive boolean indicator than eNoteSMC [347]."
+    },
+    "loan_purpose_incomplete": {
+      "applies_to": ["loan.loan_purpose"],
+      "note": "The current enum_map {1: NEW_ORIGINATION, 2: REFINANCE, 3: CASH_OUT, 4: OTHER} may be incomplete. Check the full ACDC loan purpose code listings for additional enumeration values that should be included in the transformation."
+    },
+    "gnma_fields": {
+      "applies_to": [
+        "loan_at_origination_info.gnma_loan_purpose",
+        "loan_at_origination_info.gnma_refinance_type"
+      ],
+      "note": "These fields apply ONLY to Ginnie Mae loans. First determine if the loan is a GINNIE loan by checking if Loan Program [344] contains any of: FHA, VA, USDA, RHS, PIH, GNMA. If yes, map using Ginnie Loan Purpose code listings from ACDC Lookup file. For gnma_refinance_type, only populate when the loan purpose is a refinance type. If not a Ginnie loan, set to blank. Source field is Loan Purpose [6] combined with the Ginnie determination."
+    },
+    "lender_origination_lookup": {
+      "applies_to": [
+        "loan_at_origination_info.lender_origination_name",
+        "loan_at_origination_info.lender_origination_nmls_id"
+      ],
+      "note": "These fields can be derived from MERS Original Org ID [306] via external lookup: find the company in the MERS registry using the Org ID, then cross-reference against the NMLS listing to find the exact or near-exact match. Set has_mapping=true with MEDIUM confidence and note that this requires an external registry lookup integration, not a pure field-to-field mapping."
+    },
+    "payment_application_priority": {
+      "applies_to": ["loan.payment_application_priority"],
+      "note": "The current mapping of Payment Amortization Method Dist. Type [65] is likely correct but needs verification against the Stockton-specific data dictionary/code breakers when available. Set confidence to MEDIUM until verified."
+    }
+  }
+}

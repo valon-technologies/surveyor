@@ -1,0 +1,441 @@
+position,field_name,sample_value
+0,Lakeview Loan Number,123456
+1,Old Loan No. Lender Loan Number,123456
+2,Investor Loan Number,123456
+3,Bank,TBD
+4,Accrual Status,
+5,Aggr Bank Category,TBD
+6,Loan Purpose,1
+7,Property Type for FHLB,SF
+8,Property Type,1
+9,Hi Type,1
+10,Lo Type,6
+11,Ownership Type,2
+12,Mortgagor Last Name Billing,John
+13,Mortgagor First Name Billing,Jones
+14,Mortgagor Middle Name,
+15,Mortgagor Social Security Number or Tax ID Number,123456789
+16,IndicatorSS Number or Tax ID Number_1,1
+17,Co-Mortgagor 2 Last Name,
+18,Co-Mortgagor 2 First Name,
+19,Co-Mortgagor 2 Middle Name,
+20,Co-Mortgagor 2 Social Security Number or Tax ID Number,
+21,Co-Mortgagor 3 Last Name Billing,
+22,Co-Mortgagor 3 First Name Billing,
+23,Co- Mortgagor 3 Middle Name,
+24,Co-Mortgagor 3 Social Security Number or Tax ID Number,
+25,Co-Mortgagor 4 Last Name,
+26,Co-Mortgagor 4 First Name,
+27,Co-Mortgagor 4 Middle Name,
+28,Co-Mortgagor 4 Social Security Number or Tax ID Number,
+29,Co-Mortgagor 5 Last Name Billing,
+30,Co-Mortgagor 5 First Name Billing,
+31,Co- Mortgagor 5 Middle Name,
+32,Co-Mortgagor 5 Social Security Number or Tax ID Number,
+33,IndicatorSS Number or Tax ID Number_2,1
+34,Co-Mortgagor Number,
+35,Telephone Phone Number,1234567890
+36,Second Phone Number,
+37,Property Address,123 Old Way
+38,Property Unit Number,
+39,Property Address City,MEMPHIS
+40,Property Address State,TN
+41,Property Address Zip Code,12345
+42,Property Address Plus 4 Zip,
+43,Billing Street Address,123 Old Way
+44,Billing Address City,MEMPHIS
+45,Billing Address State,TN
+46,Billing Address Zip Code,12345
+47,Billing Address Plus 4 Zip,
+48,Additional Address Line,
+49,Foreign Address Indicator,
+50,Employee Code,N
+51,Occupancy Code,1
+52,Interest on Escrow Indicator,
+53,Note Rate First Annual Interest Rate,0.06125
+54,First Principal Balance,"70,300.00"
+55,Original Loan Amount,"70,300.00"
+56,Loan Term,360
+57,Next Monthly Payment Number,1
+58,Loan Date Closing Date,02/02/2026
+59,Note Date,02/02/2026
+60,Funding Date,02/02/2026
+61,Maturity Date,03/01/2056
+62,Next Due Date,04/01/2026
+63,First Payment Date,04/01/2026
+64,Payment Frequency,12
+65,Payment Amortization Method Dist. Type,1
+66,Billing Mode,7
+67,Mnthly Pmt Brkdwn County Tax,62.27
+68,Mnthly Pmt Brkdwn City Tax,59.74
+69,Mnthly Pmt Brkdwn Hazard Flood,154.25
+70,Mnthly Pmt Brkdwn MIP PMI,14.06
+71,Mnthly Pmt Brkdwn Other Lien,
+72,Mnthly Pmt Brkdwn Optional Ins,
+73,Mnthly Pmt Brkdwn P and I,427.15
+74,Mnthly Pmt Brkdwn BSC Amount,
+75,Tot Mnthly Pmt Amnt,717.47
+76,Initial Escrow,"1,105.04"
+77,Interest,318.6
+78,Late Charge Code,A
+79,Late Chare Factor,5.000
+80,Late Charge Grace Days,15
+81,Points Paid by Borrower,914.60
+82,Purchase Price,"74,000.00"
+83,Property Value Original Appraised,"90,000"
+84,Current Appraisal Date,01/13/2026
+85,Year Built,1956
+86,Number of Units,1
+87,Builder Broker Code default field is 4 pos,
+88,Product Tax Option Code 2pos4a,
+89,Next Applicable Tax Due Date DateField2,11/01/2026
+90,State Tax Option Code 1posfld2a,
+91,Special Tax Assessment 5posfld1b,
+92,High Priced Mortgage Indicator 1posfld6B,N
+93,Mutiple Parcel Indicator 4posfld3b,
+94,Multiple Structures 2posfld5a,
+95,Debt to Income Ratio 7posfld4a,28.474
+96,Escrow Not Required 1posfld1B,
+97,Class Code,
+98,PMI MIP payee code,105
+99,Cancellation Date amortized 80 percent,02/01/2036
+100,Termination Date automatic 78 percent,02/01/2037
+101,Mid Point Date amortized final,04/01/2041
+102,MI type,N
+103,Sequence No PMI MIP Type,02
+104,Term_1,1
+105,Disbursement Status Bill Code,02
+106,Disbursement Amount,02
+107,PMI Rate,
+108,Due Date,03/01/2026
+109,Certificate Guranty Number,80052649
+110,Upfront Amount,
+111,Ins Type Code,351
+112,Payee Code,
+113,Agent Code,
+114,Coverage Amount,
+115,Installment Amount,"1,851.00"
+116,Premium Due Date,01/01/2027
+117,Term_2,12
+118,Type payment,6
+119,Type coverage,
+120,Expiration Date,01/01/2027
+121,Policy Number,
+122,Ins Type Code2,
+123,Payee Code2,
+124,Agent Code2,
+125,Coverage Amount2,//
+126,Installment Amount2,
+127,Premium Due Date2,
+128,Term2,
+129,Type payment2,
+130,Type coverage2,W
+131,Expiration Date2,
+132,Policy Number2,
+133,Ins Type Code3,
+134,Payee Code3,
+135,Agent Code3,
+136,Coverage Amount3,
+137,Installment Amount3,
+138,Premium Due Date3,
+139,Term3,
+140,Type payment3,
+141,Type coverage3,L
+142,Expiration Date3,
+143,Policy Number3,
+144,Ins Type Code4,
+145,Payee Code4,
+146,Agent Code4,
+147,Coverage Amount4,
+148,Installment Amount4,
+149,Premium Due Date4,
+150,Term4,
+151,Type payment4,
+152,Type coverage4,Q
+153,Expiration Date4,
+154,Policy Number4,
+155,Ins Type Code5,
+156,Payee Code5,
+157,Agent Code5,
+158,Coverage Amount5,
+159,Installment Amount5,
+160,Premium Due Date5,
+161,Term_5,
+162,Type payment5,6
+163,Type coverage5,
+164,Expiration Date5,
+165,Policy Number5,
+166,Flood Program,E
+167,LOMA LOMR,N
+168,Certificate Type,L
+169,Determination Date,01/08/2026
+170,Community Number,470177
+171,Panel Number,
+172,Suffix Number,
+173,Flood Zone,X
+174,Zone Indicator,
+175,Firm Date,09/28/2007
+176,Mapping Company,CoreLogic
+177,Certificate Number,2601131629
+178,Date Community Entered Program,//
+179,ARM Plan ID,
+180,ARM or Convertible Indicator Control Type,
+181,Original Index Rate,
+182,Original P and I,427.15
+183,Original Note Rate,0.06125
+184,Original IR Change Date,
+185,Original P and I Change Date,
+186,Next IR Change Date,
+187,Next P and I Change Date,
+188,IR Change Period,
+189,P and I Change Period,
+190,Margin,
+191,Single Max IR Increase percent,
+192,Single Max IR Decrease percent,
+193,Single Min IR Increase percent,
+194,Single Min IR Decrease percent,
+195,Max P and I Increase percent,
+196,Max P and I Decreasepercent,
+197,Lifetime Max Interest Rate Increase,
+198,Lifetime Min Interest Rate Decrease,
+199,Max Negative Amortization percent,
+200,IR Rounding Type,
+201,IR Rounding Basis,
+202,Convertible Type Type Convert Code,
+203,Convertible Period Pmts Btwn Conv Option,
+204,Original Conversion Date,
+205,Last Conversion Date,
+206,Conversion Margin,
+207,Convertible Rounding Type,
+208,Convertible Rounding Basis,
+209,Conversion Fee,
+210,Balloon Status,N
+211,Balloon Type,
+212,Activation Date,
+213,ELOC Plan Code,
+214,ELOC Status,
+215,Maximum Interest Rate_1,6.125
+216,Routing Transit  Number,
+217,Bank Account Number,
+218,Bank Prefix,
+219,Credit Line Amount_1,
+220,Date Calculation percent Rate -1_1,
+221,Date Calculation Eff Date -1_1,//
+222,Constrution Plan Code,
+223,Construction  Status,
+224,Maximum Interest Rate_3,6.125
+225,Credit Line Amount_2,
+226,Date Calculation percent Rate -1_2,
+227,Date Calculation Eff Date -1_2,//
+228,Prime Rate Code,
+229,Minimum Interest Rate,
+230,Maximum Interest Rate_2,6.125
+231,Payment Adjustment Indicator,
+232,Rounding Code,
+233,Interest Calculation,2
+234,Percent Minus,
+235,Percent Increment,
+236,Percent of Prime,6.190
+237,Origination Fees Costs 1,
+238,Origination Fees Costs 2,
+239,Origination Fees Costs 3,
+240,Origination Fees/Costs 4,
+241,Unamortized Fees Cost 1,
+242,Unamortized Fees Cost 2,
+243,Unamortized Fees Cost 3,
+244,Unamortized Fees Cost 4,
+245,Interest Calculation Option,
+246,360 365_1,
+247,Effective Date_1,
+248,Interest Due,
+249,Initial Index,
+250,Interest payment,
+251,Interest only Flag,Y
+252,Expire,
+253,Fully Amortized P and I Payment,
+254,Alternate Due Date,
+255,Payment Option,
+256,360 365_2,2
+257,Interest Calc Factor,C
+258,Daily Rate Factor,
+259,Pledge Type,
+260,Pledge Class,
+261,Pledge Loan Code,
+262,Pledge Index,
+263,Custodian Code File Location,
+264,SMSA Code,
+265,Subsidy Period Months,
+266,First Subsidy Date 1st Payment Due Date,
+267,Subsidy Indicator Funds Source,
+268,Period 1,
+269,Period 2,
+270,Period 3,
+271,Period 4,
+272,Period 5,
+273,Buydown Subsidy Balance,
+274,2nd Investor Bank,
+275,2nd Investor Category,
+276,2nd Annual Interest Rate,
+277,2nd Distribution Type,
+278,2nd Hi Type,
+279,2nd Lo Type,
+280,2nd Investor Loan Number,
+281,2nd Loan Term,
+282,2nd Original Mortgage Amount,
+283,2nd Principal Balance,
+284,2nd P and I,
+285,Effective Date_2,
+286,Bank Transit Number,
+287,Individual Account Number,
+288,Individual Account Name,
+289,Delay Days,
+290,Account Type,
+291,Additional Principal Amount,
+292,Risk Grade Current,799
+293,Credit Quality Agent,
+294,Credit Quality Entry Date,//
+295,FHA Section,
+296,FHA Number,
+297,FHA Check Digit,
+298,Guaranty INS CO VA Office Code,
+299,VA Loan Identification Number,
+300,RHS-Borrower ID,
+301,MERS Mortgage ID Number,1.00274213002007e+17
+302,MERS Mortgage ID Number Registration Day,01/28/2026
+303,MERS Mortgage ID Number Registration Flag,Y
+304,MERS Foreclosure Status,
+305,MERS Original Mortgagee Indicator,Y
+306,MERS Original Org ID,1002742
+307,Interviewer,Lauren Evans
+308,DMI Old Loan Number,
+309,FIPS County Code,157
+310,LO Code,546320
+311,UW Code,
+312,High Cost Type,
+313,Higher Priced Type,Y
+314,Qualified Mortgage Code,QM
+315,Ability to Repay Type,Y
+316,Litigation Status Code,
+317,Escrow Waiver Code,
+318,Escrow Waiver Date,
+319,Prepayment Penalty Indicator,N
+320,Prepayment Penalty Verbiage,
+321,PrePayment Penalty Expiration Date,//
+322,HARP Indicator,
+323,LTV,95.000
+324,Channel,Banked - Retail
+325,DOB 1,1903-11-14 00:00:00
+326,DOB 2,
+327,DOB 3,
+328,DOB 4,
+329,DOB 5,
+330,EMAIL HOME 1,johnjohnes@gmail.com
+331,EMAIL WORK 1,
+332,EMAIL HOME 2,
+333,EMAIL WORK 2,
+334,Primary Phone Source Code,H
+335,Secondary Phone Source Code,H
+336,EMAIL,johnjohnes@gmail.com
+337,EMAIL2,
+338,FICO,FICO
+339,LTV 2,95.000
+340,SUBJECT PURCHASE PRICE,"74,000.00"
+341,BUSINESS Phone,8885552367
+342,Primary Phone Source Code 2,H
+343,Secondary Phone Source Code 2,H
+344,Loan Program,Select (FNMA) Conforming 30 Yr Fixed Loan Amount <=85K (Retail)
+345,Document Custodian ID,
+346,Appraisal Required,
+347,eNoteSMC,Hybrid
+348,eNote,
+349,Buydown,
+350,Buydown Contributor,
+351,Buydown Type,
+352,Rate term 1,
+353,Months term 1,
+354,AMT Term 1,
+355,Rate term 2,
+356,Months term 2,
+357,AMT Term 2,
+358,Rate term 3,
+359,Months term 3,
+360,AMT Term 3,
+361,Rate term 4,
+362,Months term 4,
+363,AMT Term 4,
+364,Rate term 5,
+365,Months term 5,
+366,AMT Term 5,
+367,Rate term 6,
+368,Months term 6,
+369,Remaining B/D Amount,
+370,Seller Paid Buydown,
+371,Address Confidentiality Program,
+372,Mortgagor Language Preference,ENG
+373,Borrower Demographics Race Code 1,3
+374,Borrower Demographics Race Code 2,
+375,Borrower Demographics Race Code 3,
+376,Borrower Demographics Race Code 4,
+377,Borrower Demographics Race Code 5,
+378,*Borrower Demographics Race Subcategory Code 1,
+379,*Borrower Demographics Race Subcategory Code 2,
+380,*Borrower Demographics Race Subcategory Code 3,
+381,Borrower Demographics Gender,M
+382,Borrower Demographics Age,52
+383,Borrower Ethnicity Code,2
+384,*Borrower Ethnicity Subcategory Code,
+385,Co-Borrower Demographics Race Code 1,8
+386,Co-Borrower Demographics Race Code 2,
+387,Co-Borrower Demographics Race Code 3,
+388,Co-Borrower Demographics Race Code 4,
+389,Co-Borrower Demographics Race Code 5,
+390,*Co-Borrower Demographics Race Subcategory Code,
+391,*Co-Borrower Demographics Race Subcategory Code 1,
+392,*Co-Borrower Demographics Race Subcategory Code 2,
+393,Co-Borrower Demographics Gender,5
+394,Co-Borrower Demographics Age,
+395,Co-Borrower Ethnicity Code,5
+396,*Co-Borrower Ethnicity Subcategory Code,
+397,Co-Borrower  Language Preference,
+398,Co-Borrower 3 Demographics Race Code 1,
+399,Co-Borrower 3 Demographics Race Code 2,
+400,Co-Borrower 3 Demographics Race Code 3,
+401,Co-Borrower 3 Demographics Race Code 4,
+402,Co-Borrower 3 Demographics Race Code 5,
+403,*Co-Borrower 3 Demographics Race Subcategory Code,
+404,*Co-Borrower 3 Demographics Race Subcategory Code 1,
+405,*Co-Borrower 3 Demographics Race Subcategory Code 2,
+406,Co-Borrower 3 Demographics Gender,
+407,Co-Borrower 3 Demographics Age,
+408,Co-Borrower 3 Ethnicity Code,
+409,*Co-Borrower 3  Ethnicity Subcategory Code,
+410,Co-Borrower 3  Language Preference,
+411,Co-Borrower 4 Demographics Race Code 1,
+412,Co-Borrower 4 Demographics Race Code 2,
+413,Co-Borrower 4 Demographics Race Code 3,
+414,Co-Borrower 4 Demographics Race Code 4,
+415,Co-Borrower 4 Demographics Race Code 5,
+416,*Co-Borrower 4 Demographics Race Subcategory Code,
+417,*Co-Borrower 4 Demographics Race Subcategory Code 1,
+418,*Co-Borrower 4 Demographics Race Subcategory Code 2,
+419,Co-Borrower 4 Demographics Gender,
+420,Co-Borrower 4 Demographics Age,
+421,Co-Borrower 4 Ethnicity Code,
+422,*Co-Borrower 4  Ethnicity Subcategory Code,
+423,Co-Borrower 4  Language Preference,
+424,Co-Borrower 5 Demographics Race Code 1,
+425,Co-Borrower 5 Demographics Race Code 2,
+426,Co-Borrower 5 Demographics Race Code 3,
+427,Co-Borrower 5 Demographics Race Code 4,
+428,Co-Borrower 5 Demographics Race Code 5,
+429,*Co-Borrower 5 Demographics Race Subcategory Code,
+430,*Co-Borrower 5 Demographics Race Subcategory Code 1,
+431,*Co-Borrower 5 Demographics Race Subcategory Code 2,
+432,Co-Borrower 5 Demographics Gender,
+433,Co-Borrower 5 Demographics Age,
+434,Co-Borrower 5 Ethnicity Code,
+435,*Co-Borrower 5  Ethnicity Subcategory Code,
+436,Co-Borrower 5  Language Preference,
+437,Construction Interest Rate,
+438,ELOC Plan ID,
+439,ELOC Plan Description,
