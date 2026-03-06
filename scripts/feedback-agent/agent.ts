@@ -37,7 +37,9 @@ function saveState(state: AgentState): void {
 
 async function fetchNewSlackMessages(state: AgentState): Promise<SlackMessage[]> {
   const oldest = state.last_slack_ts || undefined;
-  const messages = await fetchChannelHistory(config.slack_channel, oldest);
+  // Prefer channel ID from config to avoid list_channels API call
+  const channelRef = (config as any).slack_channel_id || config.slack_channel;
+  const messages = await fetchChannelHistory(channelRef, oldest);
   // Filter out bot messages and very short messages
   return messages.filter((m: any) => !m.bot_id && m.text && m.text.length > 10);
 }

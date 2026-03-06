@@ -36,25 +36,46 @@ function gestaltGet(path: string, params: Record<string, string | number>): stri
 
 const authHeaders = () => ({ Authorization: `Bearer ${getApiKey()}` });
 
-/** Fetch channel history from Slack via Gestalt */
-export async function fetchChannelHistory(
-  channelName: string,
-  oldest?: string,
-): Promise<SlackMessage[]> {
-  // First, resolve channel name to ID
-  const channelsRes = await fetch(
-    gestaltGet("/slack/list_channels", { limit: 200 }),
+/** Resolve a channel name to its ID via search (handles private channels) */
+export async function resolveChannelId(channelName: string): Promise<string> {
+  const name = channelName.replace(/^#/, "");
+  // Try list_channels with both public and private types
+  const res = await fetch(
+    gestaltGet("/slack/list_channels", { limit: 200, types: "public_channel,private_channel" }),
     { headers: authHeaders() },
   );
-  if (!channelsRes.ok) throw new Error(`Gestalt Slack list_channels failed: ${await channelsRes.text()}`);
-  const channelsData = await channelsRes.json();
-  const channel = channelsData.channels?.find(
-    (c: { name: string }) => c.name === channelName.replace(/^#/, ""),
-  );
-  if (!channel) throw new Error(`Channel ${channelName} not found`);
+  if (!res.ok) throw new Error(`Gestalt Slack list_channels failed: ${await res.text()}`);
+  const json = await res.json();
+  const channels = json.data?.channels || json.channels || [];
+  const match = channels.find((c: { name: string }) => c.name === name);
+  if (match) return match.id;
 
-  // Fetch history
-  const params: Record<string, string | number> = { channel: channel.id, limit: 100 };
+  // Fallback: use search_messages to find the channel
+  const searchRes = await fetch(
+    gestaltGet("/slack/search_messages", { query: `in:${name}`, count: 1 }),
+    { headers: authHeaders() },
+  );
+  if (searchRes.ok) {
+    const searchJson = await searchRes.json();
+    const firstMatch = searchJson.data?.matches?.[0];
+    if (firstMatch?.channel?.id) return firstMatch.channel.id;
+  }
+
+  throw new Error(`Channel ${channelName} not found`);
+}
+
+/** Fetch channel history from Slack via Gestalt.
+ *  Accepts a channel name (#channel-name) or a Slack channel ID (C...). */
+export async function fetchChannelHistory(
+  channelNameOrId: string,
+  oldest?: string,
+): Promise<SlackMessage[]> {
+  // If it looks like a Slack channel ID, use it directly
+  const channelId = /^C[A-Z0-9]+$/.test(channelNameOrId)
+    ? channelNameOrId
+    : await resolveChannelId(channelNameOrId);
+
+  const params: Record<string, string | number> = { channel: channelId, limit: 100 };
   if (oldest) params.oldest = oldest;
 
   const historyRes = await fetch(
@@ -62,7 +83,8 @@ export async function fetchChannelHistory(
     { headers: authHeaders() },
   );
   if (!historyRes.ok) throw new Error(`Gestalt Slack history failed: ${await historyRes.text()}`);
-  const data: SlackHistoryResponse = await historyRes.json();
+  const json = await historyRes.json();
+  const data: SlackHistoryResponse = json.data || json;
   return data.messages || [];
 }
 

@@ -1,7 +1,8 @@
 {
   "slack_channel": "#proj-surveyor-feedback",
+  "slack_channel_id": "C0AJQS4FHUM",
   "linear_project": "surveyor",
-  "linear_project_id": "",
+  "linear_project_id": "85717e32-82df-4024-8dbd-5305f8af719b",
   "poll_interval_minutes": 30,
   "triage_model": "claude-haiku-4-5-20251001",
   "queue_dir": "~/.claude/feedback-queue",
