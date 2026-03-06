@@ -502,7 +502,7 @@ async function main() {
         systemMessage: plan.prompt.systemMessage,
         userMessage: plan.prompt.userMessage,
         model: model === "claude-haiku-4-5" ? "claude-haiku-4-5-20251001" : model,
-        maxTokens: 16384,
+        maxTokens: 32768,
         temperature: 0,
       });
 
@@ -654,9 +654,10 @@ async function saveMappings(
       targetFieldId: r.targetFieldId,
       transferId,
       status: r.hasMapping ? "unreviewed" : "unmapped",
-      mappingType: r.mappingType,
+      mappingType: r.defaultValue ? "derived" : r.mappingType,
       sourceFieldId: r.sourceFieldId,
       transform: r.transformation || null,
+      defaultValue: r.defaultValue || null,
       reasoning: r.reasoning,
       confidence: r.confidence,
       notes: r.contextUsed || null,

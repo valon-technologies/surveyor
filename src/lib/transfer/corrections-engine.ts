@@ -111,6 +111,9 @@ export function buildCorrectionsContext(
 /**
  * Apply hard overrides to LLM output. Returns modified array.
  * Overridden entries are marked with _corrected=true.
+ *
+ * Supports both source-field overrides (has source field) and
+ * default-value overrides (no source field, just a constant like "0.00").
  */
 export function applyHardOverrides(
   mappings: TransferMappingOutput[],
@@ -125,18 +128,22 @@ export function applyHardOverrides(
     const key = `${m.vds_entity}.${m.vds_field}`;
     const override = overrides.get(key);
     if (override) {
+      // hasMapping is true if there's a source field OR a default value/transformation
+      const hasMapping = override.hasMapping ??
+        (override.sourceFieldName != null || override.transformation != null);
       result.push({
         vds_entity: m.vds_entity,
         vds_field: m.vds_field,
-        has_mapping: override.hasMapping ?? false,
+        has_mapping: hasMapping,
         source_field: override.sourceFieldName || "",
         source_position: override.sourceFieldPosition ?? -1,
         transformation: override.transformation || "",
-        confidence: override.confidence || "",
-        reasoning: override.reasoning || "",
+        confidence: override.confidence || "HIGH",
+        reasoning: override.reasoning || override.note || "",
         context_used: "Human-reviewed correction",
         follow_up_question: "",
         _corrected: true,
+        _defaultValue: override.transformation || undefined,
       });
       applied++;
     } else {
@@ -160,18 +167,21 @@ export function generateOverrideOutputs(
 
   for (const [key, override] of overrides.entries()) {
     if (!entitySet.has(override.targetEntity)) continue;
+    const hasMapping = override.hasMapping ??
+      (override.sourceFieldName != null || override.transformation != null);
     result.push({
       vds_entity: override.targetEntity,
       vds_field: override.targetField || "",
-      has_mapping: override.hasMapping ?? false,
+      has_mapping: hasMapping,
       source_field: override.sourceFieldName || "",
       source_position: override.sourceFieldPosition ?? -1,
       transformation: override.transformation || "",
-      confidence: override.confidence || "",
+      confidence: override.confidence || "HIGH",
       reasoning: override.reasoning || `Human override: ${override.note || ""}`,
       context_used: "Human-reviewed correction",
       follow_up_question: "",
       _corrected: true,
+      _defaultValue: override.transformation || undefined,
     });
   }
 

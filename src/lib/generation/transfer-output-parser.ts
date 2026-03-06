@@ -15,6 +15,8 @@ export interface TransferMappingOutput {
   follow_up_question: string;
   /** Set post-parse when a hard override was applied. */
   _corrected?: boolean;
+  /** Default/constant value for overrides without a source field. */
+  _defaultValue?: string;
 }
 
 export interface TransferResolutionContext {
@@ -32,6 +34,7 @@ export interface ResolvedTransferMapping {
   sourceFieldName: string | null;
   sourcePosition: number;
   hasMapping: boolean;
+  defaultValue: string | null;
   transformation: string;
   confidence: "high" | "medium" | "low" | null;
   reasoning: string;
@@ -129,6 +132,8 @@ export function resolveTransferMappings(
     }
 
     // Force unmapped if no source resolved and LLM claimed mapping
+    // Exception: corrected overrides with default values don't need a source field
+    const isDefaultValueOverride = o._corrected && o._defaultValue;
     if (o.has_mapping && !sourceFieldId && !o._corrected) {
       warnings.push("Forced unmapped: source field not resolved");
     }
@@ -140,7 +145,8 @@ export function resolveTransferMappings(
       sourceFieldId,
       sourceFieldName: o.source_field || null,
       sourcePosition,
-      hasMapping: o.has_mapping && (!!sourceFieldId || !!o._corrected),
+      hasMapping: o.has_mapping && (!!sourceFieldId || !!o._corrected || !!isDefaultValueOverride),
+      defaultValue: o._defaultValue || null,
       transformation: o.transformation || "",
       confidence,
       reasoning: o.reasoning || "",

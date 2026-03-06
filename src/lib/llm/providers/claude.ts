@@ -31,6 +31,36 @@ export class ClaudeProvider implements LLMProvider {
       input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
     }));
 
+    // Use streaming for large outputs to avoid 10-minute timeout
+    const useStreaming = (request.maxTokens || 4096) > 16384;
+
+    if (useStreaming) {
+      const stream = this.client.messages.stream({
+        model: request.model || DEFAULT_MODEL,
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0,
+        system: request.systemMessage,
+        messages: messages as Anthropic.MessageParam[],
+        ...(tools && tools.length > 0 ? { tools } : {}),
+      });
+      const response = await stream.finalMessage();
+      const content = response.content
+        .filter((block) => block.type === "text")
+        .map((block) => block.text)
+        .join("");
+      const toolCalls = response.content
+        .filter((block): block is Anthropic.ToolUseBlock => block.type === "tool_use")
+        .map((block) => ({ id: block.id, name: block.name, input: block.input as Record<string, unknown> }));
+      return {
+        content,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        model: response.model,
+        stopReason: response.stop_reason as "end_turn" | "tool_use" | "max_tokens" | undefined,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      };
+    }
+
     const response = await this.client.messages.create({
       model: request.model || DEFAULT_MODEL,
       max_tokens: request.maxTokens || 4096,
