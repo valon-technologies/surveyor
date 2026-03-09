@@ -522,8 +522,8 @@ function EntityGroup({
         const isMine = currentUserId && m.assigneeId === currentUserId;
         const claimedByOther = m.assigneeId && m.assigneeId !== currentUserId;
         return (
-        <tr key={m.id} className={`border-b last:border-0 hover:bg-muted/50 group ${claimedByOther ? "opacity-50" : ""}`}>
-          <td className="px-4 py-2.5 text-center">
+        <tr key={m.id} className={`border-b last:border-0 hover:bg-muted/50 group cursor-pointer ${claimedByOther ? "opacity-50" : ""}`} onClick={() => { window.location.href = `/mapping/discuss/${m.id}`; }}>
+          <td className="px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
             {isAdmin ? (
               <span
                 className={`text-[10px] cursor-pointer ${m.assigneeName ? "text-foreground" : "text-muted-foreground"}`}
@@ -561,7 +561,7 @@ function EntityGroup({
             )}
           </td>
           <td className="px-4 py-2.5">
-            <div className="font-medium pl-3">{m.targetFieldName}</div>
+            <div className="font-medium pl-3 text-primary hover:underline">{m.targetFieldName}</div>
           </td>
           <td className="px-4 py-2.5">
             {m.sourceFieldName ? (
@@ -585,12 +585,7 @@ function EntityGroup({
             )}
           </td>
           <td className="px-4 py-2.5">
-            <Link
-              href={`/mapping/discuss/${m.id}`}
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </Link>
+            <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
           </td>
         </tr>
         );
