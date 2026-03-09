@@ -97,7 +97,7 @@ export function MappingSummary({ targetFieldName, mapping }: MappingSummaryProps
           {mapping.transform ? (
             <>
               <span className="text-muted-foreground font-medium">Transform:</span>
-              <code className="block font-mono whitespace-pre-wrap break-words bg-muted/50 rounded px-2 py-1 mt-0.5">{
+              <code className="block font-mono whitespace-pre-wrap break-words bg-muted/50 rounded px-2 py-1 mt-0.5 max-h-32 overflow-y-auto">{
                 mapping.transform
                   .replace(/\b(SELECT|FROM|WHERE|CASE|WHEN|ELSE|END)\b/gi, (match) => `\n${match}`)
                   .replace(/^\n/, '')
