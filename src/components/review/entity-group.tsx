@@ -56,6 +56,7 @@ interface EntityGroupProps {
   onAcceptWithRipple?: (card: ReviewCardData) => void;
   currentUserId?: string | null;
   onClaim?: (mappingId: string, assigneeId: string | null) => void;
+  onBatchAssign?: (mappingIds: string[], assigneeId: string | null) => void;
 }
 
 export function EntityGroup({
@@ -69,10 +70,24 @@ export function EntityGroup({
   onAcceptWithRipple,
   currentUserId,
   onClaim,
+  onBatchAssign,
 }: EntityGroupProps) {
   const router = useRouter();
   const { collapsedEntityIds, toggleEntityCollapsed } = useReviewStore();
   const isCollapsed = collapsedEntityIds.includes(entityId);
+
+  // Entity-level claim: all cards including children
+  const allCardIds = useMemo(() => {
+    const ids = cards.map((c) => c.id);
+    for (const child of childGroups) {
+      ids.push(...child.cards.map((c) => c.id));
+    }
+    return ids;
+  }, [cards, childGroups]);
+  const allClaimedByMe = currentUserId && allCardIds.length > 0 &&
+    [...cards, ...childGroups.flatMap((c) => c.cards)].every((c) => c.assigneeId === currentUserId);
+  const someClaimedByMe = currentUserId &&
+    [...cards, ...childGroups.flatMap((c) => c.cards)].some((c) => c.assigneeId === currentUserId);
 
   // Aggregate status counts across parent + all children
   const allCards = useMemo(
@@ -112,6 +127,22 @@ export function EntityGroup({
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleEntityCollapsed(entityId); } }}
         className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors rounded-t-xl cursor-pointer"
       >
+        {/* Entity-level claim checkbox */}
+        {onBatchAssign && currentUserId && (
+          <input
+            type="checkbox"
+            checked={!!allClaimedByMe}
+            ref={(el) => { if (el) el.indeterminate = !!someClaimedByMe && !allClaimedByMe; }}
+            onChange={(e) => {
+              e.stopPropagation();
+              onBatchAssign(allCardIds, allClaimedByMe ? null : currentUserId);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            title={allClaimedByMe ? "Release all fields" : "Claim all fields in this entity"}
+            className="h-3.5 w-3.5 rounded border-gray-300 text-primary cursor-pointer shrink-0"
+          />
+        )}
+
         {isCollapsed ? (
           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
         ) : (

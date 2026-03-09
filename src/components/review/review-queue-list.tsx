@@ -2,8 +2,11 @@
 
 import { useMemo } from "react";
 import { useSession } from "next-auth/react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useReviewQueue, useReassignMapping } from "@/queries/review-queries";
 import { useReviewStore } from "@/stores/review-store";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
+import { api, workspacePath } from "@/lib/api-client";
 import { EntityGroup } from "./entity-group";
 import { MILESTONE_LABELS, MILESTONE_COLORS, type Milestone } from "@/lib/constants";
 import type { ReviewCardData, ChildEntityGroup } from "@/types/review";
@@ -25,7 +28,16 @@ interface EntityGroupData {
 
 export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: ReviewQueueListProps) {
   const { data: session } = useSession();
+  const { workspaceId } = useWorkspace();
+  const qc = useQueryClient();
   const claimMutation = useReassignMapping();
+  const batchAssignMutation = useMutation({
+    mutationFn: ({ mappingIds, assigneeId }: { mappingIds: string[]; assigneeId: string | null }) =>
+      api.post(workspacePath(workspaceId, "mappings/batch-assign"), { mappingIds, assigneeId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["review-queue"] });
+    },
+  });
   const currentUserId = (session?.user as { id?: string })?.id ?? null;
 
   const {
@@ -213,6 +225,7 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
           onAcceptWithRipple={onAcceptWithRipple}
           currentUserId={currentUserId}
           onClaim={(mappingId, assigneeId) => claimMutation.mutate({ mappingId, assigneeId })}
+          onBatchAssign={(mappingIds, assigneeId) => batchAssignMutation.mutate({ mappingIds, assigneeId })}
         />
       ))}
     </div>

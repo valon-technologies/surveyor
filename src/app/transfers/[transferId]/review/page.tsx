@@ -6,9 +6,10 @@ import Link from "next/link";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
+import { useWorkspaceMembers } from "@/queries/member-queries";
 import { useToast } from "@/components/ui/toast";
 import { api, workspacePath } from "@/lib/api-client";
-import { ArrowLeft, ChevronRight, Users, EyeOff, Eye, XCircle, UserCheck } from "lucide-react";
+import { ArrowLeft, ChevronRight, Users, EyeOff, Eye, XCircle, UserCheck, ChevronDown } from "lucide-react";
 import { DistributeDialog } from "@/components/review/distribute-dialog";
 
 interface TransferMapping {
@@ -66,9 +67,21 @@ export default function TransferReviewPage() {
   const [showExcluded, setShowExcluded] = useState(false);
   const [distributeOpen, setDistributeOpen] = useState(false);
 
+  const { data: members } = useWorkspaceMembers();
+  const { role } = useWorkspace();
+  const isAdmin = role === "owner";
+
   const claimMutation = useMutation({
     mutationFn: ({ mappingId, assigneeId }: { mappingId: string; assigneeId: string | null }) =>
       api.patch(workspacePath(workspaceId, `mappings/${mappingId}`), { assigneeId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transfer-review-queue"] });
+    },
+  });
+
+  const batchAssignMutation = useMutation({
+    mutationFn: ({ mappingIds, assigneeId }: { mappingIds: string[]; assigneeId: string | null }) =>
+      api.post(workspacePath(workspaceId, "mappings/batch-assign"), { mappingIds, assigneeId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transfer-review-queue"] });
     },
@@ -369,7 +382,10 @@ export default function TransferReviewPage() {
                   group={group}
                   onToggleExclude={toggleEntityExclusion}
                   currentUserId={currentUserId}
+                  isAdmin={isAdmin}
+                  members={members}
                   onClaim={(mappingId, assigneeId) => claimMutation.mutate({ mappingId, assigneeId })}
+                  onBatchAssign={(mappingIds, assigneeId) => batchAssignMutation.mutate({ mappingIds, assigneeId })}
                 />
               ))}
             </tbody>
@@ -396,7 +412,10 @@ function EntityGroup({
   group,
   onToggleExclude,
   currentUserId,
+  isAdmin,
+  members,
   onClaim,
+  onBatchAssign,
 }: {
   group: {
     entityId: string;
@@ -406,13 +425,68 @@ function EntityGroup({
   };
   onToggleExclude: (entityId: string, entityName: string, exclude: boolean) => void;
   currentUserId: string | null;
+  isAdmin: boolean;
+  members?: { userId: string; name: string | null; email: string }[];
   onClaim: (mappingId: string, assigneeId: string | null) => void;
+  onBatchAssign: (mappingIds: string[], assigneeId: string | null) => void;
 }) {
+  const allMappingIds = group.mappings.map((m) => m.id);
+  const allClaimedByMe = currentUserId && group.mappings.length > 0 &&
+    group.mappings.every((m) => m.assigneeId === currentUserId);
+  const someClaimedByMe = currentUserId &&
+    group.mappings.some((m) => m.assigneeId === currentUserId);
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
+
   return (
     <>
       {/* Entity header row */}
       <tr className="bg-muted/30 border-b">
-        <td colSpan={5} className="px-4 py-1.5">
+        <td className="px-4 py-1.5 text-center">
+          {isAdmin ? (
+            <div className="relative inline-block">
+              <button
+                onClick={() => setShowAssignDropdown(!showAssignDropdown)}
+                className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground rounded px-1 py-0.5 hover:bg-muted"
+                title="Assign all fields in this entity"
+              >
+                <Users className="h-3 w-3" />
+                <ChevronDown className="h-2.5 w-2.5" />
+              </button>
+              {showAssignDropdown && (
+                <div className="absolute left-0 top-full mt-1 z-50 bg-popover border rounded-md shadow-md py-1 min-w-[160px]">
+                  <button
+                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent text-muted-foreground"
+                    onClick={() => { onBatchAssign(allMappingIds, null); setShowAssignDropdown(false); }}
+                  >
+                    Unassign all
+                  </button>
+                  {members?.map((m) => (
+                    <button
+                      key={m.userId}
+                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent"
+                      onClick={() => { onBatchAssign(allMappingIds, m.userId); setShowAssignDropdown(false); }}
+                    >
+                      {m.name || m.email}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <input
+              type="checkbox"
+              checked={!!allClaimedByMe}
+              ref={(el) => { if (el) el.indeterminate = !!someClaimedByMe && !allClaimedByMe; }}
+              onChange={() => {
+                if (!currentUserId) return;
+                onBatchAssign(allMappingIds, allClaimedByMe ? null : currentUserId);
+              }}
+              title={allClaimedByMe ? "Release all fields" : "Claim all fields in this entity"}
+              className="h-3.5 w-3.5 rounded border-gray-300 text-primary cursor-pointer"
+            />
+          )}
+        </td>
+        <td colSpan={4} className="px-4 py-1.5">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               {group.entityName}
@@ -450,7 +524,26 @@ function EntityGroup({
         return (
         <tr key={m.id} className={`border-b last:border-0 hover:bg-muted/50 group ${claimedByOther ? "opacity-50" : ""}`}>
           <td className="px-4 py-2.5 text-center">
-            {claimedByOther ? (
+            {isAdmin ? (
+              <span
+                className={`text-[10px] cursor-pointer ${m.assigneeName ? "text-foreground" : "text-muted-foreground"}`}
+                title={m.assigneeName ? `Assigned to ${m.assigneeName} — click to change` : "Unassigned — click to assign"}
+                onClick={() => {
+                  // For admin: cycle through unassign on click, use entity-level dropdown for full picker
+                  if (m.assigneeId) {
+                    onClaim(m.id, null);
+                  } else if (currentUserId) {
+                    onClaim(m.id, currentUserId);
+                  }
+                }}
+              >
+                {m.assigneeName ? (
+                  <UserCheck className="h-3.5 w-3.5 inline text-green-600" />
+                ) : (
+                  <input type="checkbox" checked={false} readOnly className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer" />
+                )}
+              </span>
+            ) : claimedByOther ? (
               <span className="text-[10px] text-muted-foreground" title={`Claimed by ${m.assigneeName}`}>
                 <UserCheck className="h-3.5 w-3.5 inline text-amber-500" />
               </span>
