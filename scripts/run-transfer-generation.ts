@@ -16,6 +16,8 @@
  *   npx tsx scripts/run-transfer-generation.ts --transfer-id <uuid> --domain loans --model claude-sonnet-4-6
  */
 
+import { readFileSync } from "fs";
+import { join } from "path";
 import { db } from "../src/lib/db";
 import {
   transfer,
@@ -250,8 +252,44 @@ async function main() {
     selectedDocs.push(d.content);
     learningsTokens += tokens;
   }
-  const learningsText = selectedDocs.join("\n\n---\n\n");
+  // Load flow-transfer-principles from disk (transfer-specific, not in shared context table)
+  const principlesPath = join(__dirname, "../data/transfers/flow-transfer-principles.md");
+  let principlesText = "";
+  try {
+    principlesText = readFileSync(principlesPath, "utf-8");
+    console.log(`Flow transfer principles: loaded (~${Math.ceil(principlesText.length / 4)} tokens)`);
+  } catch {
+    console.log(`Flow transfer principles: not found at ${principlesPath}, skipping`);
+  }
+
+  const learningsText = [principlesText, ...selectedDocs].filter(Boolean).join("\n\n---\n\n");
   console.log(`Foundational context: ${selectedDocs.length}/${foundationalDocs.length} docs (~${learningsTokens} tokens, budget ${FOUNDATIONAL_TOKEN_BUDGET})`);
+
+  // 5b2. Load ACDC reference context (enum maps, step codes) — for understanding, NOT as source fields
+  const ACDC_REFERENCE_TOKEN_BUDGET = 10000;
+  const acdcDocs = await db
+    .select({ name: context.name, content: context.content, tokenCount: context.tokenCount })
+    .from(context)
+    .where(
+      and(
+        eq(context.workspaceId, t.workspaceId),
+        eq(context.subcategory, "enum_map"),
+        eq(context.isActive, true),
+      )
+    );
+
+  let acdcTokens = 0;
+  const selectedAcdcDocs: { name: string; content: string }[] = [];
+  // Sort by token count ascending so we fit more docs
+  const sortedAcdc = acdcDocs.sort((a, b) => (a.tokenCount || 0) - (b.tokenCount || 0));
+  for (const d of sortedAcdc) {
+    if (!d.content) continue;
+    const tokens = d.tokenCount || Math.ceil(d.content.length / 4);
+    if (acdcTokens + tokens > ACDC_REFERENCE_TOKEN_BUDGET && selectedAcdcDocs.length > 0) break;
+    selectedAcdcDocs.push({ name: d.name, content: d.content });
+    acdcTokens += tokens;
+  }
+  console.log(`ACDC reference context: ${selectedAcdcDocs.length}/${acdcDocs.length} enum/lookup docs (~${acdcTokens} tokens, budget ${ACDC_REFERENCE_TOKEN_BUDGET})`);
 
   // 5c. Load VDS entity skill docs (per-entity documentation)
   // Build a map: entityName → assembled skill text
@@ -395,6 +433,11 @@ async function main() {
     ].filter(Boolean).join("\n\n---\n\n");
 
     // Build prompt
+    // Build ACDC reference text for this domain's entities
+    const domainAcdcText = selectedAcdcDocs.length > 0
+      ? selectedAcdcDocs.map(d => `### ${d.name}\n\n${d.content}`).join("\n\n")
+      : undefined;
+
     const prompt = buildTransferPrompt({
       domain,
       vdsFields: fieldsForLLM,
@@ -403,6 +446,7 @@ async function main() {
       learningsText: fullLearningsText,
       correctionsContext: corrContext,
       clientName: t.clientName || t.name,
+      acdcReferenceText: domainAcdcText,
     });
 
     // Estimate output tokens (~150 tokens per field)

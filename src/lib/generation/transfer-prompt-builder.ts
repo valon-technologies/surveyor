@@ -31,6 +31,7 @@ export interface TransferPromptInput {
   learningsText: string;
   correctionsContext: string;
   clientName: string;
+  acdcReferenceText?: string;
 }
 
 export function buildTransferPrompt(input: TransferPromptInput): {
@@ -38,7 +39,7 @@ export function buildTransferPrompt(input: TransferPromptInput): {
   userMessage: string;
   estimatedInputTokens: number;
 } {
-  const { domain, vdsFields, sourceFields, skillsText, learningsText, correctionsContext, clientName } = input;
+  const { domain, vdsFields, sourceFields, skillsText, learningsText, correctionsContext, clientName, acdcReferenceText } = input;
 
   // Group VDS fields by entity
   const byEntity = new Map<string, TransferVdsField[]>();
@@ -94,7 +95,7 @@ ${skillsText ? `## VDS Entity Documentation\n\n${skillsText}\n\n` : ""}## ${clie
 
 ${sourceText}
 
-${learningsText ? `## Distilled Learnings from Prior Mapping Work\n\n${learningsText}\n\n` : ""}${corrSection}## Instructions
+${learningsText ? `## Distilled Learnings from Prior Mapping Work\n\n${learningsText}\n\n` : ""}${acdcReferenceText ? `## ACDC Reference Context (for understanding ONLY — NOT valid source fields)\n\nThe following enum maps and lookup tables are from the ACDC source system. Use them to understand field semantics, valid code values, and domain terminology. They help you determine WHICH ${clientName} source field is the correct match and what transformations are needed.\n\n**IMPORTANT: These are NOT valid source fields. Source fields MUST come from the ${clientName} flat file listed above. Never map a VDS field to an ACDC table or field.**\n\n${acdcReferenceText}\n\n` : ""}${corrSection}## Instructions
 
 For **EACH** VDS field listed above (excluding system fields: id, sid, created_at, updated_at, deleted_at, deletion_reason), determine whether any ${clientName} field maps to it.
 

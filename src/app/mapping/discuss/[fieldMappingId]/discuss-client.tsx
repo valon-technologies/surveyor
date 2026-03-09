@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChatMessageList } from "@/components/chat/chat-message-list";
@@ -9,7 +9,7 @@ import { MappingSummary } from "@/components/chat/mapping-state-card";
 import { PriorSessionsPanel } from "@/components/chat/prior-sessions-panel";
 import { SessionCompleteCard } from "@/components/chat/session-complete-card";
 import { useMapping, useUpdateMapping } from "@/queries/mapping-queries";
-import { useExcludeMapping } from "@/queries/review-queries";
+import { useExcludeMapping, usePuntMapping } from "@/queries/review-queries";
 import { useEntity } from "@/queries/entity-queries";
 import { useRippleSimilar } from "@/queries/ripple-queries";
 import { RipplePanel } from "@/components/review/ripple-panel";
@@ -31,6 +31,7 @@ import { useChatStream } from "@/lib/hooks/use-chat-stream";
 import {
   ArrowLeft,
   Ban,
+  SkipForward,
   Zap,
 } from "lucide-react";
 import { CitationMarkdown } from "@/components/context/citation-markdown";
@@ -60,6 +61,7 @@ export function DiscussClient() {
 
   // Track whether user has applied an update this session
   const [hasApplied, setHasApplied] = useState(false);
+  const notesRef = useRef<HTMLTextAreaElement>(null);
 
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [viewedPriorSessionId, setViewedPriorSessionId] = useState<string | null>(null);
@@ -299,9 +301,12 @@ export function DiscussClient() {
             variant="ghost"
             size="icon"
             onClick={() => {
-              // Navigate back to transfer review queue if this is a transfer mapping
-              const tid = mapping?.transferId;
-              router.push(tid ? `/transfers/${tid}/review` : "/mapping");
+              if (window.history.length > 1) {
+                router.back();
+              } else {
+                const tid = mapping?.transferId;
+                router.push(tid ? `/transfers/${tid}/review` : "/mapping");
+              }
             }}
           >
             <ArrowLeft className="h-4 w-4" />
@@ -455,6 +460,7 @@ export function DiscussClient() {
               <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Other Notes</span>
             </div>
             <textarea
+              ref={notesRef}
               defaultValue={
                 // Strip Linear reference section (shown in mapping summary instead)
                 (mapping?.notes || "").split("--- Linear Reference ---")[0].trim()
@@ -579,7 +585,8 @@ export function DiscussClient() {
 
                   // Build update payload: if reviewer accepted AI suggestion, include the proposed changes
                   const hasAiCorrection = effectiveUpdate && (sourceDecision === "wrong" || transformDecision === "wrong");
-                  const updatePayload: Record<string, unknown> = { id: activeMappingId, status: "accepted" };
+                  const notesValue = notesRef.current?.value?.trim() || null;
+                  const updatePayload: Record<string, unknown> = { id: activeMappingId, status: "accepted", notes: notesValue };
 
                   if (hasAiCorrection && effectiveUpdate) {
                     // Include all proposed fields — the API will resolve names to IDs
@@ -682,6 +689,7 @@ export function DiscussClient() {
                 createdBy: mapping.createdBy || "",
                 batchRunId: null,
                 createdAt: mapping.createdAt || "",
+                entityMetadata: null,
               } satisfies ReviewCardData
             }
             onClose={() => {
