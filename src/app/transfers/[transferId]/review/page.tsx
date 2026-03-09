@@ -3,10 +3,12 @@
 import { useState, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useToast } from "@/components/ui/toast";
-import { ArrowLeft, ChevronRight, Users, EyeOff, Eye, XCircle } from "lucide-react";
+import { api, workspacePath } from "@/lib/api-client";
+import { ArrowLeft, ChevronRight, Users, EyeOff, Eye, XCircle, UserCheck } from "lucide-react";
 import { DistributeDialog } from "@/components/review/distribute-dialog";
 
 interface TransferMapping {
@@ -25,6 +27,8 @@ interface TransferMapping {
   sourceFieldName: string | null;
   transform: string | null;
   reasoning: string | null;
+  assigneeId: string | null;
+  assigneeName: string | null;
   createdAt: string;
 }
 
@@ -51,6 +55,7 @@ const CONFIDENCE_COLORS: Record<string, string> = {
 export default function TransferReviewPage() {
   const { transferId } = useParams<{ transferId: string }>();
   const { workspaceId } = useWorkspace();
+  const { data: session } = useSession();
   const { addToast } = useToast();
   const queryClient = useQueryClient();
 
@@ -60,6 +65,16 @@ export default function TransferReviewPage() {
   const [search, setSearch] = useState("");
   const [showExcluded, setShowExcluded] = useState(false);
   const [distributeOpen, setDistributeOpen] = useState(false);
+
+  const claimMutation = useMutation({
+    mutationFn: ({ mappingId, assigneeId }: { mappingId: string; assigneeId: string | null }) =>
+      api.patch(workspacePath(workspaceId, `mappings/${mappingId}`), { assigneeId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transfer-review-queue"] });
+    },
+  });
+
+  const currentUserId = (session?.user as { id?: string })?.id ?? null;
 
   const { data: transfer } = useQuery<TransferInfo>({
     queryKey: ["transfer", transferId],
@@ -339,6 +354,7 @@ export default function TransferReviewPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground text-xs">
+                <th className="px-4 py-2.5 font-medium w-10">Claim</th>
                 <th className="px-4 py-2.5 font-medium">Entity / Field</th>
                 <th className="px-4 py-2.5 font-medium">Source</th>
                 <th className="px-4 py-2.5 font-medium">Status</th>
@@ -352,6 +368,8 @@ export default function TransferReviewPage() {
                   key={group.entityId}
                   group={group}
                   onToggleExclude={toggleEntityExclusion}
+                  currentUserId={currentUserId}
+                  onClaim={(mappingId, assigneeId) => claimMutation.mutate({ mappingId, assigneeId })}
                 />
               ))}
             </tbody>
@@ -377,6 +395,8 @@ export default function TransferReviewPage() {
 function EntityGroup({
   group,
   onToggleExclude,
+  currentUserId,
+  onClaim,
 }: {
   group: {
     entityId: string;
@@ -385,12 +405,14 @@ function EntityGroup({
     mappings: TransferMapping[];
   };
   onToggleExclude: (entityId: string, entityName: string, exclude: boolean) => void;
+  currentUserId: string | null;
+  onClaim: (mappingId: string, assigneeId: string | null) => void;
 }) {
   return (
     <>
       {/* Entity header row */}
       <tr className="bg-muted/30 border-b">
-        <td colSpan={4} className="px-4 py-1.5">
+        <td colSpan={5} className="px-4 py-1.5">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               {group.entityName}
@@ -422,8 +444,29 @@ function EntityGroup({
         </td>
       </tr>
       {/* Mapping rows */}
-      {group.mappings.map((m) => (
-        <tr key={m.id} className="border-b last:border-0 hover:bg-muted/50 group">
+      {group.mappings.map((m) => {
+        const isMine = currentUserId && m.assigneeId === currentUserId;
+        const claimedByOther = m.assigneeId && m.assigneeId !== currentUserId;
+        return (
+        <tr key={m.id} className={`border-b last:border-0 hover:bg-muted/50 group ${claimedByOther ? "opacity-50" : ""}`}>
+          <td className="px-4 py-2.5 text-center">
+            {claimedByOther ? (
+              <span className="text-[10px] text-muted-foreground" title={`Claimed by ${m.assigneeName}`}>
+                <UserCheck className="h-3.5 w-3.5 inline text-amber-500" />
+              </span>
+            ) : (
+              <input
+                type="checkbox"
+                checked={!!isMine}
+                onChange={() => {
+                  if (!currentUserId) return;
+                  onClaim(m.id, isMine ? null : currentUserId);
+                }}
+                title={isMine ? "Release this field" : "Claim for review"}
+                className="h-3.5 w-3.5 rounded border-gray-300 text-primary cursor-pointer"
+              />
+            )}
+          </td>
           <td className="px-4 py-2.5">
             <div className="font-medium pl-3">{m.targetFieldName}</div>
           </td>
@@ -457,7 +500,8 @@ function EntityGroup({
             </Link>
           </td>
         </tr>
-      ))}
+        );
+      })}
     </>
   );
 }

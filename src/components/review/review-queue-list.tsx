@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { useReviewQueue } from "@/queries/review-queries";
+import { useSession } from "next-auth/react";
+import { useReviewQueue, useReassignMapping } from "@/queries/review-queries";
 import { useReviewStore } from "@/stores/review-store";
 import { EntityGroup } from "./entity-group";
 import { MILESTONE_LABELS, MILESTONE_COLORS, type Milestone } from "@/lib/constants";
@@ -23,6 +24,10 @@ interface EntityGroupData {
 }
 
 export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: ReviewQueueListProps) {
+  const { data: session } = useSession();
+  const claimMutation = useReassignMapping();
+  const currentUserId = (session?.user as { id?: string })?.id ?? null;
+
   const {
     confidenceFilter,
     entityFilter,
@@ -206,6 +211,8 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
           onPunt={onPunt}
           onExclude={onExclude}
           onAcceptWithRipple={onAcceptWithRipple}
+          currentUserId={currentUserId}
+          onClaim={(mappingId, assigneeId) => claimMutation.mutate({ mappingId, assigneeId })}
         />
       ))}
     </div>

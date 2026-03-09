@@ -54,6 +54,8 @@ interface EntityGroupProps {
   onPunt: (card: ReviewCardData) => void;
   onExclude: (card: ReviewCardData) => void;
   onAcceptWithRipple?: (card: ReviewCardData) => void;
+  currentUserId?: string | null;
+  onClaim?: (mappingId: string, assigneeId: string | null) => void;
 }
 
 export function EntityGroup({
@@ -65,6 +67,8 @@ export function EntityGroup({
   onPunt,
   onExclude,
   onAcceptWithRipple,
+  currentUserId,
+  onClaim,
 }: EntityGroupProps) {
   const router = useRouter();
   const { collapsedEntityIds, toggleEntityCollapsed } = useReviewStore();
@@ -187,6 +191,8 @@ export function EntityGroup({
               onPunt={onPunt}
               onExclude={onExclude}
               onAcceptWithRipple={onAcceptWithRipple}
+              currentUserId={currentUserId}
+              onClaim={onClaim}
             />
           ))}
 
@@ -198,6 +204,8 @@ export function EntityGroup({
               onPunt={onPunt}
               onExclude={onExclude}
               onAcceptWithRipple={onAcceptWithRipple}
+              currentUserId={currentUserId}
+              onClaim={onClaim}
             />
           ))}
         </div>
@@ -211,11 +219,15 @@ function ChildEntitySection({
   onPunt,
   onExclude,
   onAcceptWithRipple,
+  currentUserId,
+  onClaim,
 }: {
   child: ChildEntityGroup;
   onPunt: (card: ReviewCardData) => void;
   onExclude: (card: ReviewCardData) => void;
   onAcceptWithRipple?: (card: ReviewCardData) => void;
+  currentUserId?: string | null;
+  onClaim?: (mappingId: string, assigneeId: string | null) => void;
 }) {
   const sorted = useMemo(() => sortCards(child.cards), [child.cards]);
 
@@ -235,6 +247,8 @@ function ChildEntitySection({
             onPunt={onPunt}
             onExclude={onExclude}
             onAcceptWithRipple={onAcceptWithRipple}
+            currentUserId={currentUserId}
+            onClaim={onClaim}
           />
         ))}
       </div>

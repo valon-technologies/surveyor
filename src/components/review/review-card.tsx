@@ -11,13 +11,15 @@ import type { ReviewCardData } from "@/types/review";
 import type { ConfidenceLevel, MappingType, MappingStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { stripCitations } from "@/lib/generation/citation-parser";
-import { MessageSquare, Check, ArrowRight, Ban, Undo2, ChevronRight, ChevronDown, UserCircle } from "lucide-react";
+import { MessageSquare, Check, ArrowRight, Ban, Undo2, ChevronRight, ChevronDown, UserCircle, UserCheck } from "lucide-react";
 
 interface ReviewCardProps {
   card: ReviewCardData;
   onPunt: (card: ReviewCardData) => void;
   onExclude: (card: ReviewCardData) => void;
   onAcceptWithRipple?: (card: ReviewCardData) => void;
+  currentUserId?: string | null;
+  onClaim?: (mappingId: string, assigneeId: string | null) => void;
 }
 
 function buildSqlPreview(card: ReviewCardData): string | null {
@@ -35,7 +37,7 @@ function buildSqlPreview(card: ReviewCardData): string | null {
   return `${target} ← ${src}`;
 }
 
-export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple }: ReviewCardProps) {
+export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple, currentUserId, onClaim }: ReviewCardProps) {
   const router = useRouter();
   const acceptMutation = useAcceptMapping();
   const undoMutation = useUndoReview();
@@ -120,6 +122,28 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple }: Revi
     >
       {/* Header row */}
       <div className="flex items-center gap-3 px-3 py-2">
+        {/* Claim checkbox */}
+        {onClaim && currentUserId && (() => {
+          const isMine = card.assigneeId === currentUserId;
+          const claimedByOther = card.assigneeId && card.assigneeId !== currentUserId;
+          if (claimedByOther) {
+            return (
+              <span title={`Claimed by ${card.assigneeName}`} className="shrink-0">
+                <UserCheck className="h-3.5 w-3.5 text-amber-500" />
+              </span>
+            );
+          }
+          return (
+            <input
+              type="checkbox"
+              checked={!!isMine}
+              onChange={() => onClaim(card.id, isMine ? null : currentUserId)}
+              title={isMine ? "Release this field" : "Claim for review"}
+              className="h-3.5 w-3.5 rounded border-gray-300 text-primary cursor-pointer shrink-0"
+            />
+          );
+        })()}
+
         {/* Expand toggle (for notes/punt note) */}
         {hasExpandableDetails ? (
           <button
