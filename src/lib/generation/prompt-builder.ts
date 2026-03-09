@@ -73,7 +73,7 @@ ENTITY KNOWLEDGE RULE (HIGHEST PRIORITY): Reference documents titled "Entity Kno
 
 OUTPUT FORMAT: A single JSON object with "mappings" and "questions" arrays. No text before or after. No code fences. Example:
 
-{"mappings":[{"targetFieldName":"field_name","status":"unreviewed","mappingType":"direct","sourceEntityName":"src_table","sourceFieldName":"src_col","transform":null,"defaultValue":null,"enumMapping":null,"reasoning":"Direct 1:1 match on name and type","confidence":"high","uncertaintyType":null,"notes":null,"reviewComment":null}],"questions":[{"targetFieldName":"other_field","questionText":"Which source table contains the delinquency status?","questionType":"no_source_match","priority":"high"}]}
+{"mappings":[{"targetFieldName":"field_name","status":"unreviewed","mappingType":"direct","sourceEntityName":"src_table","sourceFieldName":"src_col","transform":null,"defaultValue":null,"enumMapping":null,"reasoning":"src_table.src_col stores the origination date in YYYY-MM-DD format, matching the VDS field_name definition for the date the loan was originated [ref:ctx_abc123]","confidence":"high","uncertaintyType":null,"notes":null,"reviewComment":null}],"questions":[{"targetFieldName":"other_field","questionText":"Which source table contains the delinquency status?","questionType":"no_source_match","priority":"high"}]}
 
 MAPPING SCHEMA (every object in "mappings" must have these keys):
 - targetFieldName (string): exact target field name from the request
