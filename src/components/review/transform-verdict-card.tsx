@@ -151,7 +151,7 @@ export function TransformVerdictCard({
               )}>
                 {selected === "current" && <Check className="w-2.5 h-2.5" />}
               </span>
-              <span className="flex-1 break-words whitespace-pre-wrap">{transformLabel}</span>
+              <span className="flex-1 break-words whitespace-pre-wrap max-h-32 overflow-y-auto">{transformLabel}</span>
               {aiAgrees ? (
                 <span className="text-[9px] text-green-600 shrink-0 mt-0.5">AI Review confirms</span>
               ) : (
@@ -178,7 +178,7 @@ export function TransformVerdictCard({
                 )}>
                   {(selected === "suggested" || suggestionApplied) && <Check className="w-2.5 h-2.5" />}
                 </span>
-                <span className="flex-1 break-words whitespace-pre-wrap">{suggestedLabel}</span>
+                <span className="flex-1 break-words whitespace-pre-wrap max-h-32 overflow-y-auto">{suggestedLabel}</span>
                 <span className="text-[9px] text-blue-500 shrink-0 mt-0.5">AI Review</span>
               </button>
             )}
