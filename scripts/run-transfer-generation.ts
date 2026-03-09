@@ -146,10 +146,12 @@ async function main() {
         .where(inArray(field.entityId, entityIds));
 
       for (const f of fields) {
+        const samples = (f.sampleValues as string[]) || [];
         sourceFields.push({
           position: f.position ?? 0,
           fieldName: f.name,
-          sampleValue: (f.sampleValues as string[])?.[0] || "",
+          sampleValue: samples[0] || "",
+          sampleValues: samples,
         });
       }
       sourceFields.sort((a, b) => a.position - b.position);

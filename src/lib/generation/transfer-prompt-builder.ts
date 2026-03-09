@@ -21,6 +21,7 @@ export interface TransferSourceField {
   position: number;
   fieldName: string;
   sampleValue: string;
+  sampleValues?: string[];
 }
 
 export interface TransferPromptInput {
@@ -68,11 +69,16 @@ export function buildTransferPrompt(input: TransferPromptInput): {
     })
     .join("\n\n");
 
-  // Format source fields
+  // Format source fields — show multiple sample values when available
   const sourceText = sourceFields
     .map(f => {
-      const sample = f.sampleValue ? ` (sample: ${f.sampleValue})` : "";
-      return `[${f.position}] ${f.fieldName}${sample}`;
+      const samples = f.sampleValues?.length ? f.sampleValues : (f.sampleValue ? [f.sampleValue] : []);
+      const sampleNote = samples.length > 1
+        ? ` (samples: ${samples.join(" | ")})`
+        : samples.length === 1
+          ? ` (sample: ${samples[0]})`
+          : "";
+      return `[${f.position}] ${f.fieldName}${sampleNote}`;
     })
     .join("\n");
 
@@ -119,6 +125,17 @@ For each VDS field, output a JSON object with:
 - Verify that source field names you reference actually exist in the list above.
 - A single source field can map to multiple VDS fields.
 - Prefer the simplest correct transformation (identity over expression where possible).
+- **SYSTEM-GENERATED FK FIELDS**: Fields ending in _id or _sid that are foreign keys to other VDS entities (e.g., loan_id, borrower_id, property_id) are system-generated pass-throughs populated during the VDS staging pipeline. They do NOT come from the source flat file. Set has_mapping to false, reasoning to "System-generated FK — populated as a staging dependency pass-through during VDS pipeline execution, not sourced from flat file." Do NOT search for these in the source fields.
+- **REASONING QUALITY**: The reasoning field must provide semantic justification — explain WHY the source field is the correct match based on its meaning, data type, and sample values. Do NOT use lazy reasoning like "Direct 1:1 match on name" or "Field names match". Instead, explain the domain semantics.
+- **DEPRECATED FIELDS**: If a target field's description indicates it is deprecated, set has_mapping to false, confidence to "HIGH", and reasoning to "Field deprecated per VDS documentation." Do NOT search for source fields or generate follow-up questions.
+- **DATE FROM BOOLEAN**: When the target expects a date/timestamp but the only relevant source is a boolean indicator (Y/N flag), do NOT fabricate a date expression. The boolean tells you IF something happened, not WHEN. Set has_mapping to false and use the follow_up_question to ask where the date value should come from.
+
+## Self-Review Checklist (verify before outputting)
+
+1. Every source field referenced in your output actually exists in the source fields list — no invented names
+2. Every non-system VDS field has exactly one entry in your output (count must match)
+3. Confidence is calibrated honestly — not everything should be HIGH
+4. Sample values were considered when determining the correct mapping
 
 ## Output Format
 
@@ -133,8 +150,8 @@ Return a JSON array. No markdown fences, no commentary.
     "source_position": 0,
     "transformation": "identity",
     "confidence": "HIGH",
-    "reasoning": "Primary loan identifier maps directly to VDS loan_number.",
-    "context_used": "VDS schema: loan.loan_number (varchar, required)",
+    "reasoning": "Lakeview Loan Number is the servicer's primary loan identifier assigned at boarding, matching VDS loan_number which stores the canonical loan number for all downstream entity references.",
+    "context_used": "VDS schema: loan.loan_number (varchar, required); source sample: 123456",
     "follow_up_question": ""
   }
 ]`;
