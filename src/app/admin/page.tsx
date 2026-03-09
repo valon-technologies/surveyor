@@ -12,6 +12,7 @@ import { LinearSyncPanel } from "@/components/admin/linear-sync-panel";
 import { AnalyticsPanel } from "@/components/admin/analytics-panel";
 
 type Tab = "corrections" | "questions" | "generation" | "linear" | "analytics";
+type Workflow = "sdt" | "transfers";
 
 interface PendingLearning {
   id: string;
@@ -39,6 +40,7 @@ interface DraftQuestion {
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("corrections");
+  const [workflow, setWorkflow] = useState<Workflow>("sdt");
   const { workspaceId, role } = useWorkspace();
   const qc = useQueryClient();
 
@@ -51,11 +53,13 @@ export default function AdminPage() {
   }
   const basePath = workspacePath(workspaceId, "admin");
 
-  // Corrections
-  const { data: pendingLearnings, isLoading: loadingLearnings } = useQuery({
+  // Corrections — fetch all, filter client-side by workflow
+  const { data: allPendingLearnings, isLoading: loadingLearnings } = useQuery({
     queryKey: ["admin", "validation", workspaceId],
     queryFn: () => api.get<PendingLearning[]>(`${basePath}/validation?status=pending`),
   });
+  // TODO: Add server-side workflow filter once learning table has transferId
+  const pendingLearnings = allPendingLearnings;
 
   const validateMutation = useMutation({
     mutationFn: (input: { learningId: string; action: "validate" | "reject" }) =>
@@ -65,11 +69,13 @@ export default function AdminPage() {
     },
   });
 
-  // Questions
-  const { data: draftQuestions, isLoading: loadingQuestions } = useQuery({
+  // Questions — fetch all, filter client-side by workflow
+  const { data: allDraftQuestions, isLoading: loadingQuestions } = useQuery({
     queryKey: ["admin", "questions", workspaceId],
     queryFn: () => api.get<DraftQuestion[]>(`${basePath}/questions?status=draft`),
   });
+  // TODO: Add server-side workflow filter once question table has transferId
+  const draftQuestions = allDraftQuestions;
 
   const curateMutation = useMutation({
     mutationFn: (input: { questionId: string; action: "approve" | "reject" | "duplicate"; duplicateOf?: string; editedQuestion?: string }) =>
@@ -81,7 +87,33 @@ export default function AdminPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Admin: Validation & Curation</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Admin: Validation & Curation</h1>
+        <div className="flex rounded-lg border p-0.5 bg-muted/50">
+          <button
+            onClick={() => { setWorkflow("sdt"); setTab("corrections"); }}
+            className={cn(
+              "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+              workflow === "sdt"
+                ? "bg-background shadow text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            SDT Mappings
+          </button>
+          <button
+            onClick={() => { setWorkflow("transfers"); setTab("corrections"); }}
+            className={cn(
+              "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+              workflow === "transfers"
+                ? "bg-background shadow text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Servicing Transfers
+          </button>
+        </div>
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b">
@@ -117,28 +149,32 @@ export default function AdminPage() {
             </span>
           )}
         </button>
-        <button
-          onClick={() => setTab("generation")}
-          className={cn(
-            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-            tab === "generation"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Generation
-        </button>
-        <button
-          onClick={() => setTab("linear")}
-          className={cn(
-            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-            tab === "linear"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Linear Sync
-        </button>
+        {workflow === "sdt" && (
+          <>
+            <button
+              onClick={() => setTab("generation")}
+              className={cn(
+                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+                tab === "generation"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Generation
+            </button>
+            <button
+              onClick={() => setTab("linear")}
+              className={cn(
+                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+                tab === "linear"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Linear Sync
+            </button>
+          </>
+        )}
         <button
           onClick={() => setTab("analytics")}
           className={cn(
