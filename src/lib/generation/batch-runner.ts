@@ -334,16 +334,9 @@ async function generateFlatEntity(
             contextType: "context_reference",
           });
         }
-      } else {
-        // Fallback: no citations found, link all context (backwards compat)
-        for (const ctx of contextUsed) {
-          rows.push({
-            fieldMappingId: info.mappingId,
-            contextId: ctx.id,
-            contextType: "context_reference",
-          });
-        }
       }
+      // No fallback — only link docs actually cited in reasoning.
+      // This prevents bloating the context panel with all entity-level docs.
     }
     // Batch insert in chunks of 500 (SQLite variable limit)
     for (let i = 0; i < rows.length; i += 500) {

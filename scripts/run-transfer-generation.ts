@@ -32,6 +32,7 @@ import {
   skillContext,
   learning,
   userWorkspace,
+  mappingContext,
 } from "../src/lib/db/schema";
 import { eq, and, inArray, isNull, desc } from "drizzle-orm";
 import { resolveProvider } from "../src/lib/generation/provider-resolver";
@@ -588,6 +589,61 @@ async function main() {
       totalCreated += created;
       console.log(`    Saved: ${created} field_mapping records`);
 
+      // Populate mapping_context junction — link each field's context_used to context docs
+      // For transfers, context_used is free text. Extract any ctx_ID refs, and also
+      // try to match context doc names mentioned in the text.
+      if (resolved.length > 0) {
+        // Get all context docs that were in the prompt (foundational + skills + ACDC)
+        const allPromptContextIds = new Set<string>();
+        const allContextDocs = await db
+          .select({ id: context.id, name: context.name })
+          .from(context)
+          .where(eq(context.workspaceId, t.workspaceId));
+
+        const contextByNameLower = new Map<string, string>();
+        for (const c of allContextDocs) {
+          contextByNameLower.set(c.name.toLowerCase(), c.id);
+        }
+
+        const mcRows: { fieldMappingId: string; contextId: string; contextType: string }[] = [];
+
+        // For each saved mapping, find the field_mapping ID and link context
+        for (const r of resolved) {
+          if (!r.targetFieldId) continue;
+          const [fm] = await db
+            .select({ id: fieldMapping.id })
+            .from(fieldMapping)
+            .where(
+              and(
+                eq(fieldMapping.targetFieldId, r.targetFieldId),
+                eq(fieldMapping.transferId, transferId!),
+                eq(fieldMapping.isLatest, true),
+              )
+            )
+            .limit(1);
+          if (!fm) continue;
+
+          // Extract [ref:ctx_*] citations from reasoning + contextUsed
+          const text = [r.reasoning, r.contextUsed].filter(Boolean).join(" ");
+          const refMatches = text.match(/\[ref:ctx_([^\]]+)\]/g);
+          if (refMatches) {
+            for (const ref of refMatches) {
+              const id = ref.replace("[ref:ctx_", "").replace("]", "");
+              if (contextByNameLower.has(id) || allContextDocs.some(c => c.id === id)) {
+                mcRows.push({ fieldMappingId: fm.id, contextId: id, contextType: "context_reference" });
+              }
+            }
+          }
+        }
+
+        if (mcRows.length > 0) {
+          for (let i = 0; i < mcRows.length; i += 500) {
+            await db.insert(mappingContext).values(mcRows.slice(i, i + 500));
+          }
+          console.log(`    Context links: ${mcRows.length} mapping_context records`);
+        }
+      }
+
       // Save generation record
       await db.insert(generation).values({
         workspaceId: t.workspaceId,
@@ -704,7 +760,7 @@ async function saveMappings(
       defaultValue: r.defaultValue || null,
       reasoning: r.reasoning,
       confidence: r.confidence,
-      notes: r.contextUsed || null,
+      notes: null,
       createdBy: r.corrected ? "import" : "llm",
       isLatest: true,
       version: existing ? existing.version + 1 : 1,
