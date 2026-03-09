@@ -63,8 +63,15 @@ export async function POST(req: NextRequest) {
         })
         .where(eq(workspaceInvite.id, invite.id));
     }
+  } else if (email.endsWith("@valon.com")) {
+    // Auto-join the first workspace as editor for Valon employees
+    const [firstWs] = await db.select().from(workspace).limit(1);
+    if (firstWs) {
+      await db.insert(userWorkspace)
+        .values({ userId: newUser.id, workspaceId: firstWs.id, role: "editor" });
+    }
   } else {
-    // No invites — create a personal workspace
+    // No invites, non-Valon — create a personal workspace
     const [ws] = await db
       .insert(workspace)
       .values({
