@@ -1,0 +1,340 @@
+InvestorLoanIdentifier,SRPPricingSequence,ExceptionPricingIndicator,FundedSRPProceeds,GrossSRPAmount,GrossSRPPercent,NetSRPAmount,NetSRPPercent,ServicerFeesDescription,ServicerFeesItemizedAmount,ServicerFees,BaseSRPAttributeAmortizationTerm,BaseSRPAttributeAmortizationType,BaseSRPAttributeLoanType,BaseSRPAdjustment,SRPHoldbackAmount,SRPHoldbackPercent,SRPAttributeAdjustment,SRPAttributeType,SRPAttributeValue,SRPGridIdentifier
+4033528965,1,false,1818.58,3524.50,1.40000,3450.34,1.37054,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,46.0,1VKaS4pO
+4033528965,2,false,1818.58,3524.50,1.40000,3450.34,1.37054,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,1VKaS4pO
+4033528965,3,false,1818.58,3524.50,1.40000,3450.34,1.37054,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.175,UPB Par Spread,251750.0/0.00,1VKaS4pO
+4033528965,4,false,1818.58,3524.50,1.40000,3450.34,1.37054,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.05,State,FL,1VKaS4pO
+4033528965,5,false,1818.58,3524.50,1.40000,3450.34,1.37054,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,95.0,1VKaS4pO
+4033531842,6,false,3701.49,4896.83,1.22500,4822.67,1.20645,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,j9suwUQg
+4033531842,7,false,3701.49,4896.83,1.22500,4822.67,1.20645,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.05,State,NC,j9suwUQg
+4033531842,8,false,3701.49,4896.83,1.22500,4822.67,1.20645,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.0875,UPB Par Spread,399741.0/0.375,j9suwUQg
+4033531842,9,false,3701.49,4896.83,1.22500,4822.67,1.20645,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,95.0,j9suwUQg
+4033533017,10,false,3108.78,5158.40,1.00750,5084.24,0.99302,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,j9suwUQg
+4033533017,11,false,3108.78,5158.40,1.00750,5084.24,0.99302,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,48.0,j9suwUQg
+4033533017,12,false,3108.78,5158.40,1.00750,5084.24,0.99302,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.03,State,NY,j9suwUQg
+4033533017,13,false,3108.78,5158.40,1.00750,5084.24,0.99302,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,j9suwUQg
+4033533017,14,false,3108.78,5158.40,1.00750,5084.24,0.99302,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,Credit Score,663,j9suwUQg
+4033533017,15,false,3108.78,5158.40,1.00750,5084.24,0.99302,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.0375,UPB Par Spread,512000.0/0.375,j9suwUQg
+4033533017,16,false,3108.78,5158.40,1.00750,5084.24,0.99302,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.15,LTV,80.0,j9suwUQg
+4033533165,17,false,2469.10,4762.80,1.40000,4688.64,1.37820,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,j9suwUQg
+4033533165,18,false,2469.10,4762.80,1.40000,4688.64,1.37820,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,340200.0/-0.125,j9suwUQg
+4033533165,19,false,2469.10,4762.80,1.40000,4688.64,1.37820,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.05,State,FL,j9suwUQg
+4033533165,20,false,2469.10,4762.80,1.40000,4688.64,1.37820,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,j9suwUQg
+4033533165,21,false,2469.10,4762.80,1.40000,4688.64,1.37820,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,62.0,j9suwUQg
+4033535621,22,false,979.80,5374.26,0.81800,5300.10,0.80671,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,,Escrow Indicator,true,j9suwUQg
+4033535621,23,false,979.80,5374.26,0.81800,5300.10,0.80671,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,-0.102,LTV,66.0,j9suwUQg
+4033535621,24,false,979.80,5374.26,0.81800,5300.10,0.80671,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,-0.1,State,MA,j9suwUQg
+4033535621,25,false,979.80,5374.26,0.81800,5300.10,0.80671,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,0.1785,UPB Par Spread,657000.0/-0.875,j9suwUQg
+4033535621,26,false,979.80,5374.26,0.81800,5300.10,0.80671,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,-0.0085,Debt To Income,49.0,j9suwUQg
+4033536439,27,false,-4450.61,6140.22,1.37000,6066.06,1.35345,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.125,LTV,90.0,RxiiW5TI
+4033536439,28,false,-4450.61,6140.22,1.37000,6066.06,1.35345,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,RxiiW5TI
+4033536439,29,false,-4450.61,6140.22,1.37000,6066.06,1.35345,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2375,UPB Par Spread,448191.0/-0.50,RxiiW5TI
+4033536439,30,false,-4450.61,6140.22,1.37000,6066.06,1.35345,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.03,State,ID,RxiiW5TI
+4033536439,31,false,-4450.61,6140.22,1.37000,6066.06,1.35345,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.0375,Special Feature Code,"=""009""",RxiiW5TI
+4033536527,32,false,775.91,6145.31,1.43750,6071.15,1.42015,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033536527,33,false,775.91,6145.31,1.43750,6071.15,1.42015,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.05,State,FL,O6w5VTCc
+4033536527,34,false,775.91,6145.31,1.43750,6071.15,1.42015,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2,UPB Par Spread,427500.0/-0.375,O6w5VTCc
+4033536527,35,false,775.91,6145.31,1.43750,6071.15,1.42015,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,95.0,O6w5VTCc
+4033536596,36,false,2093.54,5106.22,1.54500,5032.06,1.52256,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,RxiiW5TI
+4033536596,37,false,2093.54,5106.22,1.54500,5032.06,1.52256,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,56.0,RxiiW5TI
+4033536596,38,false,2093.54,5106.22,1.54500,5032.06,1.52256,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.375,UPB Par Spread,330500.0/-1.375,RxiiW5TI
+4033536596,39,false,2093.54,5106.22,1.54500,5032.06,1.52256,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.03,State,ID,RxiiW5TI
+4033536596,40,false,2093.54,5106.22,1.54500,5032.06,1.52256,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.0375,Special Feature Code,"=""009""",RxiiW5TI
+4033536775,41,false,2569.71,4624.96,1.23250,4550.80,1.21274,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033536775,42,false,2569.71,4624.96,1.23250,4550.80,1.21274,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.0875,UPB Par Spread,375250.0/0.365,O6w5VTCc
+4033536775,43,false,2569.71,4624.96,1.23250,4550.80,1.21274,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.03,State,NY,O6w5VTCc
+4033536775,44,false,2569.71,4624.96,1.23250,4550.80,1.21274,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,95.0,O6w5VTCc
+4033536775,45,false,2569.71,4624.96,1.23250,4550.80,1.21274,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,49.0,O6w5VTCc
+4033536857,46,false,3791.12,6061.15,1.04600,5989.15,1.03357,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,ARM,Conventional,0.95,0.00,0.00000,,Escrow Indicator,true,Vq3KhZnp
+4033536857,47,false,3791.12,6061.15,1.04600,5989.15,1.03357,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,ARM,Conventional,0.95,0.00,0.00000,-0.17,State,OR,Vq3KhZnp
+4033536857,48,false,3791.12,6061.15,1.04600,5989.15,1.03357,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,ARM,Conventional,0.95,0.00,0.00000,0.3135,UPB Par Spread,579460.0/-2.00,Vq3KhZnp
+4033536857,49,false,3791.12,6061.15,1.04600,5989.15,1.03357,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,ARM,Conventional,0.95,0.00,0.00000,-0.0475,LTV,95.0,Vq3KhZnp
+4033537998,50,false,1288.18,2141.20,1.01000,2067.04,0.97502,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2,UPB Par Spread,212000.0/0.000,O6w5VTCc
+4033537998,51,false,1288.18,2141.20,1.01000,2067.04,0.97502,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033537998,52,false,1288.18,2141.20,1.01000,2067.04,0.97502,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.25,Special Feature Code,235,O6w5VTCc
+4033537998,53,false,1288.18,2141.20,1.01000,2067.04,0.97502,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.04,State,MO,O6w5VTCc
+4033537998,54,false,1288.18,2141.20,1.01000,2067.04,0.97502,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.15,LTV,80.0,O6w5VTCc
+4033538033,55,false,1598.84,3284.54,1.31500,3210.38,1.28531,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538033,56,false,1598.84,3284.54,1.31500,3210.38,1.28531,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.06,State,KS,O6w5VTCc
+4033538033,57,false,1598.84,3284.54,1.31500,3210.38,1.28531,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,249775.0/-0.125,O6w5VTCc
+4033538033,58,false,1598.84,3284.54,1.31500,3210.38,1.28531,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0375,LTV,97.0,O6w5VTCc
+4033538033,59,false,1598.84,3284.54,1.31500,3210.38,1.28531,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.05,Special Feature Code,900,O6w5VTCc
+4033538041,60,false,3265.88,4835.08,1.38500,4760.92,1.36376,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538041,61,false,3265.88,4835.08,1.38500,4760.92,1.36376,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.04,State,MO,O6w5VTCc
+4033538041,62,false,3265.88,4835.08,1.38500,4760.92,1.36376,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0375,LTV,97.0,O6w5VTCc
+4033538041,63,false,3265.88,4835.08,1.38500,4760.92,1.36376,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,349103.0/-0.135,O6w5VTCc
+4033538054,64,false,-2829.50,2017.01,1.34750,1942.85,1.29796,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538054,65,false,-2829.50,2017.01,1.34750,1942.85,1.29796,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Credit Score,809,O6w5VTCc
+4033538054,66,false,-2829.50,2017.01,1.34750,1942.85,1.29796,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.04,State,MO,O6w5VTCc
+4033538054,67,false,-2829.50,2017.01,1.34750,1942.85,1.29796,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,30.0,O6w5VTCc
+4033538054,68,false,-2829.50,2017.01,1.34750,1942.85,1.29796,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2375,UPB Par Spread,149685.03/-0.135,O6w5VTCc
+4033538055,69,false,1343.89,2634.25,1.28500,2560.09,1.24882,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538055,70,false,1343.89,2634.25,1.28500,2560.09,1.24882,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.04,State,MO,O6w5VTCc
+4033538055,71,false,1343.89,2634.25,1.28500,2560.09,1.24882,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.05,Special Feature Code,900,O6w5VTCc
+4033538055,72,false,1343.89,2634.25,1.28500,2560.09,1.24882,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Debt To Income,50.0,O6w5VTCc
+4033538055,73,false,1343.89,2634.25,1.28500,2560.09,1.24882,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,94.0,O6w5VTCc
+4033538055,74,false,1343.89,2634.25,1.28500,2560.09,1.24882,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,205000.0/-0.250,O6w5VTCc
+4033538059,75,false,2408.76,4027.32,1.27750,3953.16,1.25398,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538059,76,false,2408.76,4027.32,1.27750,3953.16,1.25398,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.06,State,KS,O6w5VTCc
+4033538059,77,false,2408.76,4027.32,1.27750,3953.16,1.25398,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0375,LTV,97.0,O6w5VTCc
+4033538059,78,false,2408.76,4027.32,1.27750,3953.16,1.25398,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.05,Special Feature Code,900,O6w5VTCc
+4033538059,79,false,2408.76,4027.32,1.27750,3953.16,1.25398,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.175,UPB Par Spread,315250.0/0.000,O6w5VTCc
+4033538061,80,false,2233.40,2680.42,0.99000,2606.26,0.96261,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538061,81,false,2233.40,2680.42,0.99000,2606.26,0.96261,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.25,Special Feature Code,235,O6w5VTCc
+4033538061,82,false,2233.40,2680.42,0.99000,2606.26,0.96261,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.06,State,KS,O6w5VTCc
+4033538061,83,false,2233.40,2680.42,0.99000,2606.26,0.96261,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,95.0,O6w5VTCc
+4033538061,84,false,2233.40,2680.42,0.99000,2606.26,0.96261,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,49.0,O6w5VTCc
+4033538061,85,false,2233.40,2680.42,0.99000,2606.26,0.96261,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.125,UPB Par Spread,270750.0/0.250,O6w5VTCc
+4033538064,86,false,1907.42,2497.26,1.35500,2423.10,1.31476,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Credit Score,805,O6w5VTCc
+4033538064,87,false,1907.42,2497.26,1.35500,2423.10,1.31476,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538064,88,false,1907.42,2497.26,1.35500,2423.10,1.31476,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.02,State,NE,O6w5VTCc
+4033538064,89,false,1907.42,2497.26,1.35500,2423.10,1.31476,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0375,LTV,97.0,O6w5VTCc
+4033538064,90,false,1907.42,2497.26,1.35500,2423.10,1.31476,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.05,Special Feature Code,900,O6w5VTCc
+4033538064,91,false,1907.42,2497.26,1.35500,2423.10,1.31476,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.225,UPB Par Spread,184300.0/-0.125,O6w5VTCc
+4033538066,92,false,610.84,1391.20,1.27750,1317.04,1.20940,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.125,LTV,90.0,O6w5VTCc
+4033538066,93,false,610.84,1391.20,1.27750,1317.04,1.20940,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538066,94,false,610.84,1391.20,1.27750,1317.04,1.20940,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,47.0,O6w5VTCc
+4033538066,95,false,610.84,1391.20,1.27750,1317.04,1.20940,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.06,State,KS,O6w5VTCc
+4033538066,96,false,610.84,1391.20,1.27750,1317.04,1.20940,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.225,UPB Par Spread,108900.0/-0.125,O6w5VTCc
+4033538071,97,false,392.59,922.00,0.73760,847.84,0.67827,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,180,Fixed,Conventional,1.08,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538071,98,false,392.59,922.00,0.73760,847.84,0.67827,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,180,Fixed,Conventional,1.08,0.00,0.00000,-0.216,Special Feature Code,235,O6w5VTCc
+4033538071,99,false,392.59,922.00,0.73760,847.84,0.67827,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,180,Fixed,Conventional,1.08,0.00,0.00000,-0.0756,LTV,34.0,O6w5VTCc
+4033538071,100,false,392.59,922.00,0.73760,847.84,0.67827,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,180,Fixed,Conventional,1.08,0.00,0.00000,-0.04,State,TN,O6w5VTCc
+4033538071,101,false,392.59,922.00,0.73760,847.84,0.67827,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,180,Fixed,Conventional,1.08,0.00,0.00000,-0.0108,UPB Par Spread,125000.0/1.250,O6w5VTCc
+4033538076,102,false,1087.45,1478.34,1.30250,1404.18,1.23716,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538076,103,false,1087.45,1478.34,1.30250,1404.18,1.23716,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.06,State,KS,O6w5VTCc
+4033538076,104,false,1087.45,1478.34,1.30250,1404.18,1.23716,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,58.0,O6w5VTCc
+4033538076,105,false,1087.45,1478.34,1.30250,1404.18,1.23716,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,113500.0/0.000,O6w5VTCc
+4033538076,106,false,1087.45,1478.34,1.30250,1404.18,1.23716,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,49.0,O6w5VTCc
+4033538100,107,false,-236.51,732.05,1.21000,657.89,1.08742,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538100,108,false,-236.51,732.05,1.21000,657.89,1.08742,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,39.0,O6w5VTCc
+4033538100,109,false,-236.51,732.05,1.21000,657.89,1.08742,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.04,State,MO,O6w5VTCc
+4033538100,110,false,-236.51,732.05,1.21000,657.89,1.08742,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.0875,UPB Par Spread,60500.0/0.000,O6w5VTCc
+4033538104,111,false,2565.68,4177.73,1.17250,4103.57,1.15169,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.125,LTV,90.0,O6w5VTCc
+4033538104,112,false,2565.68,4177.73,1.17250,4103.57,1.15169,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538104,113,false,2565.68,4177.73,1.17250,4103.57,1.15169,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.04,State,MO,O6w5VTCc
+4033538104,114,false,2565.68,4177.73,1.17250,4103.57,1.15169,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.0875,UPB Par Spread,356310.0/0.250,O6w5VTCc
+4033538147,115,false,394.76,852.59,1.14750,778.43,1.04769,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538147,116,false,394.76,852.59,1.14750,778.43,1.04769,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.0875,UPB Par Spread,74300.0/-0.250,O6w5VTCc
+4033538147,117,false,394.76,852.59,1.14750,778.43,1.04769,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.04,State,MO,O6w5VTCc
+4033538147,118,false,394.76,852.59,1.14750,778.43,1.04769,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.125,LTV,89.0,O6w5VTCc
+4033538147,119,false,394.76,852.59,1.14750,778.43,1.04769,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,O6w5VTCc
+4033538161,120,false,943.32,2147.34,1.26500,2073.18,1.22131,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2375,UPB Par Spread,169750.0/-0.135,O6w5VTCc
+4033538161,121,false,943.32,2147.34,1.26500,2073.18,1.22131,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538161,122,false,943.32,2147.34,1.26500,2073.18,1.22131,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.11,State,IN,O6w5VTCc
+4033538161,123,false,943.32,2147.34,1.26500,2073.18,1.22131,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Credit Score,698,O6w5VTCc
+4033538161,124,false,943.32,2147.34,1.26500,2073.18,1.22131,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0375,LTV,97.0,O6w5VTCc
+4033538161,125,false,943.32,2147.34,1.26500,2073.18,1.22131,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.05,Special Feature Code,900,O6w5VTCc
+4033538163,126,false,3629.48,4891.55,1.35500,4817.39,1.33446,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538163,127,false,3629.48,4891.55,1.35500,4817.39,1.33446,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.02,State,MD,O6w5VTCc
+4033538163,128,false,3629.48,4891.55,1.35500,4817.39,1.33446,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,95.0,O6w5VTCc
+4033538163,129,false,3629.48,4891.55,1.35500,4817.39,1.33446,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.1875,UPB Par Spread,361000.0/-0.125,O6w5VTCc
+4033538164,130,false,-707.34,1988.90,1.34750,1914.74,1.29726,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538164,131,false,-707.34,1988.90,1.34750,1914.74,1.29726,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.06,State,IL,O6w5VTCc
+4033538164,132,false,-707.34,1988.90,1.34750,1914.74,1.29726,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.15,LTV,78.0,O6w5VTCc
+4033538164,133,false,-707.34,1988.90,1.34750,1914.74,1.29726,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.05,Special Feature Code,900,O6w5VTCc
+4033538164,134,false,-707.34,1988.90,1.34750,1914.74,1.29726,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2375,UPB Par Spread,147598.95/-0.250,O6w5VTCc
+4033538255,135,false,1753.34,2544.02,1.31000,2469.86,1.27181,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538255,136,false,1753.34,2544.02,1.31000,2469.86,1.27181,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,194200.0/0.000,O6w5VTCc
+4033538255,137,false,1753.34,2544.02,1.31000,2469.86,1.27181,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.04,State,MO,O6w5VTCc
+4033538255,138,false,1753.34,2544.02,1.31000,2469.86,1.27181,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.05,Special Feature Code,900,O6w5VTCc
+4033538255,139,false,1753.34,2544.02,1.31000,2469.86,1.27181,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,93.0,O6w5VTCc
+4033538260,140,false,413.19,487.35,0.85500,413.19,0.72489,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,false,O6w5VTCc
+4033538260,141,false,413.19,487.35,0.85500,413.19,0.72489,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.22,State,IL,O6w5VTCc
+4033538260,142,false,413.19,487.35,0.85500,413.19,0.72489,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.15,LTV,75.0,O6w5VTCc
+4033538260,143,false,413.19,487.35,0.85500,413.19,0.72489,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Occupancy Type,Investment Property,O6w5VTCc
+4033538261,144,false,2340.96,3648.36,1.34750,3574.20,1.32011,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.15,UPB Par Spread,270750.0/0.125,O6w5VTCc
+4033538261,145,false,2340.96,3648.36,1.34750,3574.20,1.32011,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538261,146,false,2340.96,3648.36,1.34750,3574.20,1.32011,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.01,State,OK,O6w5VTCc
+4033538261,147,false,2340.96,3648.36,1.34750,3574.20,1.32011,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,95.0,O6w5VTCc
+4033538263,148,false,4141.33,4634.90,1.38500,4560.74,1.36284,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033538263,149,false,4141.33,4634.90,1.38500,4560.74,1.36284,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,334650.0/-0.135,O6w5VTCc
+4033538263,150,false,4141.33,4634.90,1.38500,4560.74,1.36284,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.04,State,AR,O6w5VTCc
+4033538263,151,false,4141.33,4634.90,1.38500,4560.74,1.36284,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0375,LTV,97.0,O6w5VTCc
+4033539914,152,false,1129.49,1203.65,0.90500,1129.49,0.84924,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,false,QG5AAKa7
+4033539914,153,false,1129.49,1203.65,0.90500,1129.49,0.84924,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Loan Purpose Code,Refinance,QG5AAKa7
+4033539914,154,false,1129.49,1203.65,0.90500,1129.49,0.84924,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,47.0,QG5AAKa7
+4033539914,155,false,1129.49,1203.65,0.90500,1129.49,0.84924,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.22,State,IL,QG5AAKa7
+4033539914,156,false,1129.49,1203.65,0.90500,1129.49,0.84924,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,QG5AAKa7
+4033539914,157,false,1129.49,1203.65,0.90500,1129.49,0.84924,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.125,UPB Par Spread,133000.0/0.74,QG5AAKa7
+4033539914,158,false,1129.49,1203.65,0.90500,1129.49,0.84924,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Credit Score,801,QG5AAKa7
+4033539914,159,false,1129.49,1203.65,0.90500,1129.49,0.84924,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.15,LTV,70.0,QG5AAKa7
+4033539914,160,false,1129.49,1203.65,0.90500,1129.49,0.84924,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Occupancy Type,Investment Property,QG5AAKa7
+4033540340,161,false,13010.34,13084.50,1.07250,13010.34,1.06642,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,false,O6w5VTCc
+4033540340,162,false,13010.34,13084.50,1.07250,13010.34,1.06642,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.1375,UPB Par Spread,1220000.0/-0.135,O6w5VTCc
+4033540340,163,false,13010.34,13084.50,1.07250,13010.34,1.06642,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.14,State,CA,O6w5VTCc
+4033540340,164,false,13010.34,13084.50,1.07250,13010.34,1.06642,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,O6w5VTCc
+4033540340,165,false,13010.34,13084.50,1.07250,13010.34,1.06642,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.15,LTV,76.0,O6w5VTCc
+4033540349,166,false,5143.03,5217.19,0.92750,5143.03,0.91432,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.95,0.00,0.00000,,Escrow Indicator,false,O6w5VTCc
+4033540349,167,false,5143.03,5217.19,0.92750,5143.03,0.91432,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.95,0.00,0.00000,-0.0095,Debt To Income,48.0,O6w5VTCc
+4033540349,168,false,5143.03,5217.19,0.92750,5143.03,0.91432,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.95,0.00,0.00000,-0.07,State,TX,O6w5VTCc
+4033540349,169,false,5143.03,5217.19,0.92750,5143.03,0.91432,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.95,0.00,0.00000,-0.019,Special Feature Code,212,O6w5VTCc
+4033540349,170,false,5143.03,5217.19,0.92750,5143.03,0.91432,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.95,0.00,0.00000,0.19,UPB Par Spread,562500.0/-0.75,O6w5VTCc
+4033540349,171,false,5143.03,5217.19,0.92750,5143.03,0.91432,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.95,0.00,0.00000,-0.114,LTV,75.0,O6w5VTCc
+4033540350,172,false,3.68,4620.00,1.40000,4545.84,1.37753,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033540350,173,false,3.68,4620.00,1.40000,4545.84,1.37753,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.05,State,CT,O6w5VTCc
+4033540350,174,false,3.68,4620.00,1.40000,4545.84,1.37753,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,35.0,O6w5VTCc
+4033540350,175,false,3.68,4620.00,1.40000,4545.84,1.37753,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,O6w5VTCc
+4033540350,176,false,3.68,4620.00,1.40000,4545.84,1.37753,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,330000.0/-0.250,O6w5VTCc
+4033540351,177,false,3083.94,3158.10,1.21000,3083.94,1.18159,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,false,O6w5VTCc
+4033540351,178,false,3083.94,3158.10,1.21000,3083.94,1.18159,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,27.0,O6w5VTCc
+4033540351,179,false,3083.94,3158.10,1.21000,3083.94,1.18159,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.14,State,CA,O6w5VTCc
+4033540351,180,false,3083.94,3158.10,1.21000,3083.94,1.18159,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,O6w5VTCc
+4033540351,181,false,3083.94,3158.10,1.21000,3083.94,1.18159,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,261000.0/-0.135,O6w5VTCc
+4033540352,182,false,-1045.50,3111.50,1.27000,3037.34,1.23973,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033540352,183,false,-1045.50,3111.50,1.27000,3037.34,1.23973,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,245000.0/-0.125,O6w5VTCc
+4033540352,184,false,-1045.50,3111.50,1.27000,3037.34,1.23973,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Loan Purpose Code,Refinance,O6w5VTCc
+4033540352,185,false,-1045.50,3111.50,1.27000,3037.34,1.23973,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,17.0,O6w5VTCc
+4033540352,186,false,-1045.50,3111.50,1.27000,3037.34,1.23973,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.03,State,NY,O6w5VTCc
+4033540352,187,false,-1045.50,3111.50,1.27000,3037.34,1.23973,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,O6w5VTCc
+4033540352,188,false,-1045.50,3111.50,1.27000,3037.34,1.23973,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Debt To Income,50.0,O6w5VTCc
+4033540452,189,false,4293.92,4368.08,1.04250,4293.92,1.02480,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,false,RxiiW5TI
+4033540452,190,false,4293.92,4368.08,1.04250,4293.92,1.02480,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.075,UPB Par Spread,419000.0/0.375,RxiiW5TI
+4033540452,191,false,4293.92,4368.08,1.04250,4293.92,1.02480,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.12,State,FL,RxiiW5TI
+4033540452,192,false,4293.92,4368.08,1.04250,4293.92,1.02480,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,49.0,RxiiW5TI
+4033540452,193,false,4293.92,4368.08,1.04250,4293.92,1.02480,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.15,LTV,80.0,RxiiW5TI
+4033540507,194,false,3913.72,3987.88,1.30750,3913.72,1.28319,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033540507,195,false,3913.72,3987.88,1.30750,3913.72,1.28319,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.175,UPB Par Spread,305000.0/0.000,O6w5VTCc
+4033540507,196,false,3913.72,3987.88,1.30750,3913.72,1.28319,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.03,State,ID,O6w5VTCc
+4033540507,197,false,3913.72,3987.88,1.30750,3913.72,1.28319,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,60.0,O6w5VTCc
+4033540732,198,false,8311.14,8385.30,1.15500,8311.14,1.14479,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,false,O6w5VTCc
+4033540732,199,false,8311.14,8385.30,1.15500,8311.14,1.14479,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.12,State,FL,O6w5VTCc
+4033540732,200,false,8311.14,8385.30,1.15500,8311.14,1.14479,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,O6w5VTCc
+4033540732,201,false,8311.14,8385.30,1.15500,8311.14,1.14479,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.1375,UPB Par Spread,726000.0/-0.135,O6w5VTCc
+4033540732,202,false,8311.14,8385.30,1.15500,8311.14,1.14479,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,60.0,O6w5VTCc
+4033540968,203,false,4753.59,4827.75,1.17750,4753.59,1.15941,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,false,O6w5VTCc
+4033540968,204,false,4753.59,4827.75,1.17750,4753.59,1.15941,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,39.0,O6w5VTCc
+4033540968,205,false,4753.59,4827.75,1.17750,4753.59,1.15941,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.11,State,CO,O6w5VTCc
+4033540968,206,false,4753.59,4827.75,1.17750,4753.59,1.15941,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,O6w5VTCc
+4033540968,207,false,4753.59,4827.75,1.17750,4753.59,1.15941,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.15,UPB Par Spread,410000.0/0.000,O6w5VTCc
+4033541012,208,false,10588.34,10967.50,1.33750,10893.34,1.32846,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033541012,209,false,10588.34,10967.50,1.33750,10893.34,1.32846,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,45.0,O6w5VTCc
+4033541012,210,false,10588.34,10967.50,1.33750,10893.34,1.32846,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Loan Purpose Code,Refinance,O6w5VTCc
+4033541012,211,false,10588.34,10967.50,1.33750,10893.34,1.32846,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,820000.0/-0.500,O6w5VTCc
+4033541012,212,false,10588.34,10967.50,1.33750,10893.34,1.32846,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Credit Score,695,O6w5VTCc
+4033541012,213,false,10588.34,10967.50,1.33750,10893.34,1.32846,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.05,State,FL,O6w5VTCc
+4033541012,214,false,10588.34,10967.50,1.33750,10893.34,1.32846,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,O6w5VTCc
+4033541012,215,false,10588.34,10967.50,1.33750,10893.34,1.32846,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,43.0,O6w5VTCc
+4033541027,216,false,-32.66,840.38,1.24500,766.22,1.13513,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.125,LTV,90.0,O6w5VTCc
+4033541027,217,false,-32.66,840.38,1.24500,766.22,1.13513,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033541027,218,false,-32.66,840.38,1.24500,766.22,1.13513,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.0375,UPB Par Spread,67500.0/0.750,O6w5VTCc
+4033541027,219,false,-32.66,840.38,1.24500,766.22,1.13513,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.22,State,TX,O6w5VTCc
+4033541027,220,false,-32.66,840.38,1.24500,766.22,1.13513,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,O6w5VTCc
+4033541027,221,false,-32.66,840.38,1.24500,766.22,1.13513,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.1125,Credit Score,620,O6w5VTCc
+4033541468,222,false,3612.88,3687.04,0.82300,3612.88,0.80645,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,,Escrow Indicator,false,j9suwUQg
+4033541468,223,false,3612.88,3687.04,0.82300,3612.88,0.80645,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,-0.18,State,AL,j9suwUQg
+4033541468,224,false,3612.88,3687.04,0.82300,3612.88,0.80645,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,0.2635,UPB Par Spread,448000.0/-1.50,j9suwUQg
+4033541468,225,false,3612.88,3687.04,0.82300,3612.88,0.80645,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,-0.102,LTV,71.0,j9suwUQg
+4033541468,226,false,3612.88,3687.04,0.82300,3612.88,0.80645,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,-0.0085,Debt To Income,49.0,j9suwUQg
+4033541739,227,false,2383.33,4672.60,0.95750,4598.44,0.94230,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,-0.0085,Debt To Income,46.0,j9suwUQg
+4033541739,228,false,2383.33,4672.60,0.95750,4598.44,0.94230,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,0.238,UPB Par Spread,488000.0/-1.125,j9suwUQg
+4033541739,229,false,2383.33,4672.60,0.95750,4598.44,0.94230,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,,Escrow Indicator,true,j9suwUQg
+4033541739,230,false,2383.33,4672.60,0.95750,4598.44,0.94230,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,-0.02,State,MD,j9suwUQg
+4033541739,231,false,2383.33,4672.60,0.95750,4598.44,0.94230,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,-0.102,LTV,80.0,j9suwUQg
+4033541874,232,false,1035.95,6131.72,1.28750,6057.56,1.27193,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.1875,UPB Par Spread,476250.0/-0.250,O6w5VTCc
+4033541874,233,false,1035.95,6131.72,1.28750,6057.56,1.27193,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033541874,234,false,1035.95,6131.72,1.28750,6057.56,1.27193,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.05,State,FL,O6w5VTCc
+4033541874,235,false,1035.95,6131.72,1.28750,6057.56,1.27193,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,O6w5VTCc
+4033541874,236,false,1035.95,6131.72,1.28750,6057.56,1.27193,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.15,LTV,75.0,O6w5VTCc
+4033541874,237,false,1035.95,6131.72,1.28750,6057.56,1.27193,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Occupancy Type,Investment Property,O6w5VTCc
+4033541888,238,false,145.40,3561.25,1.29500,3487.09,1.26803,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,NJJRFTcw
+4033541888,239,false,145.40,3561.25,1.29500,3487.09,1.26803,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.15,LTV,79.0,NJJRFTcw
+4033541888,240,false,145.40,3561.25,1.29500,3487.09,1.26803,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.07,State,PA,NJJRFTcw
+4033541888,241,false,145.40,3561.25,1.29500,3487.09,1.26803,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,NJJRFTcw
+4033541888,242,false,145.40,3561.25,1.29500,3487.09,1.26803,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.05,Special Feature Code,900,NJJRFTcw
+4033541888,243,false,145.40,3561.25,1.29500,3487.09,1.26803,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,275000.0/-0.125,NJJRFTcw
+4033541888,244,false,145.40,3561.25,1.29500,3487.09,1.26803,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,49.0,NJJRFTcw
+4033542112,245,false,1849.99,2657.80,1.37000,2583.64,1.33177,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,j9suwUQg
+4033542112,246,false,1849.99,2657.80,1.37000,2583.64,1.33177,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2375,UPB Par Spread,194000.0/-0.135,j9suwUQg
+4033542112,247,false,1849.99,2657.80,1.37000,2583.64,1.33177,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.03,State,MI,j9suwUQg
+4033542112,248,false,1849.99,2657.80,1.37000,2583.64,1.33177,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0375,LTV,97.0,j9suwUQg
+4033542112,249,false,1849.99,2657.80,1.37000,2583.64,1.33177,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.05,Special Feature Code,900,j9suwUQg
+4033542233,250,false,54.92,1083.22,1.07250,1009.06,0.99907,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,RxiiW5TI
+4033542233,251,false,54.92,1083.22,1.07250,1009.06,0.99907,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Loan Purpose Code,Refinance,RxiiW5TI
+4033542233,252,false,54.92,1083.22,1.07250,1009.06,0.99907,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,101000.0/0.00,RxiiW5TI
+4033542233,253,false,54.92,1083.22,1.07250,1009.06,0.99907,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.09,State,CA,RxiiW5TI
+4033542233,254,false,54.92,1083.22,1.07250,1009.06,0.99907,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,30.0,RxiiW5TI
+4033542233,255,false,54.92,1083.22,1.07250,1009.06,0.99907,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.1875,Credit Score,513,RxiiW5TI
+4033542445,256,false,817.91,892.08,1.03250,817.92,0.94667,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.125,LTV,90.0,RxiiW5TI
+4033542445,257,false,817.91,892.08,1.03250,817.92,0.94667,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,RxiiW5TI
+4033542445,258,false,817.91,892.08,1.03250,817.92,0.94667,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.075,UPB Par Spread,86400.0/0.375,RxiiW5TI
+4033542445,259,false,817.91,892.08,1.03250,817.92,0.94667,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,Credit Score,651,RxiiW5TI
+4033542445,260,false,817.91,892.08,1.03250,817.92,0.94667,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.03,State,MI,RxiiW5TI
+4033542445,261,false,817.91,892.08,1.03250,817.92,0.94667,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Special Feature Code,212,RxiiW5TI
+4033542445,262,false,817.91,892.08,1.03250,817.92,0.94667,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.05,Special Feature Code,900,RxiiW5TI
+4033542494,263,false,2092.70,4010.34,1.31250,3936.18,1.28823,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,NJJRFTcw
+4033542494,264,false,2092.70,4010.34,1.31250,3936.18,1.28823,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.05,State,NC,NJJRFTcw
+4033542494,265,false,2092.70,4010.34,1.31250,3936.18,1.28823,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0375,LTV,97.0,NJJRFTcw
+4033542494,266,false,2092.70,4010.34,1.31250,3936.18,1.28823,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.15,UPB Par Spread,305550.0/0.125,NJJRFTcw
+4033542507,267,false,3472.21,5069.20,1.45000,4995.04,1.42879,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,NJJRFTcw
+4033542507,268,false,3472.21,5069.20,1.45000,4995.04,1.42879,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,349600.0/-0.125,NJJRFTcw
+4033542507,269,false,3472.21,5069.20,1.45000,4995.04,1.42879,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.05,State,FL,NJJRFTcw
+4033542507,270,false,3472.21,5069.20,1.45000,4995.04,1.42879,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,95.0,NJJRFTcw
+4033542509,271,false,2905.11,3416.40,1.30000,3342.24,1.27178,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,NJJRFTcw
+4033542509,272,false,2905.11,3416.40,1.30000,3342.24,1.27178,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.05,State,FL,NJJRFTcw
+4033542509,273,false,2905.11,3416.40,1.30000,3342.24,1.27178,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.125,UPB Par Spread,262800.0/0.24,NJJRFTcw
+4033542509,274,false,2905.11,3416.40,1.30000,3342.24,1.27178,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,64.0,NJJRFTcw
+4033542509,275,false,2905.11,3416.40,1.30000,3342.24,1.27178,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Credit Score,801,NJJRFTcw
+4033542509,276,false,2905.11,3416.40,1.30000,3342.24,1.27178,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Occupancy Type,Investment Property,NJJRFTcw
+4033542759,277,false,650.84,4426.40,1.25750,4352.24,1.23643,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033542759,278,false,650.84,4426.40,1.25750,4352.24,1.23643,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.03,State,NY,O6w5VTCc
+4033542759,279,false,650.84,4426.40,1.25750,4352.24,1.23643,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.1875,UPB Par Spread,352000.0/-0.250,O6w5VTCc
+4033542759,280,false,650.84,4426.40,1.25750,4352.24,1.23643,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.15,LTV,80.0,O6w5VTCc
+4033543506,281,false,2381.90,3718.55,1.60750,3644.39,1.57544,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,NJJRFTcw
+4033543506,282,false,2381.90,3718.55,1.60750,3644.39,1.57544,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,48.0,NJJRFTcw
+4033543506,283,false,2381.90,3718.55,1.60750,3644.39,1.57544,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2125,UPB Par Spread,231325.0/-0.125,NJJRFTcw
+4033543506,284,false,2381.90,3718.55,1.60750,3644.39,1.57544,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.22,State,TX,NJJRFTcw
+4033543506,285,false,2381.90,3718.55,1.60750,3644.39,1.57544,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,95.0,NJJRFTcw
+4033543637,286,false,358.40,1053.00,0.87750,981.00,0.81750,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,vnpj6HAC
+4033543637,287,false,358.40,1053.00,0.87750,981.00,0.81750,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,47.0,vnpj6HAC
+4033543637,288,false,358.40,1053.00,0.87750,981.00,0.81750,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,UPB Par Spread,120000.0/1.25,vnpj6HAC
+4033543637,289,false,358.40,1053.00,0.87750,981.00,0.81750,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,Credit Score,661,vnpj6HAC
+4033543637,290,false,358.40,1053.00,0.87750,981.00,0.81750,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,-0.11,State,IN,vnpj6HAC
+4033543637,291,false,358.40,1053.00,0.87750,981.00,0.81750,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,-0.15,LTV,75.0,vnpj6HAC
+4033543637,292,false,358.40,1053.00,0.87750,981.00,0.81750,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Occupancy Type,Investment Property,vnpj6HAC
+4033543679,293,false,1118.34,1192.50,1.19250,1118.34,1.11834,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,false,9QvM18tF
+4033543679,294,false,1118.34,1192.50,1.19250,1118.34,1.11834,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Loan Purpose Code,Refinance,9QvM18tF
+4033543679,295,false,1118.34,1192.50,1.19250,1118.34,1.11834,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.12,State,NJ,9QvM18tF
+4033543679,296,false,1118.34,1192.50,1.19250,1118.34,1.11834,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,25.0,9QvM18tF
+4033543679,297,false,1118.34,1192.50,1.19250,1118.34,1.11834,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.175,UPB Par Spread,100000.0/0.375,9QvM18tF
+4033543760,298,false,-7815.47,2197.65,1.20750,2125.65,1.16794,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,14.0,w6u1eGyB
+4033543760,299,false,-7815.47,2197.65,1.20750,2125.65,1.16794,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,w6u1eGyB
+4033543760,300,false,-7815.47,2197.65,1.20750,2125.65,1.16794,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Loan Purpose Code,Refinance,w6u1eGyB
+4033543760,301,false,-7815.47,2197.65,1.20750,2125.65,1.16794,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,-0.03,State,NY,w6u1eGyB
+4033543760,302,false,-7815.47,2197.65,1.20750,2125.65,1.16794,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,0.1875,UPB Par Spread,182000.0/0.25,w6u1eGyB
+4033543760,303,false,-7815.47,2197.65,1.20750,2125.65,1.16794,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Debt To Income,50.0,w6u1eGyB
+4033543760,304,false,-7815.47,2197.65,1.20750,2125.65,1.16794,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;72;0,72.00,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,Credit Score,657,w6u1eGyB
+4033543962,305,false,6440.51,9435.50,1.67000,9361.34,1.65687,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,j9suwUQg
+4033543962,306,false,6440.51,9435.50,1.67000,9361.34,1.65687,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,45.0,j9suwUQg
+4033543962,307,false,6440.51,9435.50,1.67000,9361.34,1.65687,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.22,State,TX,j9suwUQg
+4033543962,308,false,6440.51,9435.50,1.67000,9361.34,1.65687,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.3375,UPB Par Spread,565000.0/-1.135,j9suwUQg
+4033543962,309,false,6440.51,9435.50,1.67000,9361.34,1.65687,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.125,LTV,89.0,j9suwUQg
+4033544328,310,false,741.80,1232.91,1.04750,1158.75,0.98449,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,j9suwUQg
+4033544328,311,false,741.80,1232.91,1.04750,1158.75,0.98449,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Credit Score,817,j9suwUQg
+4033544328,312,false,741.80,1232.91,1.04750,1158.75,0.98449,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.25,Special Feature Code,235,j9suwUQg
+4033544328,313,false,741.80,1232.91,1.04750,1158.75,0.98449,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.09,State,CA,j9suwUQg
+4033544328,314,false,741.80,1232.91,1.04750,1158.75,0.98449,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,41.0,j9suwUQg
+4033544328,315,false,741.80,1232.91,1.04750,1158.75,0.98449,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2375,UPB Par Spread,117700.0/-0.250,j9suwUQg
+4033544854,316,false,4492.39,4566.55,0.75250,4492.39,0.74028,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,,Escrow Indicator,false,j9suwUQg
+4033544854,317,false,4492.39,4566.55,0.75250,4492.39,0.74028,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,-0.14,State,CA,j9suwUQg
+4033544854,318,false,4492.39,4566.55,0.75250,4492.39,0.74028,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,-0.017,Special Feature Code,212,j9suwUQg
+4033544854,319,false,4492.39,4566.55,0.75250,4492.39,0.74028,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,-0.102,LTV,75.0,j9suwUQg
+4033544854,320,false,4492.39,4566.55,0.75250,4492.39,0.74028,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,ARM,Conventional,0.85,0.00,0.00000,0.1615,UPB Par Spread,606850.55/-0.625,j9suwUQg
+4033547153,321,false,3094.59,3168.75,1.26750,3094.59,1.23784,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,false,j9suwUQg
+4033547153,322,false,3094.59,3168.75,1.26750,3094.59,1.23784,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.12,State,WA,j9suwUQg
+4033547153,323,false,3094.59,3168.75,1.26750,3094.59,1.23784,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,40.0,j9suwUQg
+4033547153,324,false,3094.59,3168.75,1.26750,3094.59,1.23784,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.225,UPB Par Spread,250000.0/-0.375,j9suwUQg
+4033548519,325,false,4164.90,8389.69,1.17750,8315.53,1.16709,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033548519,326,false,4164.90,8389.69,1.17750,8315.53,1.16709,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.04,State,NJ,O6w5VTCc
+4033548519,327,false,4164.90,8389.69,1.17750,8315.53,1.16709,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0375,UPB Par Spread,712500.0/0.500,O6w5VTCc
+4033548519,328,false,4164.90,8389.69,1.17750,8315.53,1.16709,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,95.0,O6w5VTCc
+4033548519,329,false,4164.90,8389.69,1.17750,8315.53,1.16709,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0125,Debt To Income,49.0,O6w5VTCc
+4033548677,330,false,244.35,2476.25,1.41500,2402.09,1.37262,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,O6w5VTCc
+4033548677,331,false,244.35,2476.25,1.41500,2402.09,1.37262,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.2375,UPB Par Spread,175000.0/-0.135,O6w5VTCc
+4033548677,332,false,244.35,2476.25,1.41500,2402.09,1.37262,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Credit Score,695,O6w5VTCc
+4033548677,333,false,244.35,2476.25,1.41500,2402.09,1.37262,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.04,State,NJ,O6w5VTCc
+4033548677,334,false,244.35,2476.25,1.41500,2402.09,1.37262,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0875,LTV,43.0,O6w5VTCc
+4033549305,335,false,4053.46,4127.62,1.21750,4053.46,1.19563,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,,Escrow Indicator,true,1VKaS4pO
+4033549305,336,false,4053.46,4127.62,1.21750,4053.46,1.19563,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.07,State,NM,1VKaS4pO
+4033549305,337,false,4053.46,4127.62,1.21750,4053.46,1.19563,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,0.125,UPB Par Spread,339024.05/0.375,1VKaS4pO
+4033549305,338,false,4053.46,4127.62,1.21750,4053.46,1.19563,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.0625,LTV,95.0,1VKaS4pO
+4033549305,339,false,4053.46,4127.62,1.21750,4053.46,1.19563,SMP Admin Fee;Tax Cert Fees;Flood Cert Fees,0;74.16;0,74.16,360,Fixed,Conventional,1.25,0.00,0.00000,-0.025,Debt To Income,50.0,1VKaS4pO

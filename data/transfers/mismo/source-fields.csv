@@ -1,0 +1,786 @@
+position,field_name,sample_value
+0,Export Created Date Time,02/23/2026 22:14:57
+1,Combined LTV Ratio Percent,51.0
+2,Home Equity Combined LTV Ratio Percent,84.0
+3,Aggregate Loan Curtailment Amount - Current,100.00
+4,Balloon Reset Indicator - Current,
+5,Convertible Status Type - Current,
+6,Current Accrued Interest Amount - Current,
+7,Current Interest Rate Percent - Current,
+8,Delinquent Payments Over Past Twelve Months Count - Current,0
+9,Escrow Balance Amount - Current,4746.72
+10,Escrow Item Type 1 - Current,HomeownersInsurance
+11,Escrow Item Type 2 - Current,CountyPropertyTax
+12,Escrow Item Type 3 - Current,CountyPropertyTax
+13,Escrow Item Type 4 - Current,SchoolPropertyTax
+14,Escrow Item Type 5 - Current,SchoolPropertyTax
+15,Escrow Item Type 6 - Current,
+16,Escrow Item Type 7 - Current,
+17,Escrow Item Type 8 - Current,
+18,Escrow Item Type 9 - Current,
+19,Escrow Item Type 10 - Current,
+20,Escrow Item Type 11 - Current,
+21,Escrow Item Type 12 - Current,
+22,Escrow Monthly Payment Amount 1 - Current,167.34
+23,Escrow Monthly Payment Amount 2 - Current,2206.02
+24,Escrow Monthly Payment Amount 3 - Current,306.00
+25,Escrow Monthly Payment Amount 4 - Current,285.45
+26,Escrow Monthly Payment Amount 5 - Current,103.20
+27,Escrow Monthly Payment Amount 6 - Current,
+28,Escrow Monthly Payment Amount 7 - Current,
+29,Escrow Monthly Payment Amount 8 - Current,
+30,Escrow Monthly Payment Amount 9 - Current,
+31,Escrow Monthly Payment Amount 10 - Current,
+32,Escrow Monthly Payment Amount 11 - Current,
+33,Escrow Monthly Payment Amount 12 - Current,
+34,Guarantee Fee Add On Indicator - Current,
+35,Investor Collateral Program Identifier - Current,PropertyDataCollection
+36,Investor Contract Identifier,40495790
+37,Investor Feature Identifier 1 - Current,H99
+38,Investor Feature Identifier 2 - Current,
+39,Investor Feature Identifier 3 - Current,
+40,Investor Feature Identifier 4 - Current,
+41,Investor Feature Identifier 5 - Current,
+42,Investor Feature Identifier 6 - Current,
+43,Investor Feature Identifier 7 - Current,
+44,Investor Feature Identifier 8 - Current,
+45,Investor Feature Identifier 9 - Current,
+46,Investor Feature Identifier 10 - Current,
+47,Investor Ownership Percent - Current,100.0
+48,Last Paid Installment Due Date - Current,03/01/2026
+49,Last Payment Received Date - Current,
+50,Lender Paid MI Interest Rate Adjustment Percent - Current,
+51,Loan Acquisition Scheduled UPB Amount - Current,905500.0
+52,Loan Buyup Buydown Basis Point Number - Current,
+53,Loan Buyup Buydown Type - Current,
+54,Loan Program Identifier 1 - Current,HomePossibleMortgage
+55,Loan Program Identifier 2 - Current,
+56,Loan Program Identifier 3 - Current,
+57,Loan Program Identifier 4 - Current,
+58,Loan Program Identifier 5 - Current,
+59,MERS MIN Identifier,100279300072600089
+60,MI Certificate Identifier - Current,1001674172
+61,MI Company Name Type - Current,NMI
+62,MI Coverage Percent - Current,35
+63,MI Premium Financed Amount - Current,
+64,MI Premium Financed Indicator - Current,false
+65,MI Premium Source Type - Current,Borrower
+66,Mortgage Modification Indicator - Current,false
+67,Next Rate Adjustment Effective Date - Current,
+68,Primary MI Absence Reason Type - Current,NoMIBasedOnOriginalLTV
+69,Principal And Interest Payment Amount - Current,
+70,Refinance Program Identifier - Current,TexasEquity
+71,Seller Loan Identifier,001719709
+72,Servicer Loan Identifier,6011203030
+73,Universal Loan Identifier - Current,549300KIOYNU323LVJ3700171970908
+74,UPB Amount - Current,905500.0
+75,Warehouse Lender Indicator - Current,true
+76,Adjustment Rule Type 1 - Interest Rate Per Change - AtClosing,
+77,Adjustment Rule Type 2 - Interest Rate Per Change - AtClosing,
+78,Application Received Date - AtClosing,01/08/2026
+79,Assumability Indicator - AtClosing,false
+80,Automated Underwriting Case Identifier - AtClosing,1716216191
+81,Automated Underwriting Recommendation Description - AtClosing,ApproveEligible
+82,Automated Underwriting System Type - AtClosing,DesktopUnderwriter
+83,Balloon Indicator - AtClosing,false
+84,Base LTV Ratio Percent - AtClosing,50.306
+85,Biweekly Comparable Monthly Maturity Date - AtClosing,
+86,Borrower Count - AtClosing,2
+87,Borrower Paid Discount Points Total Amount - AtClosing,136.96
+88,Borrower Reserves Monthly Payment Count - AtClosing,4
+89,Buydown Change Frequency Months Count - AtClosing,12
+90,Buydown Contributor Type - AtClosing,InterestedThirdParty
+91,Buydown Duration Months Count - AtClosing,24
+92,Buydown Increase Rate Percent - AtClosing,1.0
+93,Buydown Initial Discount Percent - AtClosing,2.0
+94,Buydown Temporary Subsidy Indicator - AtClosing,false
+95,Capitalized Loan Indicator - AtClosing,false
+96,Ceiling Rate Percent - AtClosing,
+97,Closing Cost Contribution Amount 1 - AtClosing,7398.61
+98,Closing Cost Contribution Amount 2 - AtClosing,8847.00
+99,Closing Cost Contribution Amount 3 - AtClosing,4034.00
+100,Closing Cost Contribution Amount 4 - AtClosing,
+101,Closing Cost Funds Type 1 - AtClosing,CheckingSavings
+102,Closing Cost Funds Type 2 - AtClosing,CheckingSavings
+103,Closing Cost Funds Type 3 - AtClosing,CheckingSavings
+104,Closing Cost Funds Type 4 - AtClosing,
+105,Closing Cost Source Type 1 - AtClosing,Borrower
+106,Closing Cost Source Type 2 - AtClosing,PropertySeller
+107,Closing Cost Source Type 3 - AtClosing,PropertySeller
+108,Closing Cost Source Type 4 - AtClosing,
+109,Construction Loan Indicator - AtClosing,false
+110,Construction Loan Type - AtClosing,
+111,Construction To Permanent Closing Feature Type - AtClosing,
+112,Construction To Permanent Closing Type - AtClosing,
+113,Construction To Permanent First Payment Due Date - AtClosing,
+114,Conversion Type - AtClosing,
+115,Convertible Indicator - AtClosing,false
+116,Credit Score Impairment Type - AtClosing,
+117,Disclosed Index Rate Percent - AtClosing,
+118,Down Payment Amount 1 - AtClosing,6375.00
+119,Down Payment Amount 2 - AtClosing,
+120,Down Payment Amount 3 - AtClosing,
+121,Down Payment Amount 4 - AtClosing,
+122,Down Payment Source Type 1 - AtClosing,Borrower
+123,Down Payment Source Type 2 - AtClosing,
+124,Down Payment Source Type 3 - AtClosing,
+125,Down Payment Source Type 4 - AtClosing,
+126,Down Payment Type 1 - AtClosing,GiftFunds
+127,Down Payment Type 2 - AtClosing,
+128,Down Payment Type 3 - AtClosing,
+129,Down Payment Type 4 - AtClosing,
+130,ENote Indicator - AtClosing,false
+131,Escrow Indicator - AtClosing,true
+132,First Rate Adjustment Effective Date - AtClosing,
+133,First Rate Change Payment Effective Date - AtClosing,
+134,Floor Rate Percent - AtClosing,
+135,HMDA HOEPA Loan Status Indicator - AtClosing,false
+136,HMDA Rate Spread Percent - AtClosing,0.0
+137,Index Source Type - AtClosing,
+138,Initial Fixed Period Effective Months Count - AtClosing,
+139,Initial Principal And Interest Payment Amount - AtClosing,5423.11
+140,Interest Accrual Type - AtClosing,
+141,Interest And Payment Adjustment Index Lead Days Count - AtClosing,
+142,Interest Calculation Basis Days In Year Count Type - AtClosing,
+143,Interest Calculation Basis Type - AtClosing,
+144,Interest Calculation Period Type - AtClosing,Month
+145,Interest Calculation Type - AtClosing,Simple
+146,Interest Only End Date - AtClosing,
+147,Interest Only Indicator - AtClosing,false
+148,Interest Rate Rounding Percent - AtClosing,
+149,Interest Rate Rounding Type - AtClosing,
+150,Lien Priority Type - AtClosing,FirstLien
+151,Loan Affordable Indicator - AtClosing,false
+152,Loan Amortization Period Count - AtClosing,360
+153,Loan Amortization Period Type - AtClosing,Month
+154,Loan Amortization Type - AtClosing,Fixed
+155,Loan Interest Accrual Start Date - AtClosing,
+156,Loan Level Credit Score Selection Method Type - AtClosing,MiddleOrLowerThenLowest
+157,Loan Level Credit Score Value - AtClosing,793
+158,Loan Manual Underwriting Indicator - AtClosing,false
+159,Loan Maturity Date - AtClosing,03/01/2056
+160,Loan Maturity Period Count - AtClosing,360
+161,Loan Maturity Period Type - AtClosing,Month
+162,Loan Purpose Type - AtClosing,Refinance
+163,Loan State Date - AtClosing,02/03/2026
+164,LTV Ratio Percent - AtClosing,51.0
+165,Margin Rate Percent - AtClosing,
+166,Mortgage Type - AtClosing,Conventional
+167,Note Amount - AtClosing,905500.00
+168,Note Date - AtClosing,02/03/2026
+169,Note Rate Percent - AtClosing,5.99
+170,Other Funds Collected At Closing Amount 1 - AtClosing,383.17
+171,Other Funds Collected At Closing Amount 2 - AtClosing,
+172,Other Funds Collected At Closing Amount 3 - AtClosing,
+173,Other Funds Collected At Closing Amount 4 - AtClosing,
+174,Other Funds Collected At Closing Type 1 - AtClosing,Buydown
+175,Other Funds Collected At Closing Type 2 - AtClosing,
+176,Other Funds Collected At Closing Type 3 - AtClosing,
+177,Other Funds Collected At Closing Type 4 - AtClosing,
+178,Payment Billing Statement Lead Days Count - AtClosing,
+179,Payment Frequency Type - AtClosing,Monthly
+180,Per Change Maximum Decrease Rate Percent - First - AtClosing,
+181,Per Change Maximum Decrease Rate Percent - Subsequent - AtClosing,
+182,Per Change Maximum Increase Rate Percent - First - AtClosing,
+183,Per Change Maximum Increase Rate Percent - Subsequent - AtClosing,
+184,Per Change Rate Adjustment Frequency Months Count - First - AtClosing,
+185,Per Change Rate Adjustment Frequency Months Count - Subsequent - AtClosing,
+186,Prepayment Penalty Indicator - AtClosing,false
+187,Borrower Price Lock Datetime - AtClosing,01/12/2026
+188,Purchase Price Amount - AtClosing,395000
+189,Refinance Cash Out Amount - AtClosing,1.00
+190,Refinance Cash Out Determination Type - AtClosing,NoCashOut
+191,Related Investor Loan Identifier - AtClosing,
+192,Related Loan Investor Type - AtClosing,
+193,Relocation Loan Indicator - AtClosing,false
+194,Scheduled First Payment Date - AtClosing,04/01/2026
+195,Section Of Act Type - AtClosing,
+196,Shared Equity Indicator - AtClosing,false
+197,Subsequent Rate Adjustment Effective Date - AtClosing,
+198,Total Liabilities Monthly Payment Amount - AtClosing,10454
+199,Total Monthly Income Amount - AtClosing,30519
+200,Total Monthly Proposed Housing Expense Amount - AtClosing,7796
+201,Total Mortgaged Properties Count - AtClosing,2
+202,Adjustment Rule Type 1 - Interest Rate Per Change - AtModification,
+203,Adjustment Rule Type 2 - Interest Rate Per Change - AtModification,
+204,Application Received Date - AtModification,
+205,Assumability Indicator - AtModification,
+206,Automated Underwriting Case Identifier - AtModification,
+207,Automated Underwriting Recommendation Description - AtModification,
+208,Automated Underwriting System Type - AtModification,
+209,Balloon Indicator - AtModification,
+210,Base LTV Ratio Percent - AtModification,
+211,Biweekly Comparable Monthly Maturity Date - AtModification,
+212,Borrower Count - AtModification,
+213,Borrower Paid Discount Points Total Amount - AtModification,
+214,Borrower Reserves Monthly Payment Count - AtModification,
+215,Buydown Change Frequency Months Count - AtModification,
+216,Buydown Contributor Type - AtModification,
+217,Buydown Duration Months Count - AtModification,
+218,Buydown Increase Rate Percent - AtModification,
+219,Buydown Initial Discount Percent - AtModification,
+220,Buydown Temporary Subsidy Indicator - AtModification,
+221,Capitalized Loan Indicator - AtModification,
+222,Ceiling Rate Percent - AtModification,
+223,Closing Cost Contribution Amount 1 - AtModification,
+224,Closing Cost Contribution Amount 2 - AtModification,
+225,Closing Cost Contribution Amount 3 - AtModification,
+226,Closing Cost Contribution Amount 4 - AtModification,
+227,Closing Cost Funds Type 1 - AtModification,
+228,Closing Cost Funds Type 2 - AtModification,
+229,Closing Cost Funds Type 3 - AtModification,
+230,Closing Cost Funds Type 4 - AtModification,
+231,Closing Cost Source Type 1 - AtModification,
+232,Closing Cost Source Type 2 - AtModification,
+233,Closing Cost Source Type 3 - AtModification,
+234,Closing Cost Source Type 4 - AtModification,
+235,Construction Loan Indicator - AtModification,
+236,Construction Loan Type - AtModification,
+237,Construction To Permanent Closing Feature Type - AtModification,
+238,Construction To Permanent Closing Type - AtModification,
+239,Construction To Permanent First Payment Due Date - AtModification,
+240,Conversion Type - AtModification,
+241,Convertible Indicator - AtModification,
+242,Credit Score Impairment Type - AtModification,
+243,Disclosed Index Rate Percent - AtModification,
+244,Down Payment Amount 1 - AtModification,
+245,Down Payment Amount 2 - AtModification,
+246,Down Payment Amount 3 - AtModification,
+247,Down Payment Amount 4 - AtModification,
+248,Down Payment Source Type 1 - AtModification,
+249,Down Payment Source Type 2 - AtModification,
+250,Down Payment Source Type 3 - AtModification,
+251,Down Payment Source Type 4 - AtModification,
+252,Down Payment Type 1 - AtModification,
+253,Down Payment Type 2 - AtModification,
+254,Down Payment Type 3 - AtModification,
+255,Down Payment Type 4 - AtModification,
+256,ENote Indicator - AtModification,
+257,Escrow Indicator - AtModification,
+258,First Rate Adjustment Effective Date - AtModification,
+259,First Rate Change Payment Effective Date - AtModification,
+260,Floor Rate Percent - AtModification,
+261,HMDA HOEPA Loan Status Indicator - AtModification,
+262,HMDA Rate Spread Percent - AtModification,
+263,Index Source Type - AtModification,
+264,Initial Fixed Period Effective Months Count - AtModification,
+265,Initial Principal And Interest Payment Amount - AtModification,
+266,Interest Accrual Type - AtModification,
+267,Interest And Payment Adjustment Index Lead Days Count - AtModification,
+268,Interest Calculation Basis Days In Year Count Type - AtModification,
+269,Interest Calculation Basis Type - AtModification,
+270,Interest Calculation Period Type - AtModification,
+271,Interest Calculation Type - AtModification,
+272,Interest Only End Date - AtModification,
+273,Interest Only Indicator - AtModification,
+274,Interest Rate Rounding Percent - AtModification,
+275,Interest Rate Rounding Type - AtModification,
+276,Loan Affordable Indicator - AtModification,
+277,Loan Amortization Period Count - AtModification,
+278,Loan Amortization Period Type - AtModification,
+279,Loan Amortization Type - AtModification,
+280,Loan Interest Accrual Start Date - AtModification,
+281,Loan Level Credit Score Selection Method Type - AtModification,
+282,Loan Level Credit Score Value - AtModification,
+283,Loan Manual Underwriting Indicator - AtModification,
+284,Loan Maturity Date - AtModification,
+285,Loan Maturity Period Count - AtModification,
+286,Loan Maturity Period Type - AtModification,
+287,Loan Modification Effective Date - AtModification,
+288,Loan Purpose Type - AtModification,
+289,Loan State Date - AtModification,
+290,LTV Ratio Percent - AtModification,
+291,Margin Rate Percent - AtModification,
+292,Mortgage Type - AtModification,
+293,Note Amount - AtModification,
+294,Note Rate Percent - AtModification,
+295,Other Funds Collected At Closing Amount 1 - AtModification,
+296,Other Funds Collected At Closing Amount 2 - AtModification,
+297,Other Funds Collected At Closing Amount 3 - AtModification,
+298,Other Funds Collected At Closing Amount 4 - AtModification,
+299,Other Funds Collected At Closing Type 1 - AtModification,
+300,Other Funds Collected At Closing Type 2 - AtModification,
+301,Other Funds Collected At Closing Type 3 - AtModification,
+302,Other Funds Collected At Closing Type 4 - AtModification,
+303,Payment Billing Statement Lead Days Count - AtModification,
+304,Payment Frequency Type - AtModification,
+305,Per Change Maximum Decrease Rate Percent - First - AtModification,
+306,Per Change Maximum Decrease Rate Percent - Subsequent - AtModification,
+307,Per Change Maximum Increase Rate Percent - First - AtModification,
+308,Per Change Maximum Increase Rate Percent - Subsequent - AtModification,
+309,Per Change Rate Adjustment Frequency Months Count - First - AtModification,
+310,Per Change Rate Adjustment Frequency Months Count - Subsequent - AtModification,
+311,Prepayment Penalty Indicator - AtModification,
+312,Borrower Price Lock Datetime - AtModification,
+313,Purchase Price Amount - AtModification,
+314,Refinance Cash Out Amount - AtModification,
+315,Refinance Cash Out Determination Type - AtModification,
+316,Related Investor Loan Identifier - AtModification,
+317,Related Loan Investor Type - AtModification,
+318,Relocation Loan Indicator - AtModification,
+319,Scheduled First Payment Date - AtModification,
+320,Shared Equity Indicator - AtModification,
+321,Subsequent Rate Adjustment Effective Date - AtModification,
+322,Total Liabilities Monthly Payment Amount - AtModification,
+323,Total Monthly Income Amount - AtModification,
+324,Total Monthly Proposed Housing Expense Amount - AtModification,
+325,Total Mortgaged Properties Count - AtModification,
+326,Balloon Indicator - AtConversion,
+327,Initial Principal And Interest Payment Amount - AtConversion,
+328,Interest Calculation Type - AtConversion,
+329,Latest Conversion Effective Date - AtConversion,
+330,Loan Amortization Type - AtConversion,
+331,Loan Maturity Date - AtConversion,
+332,Loan State Date - AtConversion,
+333,Mortgage Type - AtConversion,
+334,Note Amount - AtConversion,
+335,Note Rate Percent - AtConversion,
+336,Payment Frequency Type - AtConversion,
+337,Scheduled First Payment Date - AtConversion,
+338,Related Loan 1 - Current HELOC Maximum Balance Amount - Current,325000.00
+339,Related Loan 1 - HELOC Balance Amount - Current,325000.00
+340,Related Loan 1 - HELOC Indicator - Current,true
+341,Related Loan 1 - Lien Priority Type - Current,SecondLien
+342,Related Loan 1 - Loan Affordable Indicator - Current,false
+343,Related Loan 1 - Mortgage Type - Current,Conventional
+344,Related Loan 1 - UPB Amount - Current,
+345,Related Loan 2 - Current HELOC Maximum Balance Amount - Current,
+346,Related Loan 2 - HELOC Balance Amount - Current,
+347,Related Loan 2 - HELOC Indicator - Current,
+348,Related Loan 2 - Lien Priority Type - Current,
+349,Related Loan 2 - Loan Affordable Indicator - Current,
+350,Related Loan 2 - Mortgage Type - Current,
+351,Related Loan 2 - UPB Amount - Current,
+352,Related Loan 3 - Current HELOC Maximum Balance Amount - Current,
+353,Related Loan 3 - HELOC Balance Amount - Current,
+354,Related Loan 3 - HELOC Indicator - Current,
+355,Related Loan 3 - Lien Priority Type - Current,
+356,Related Loan 3 - Loan Affordable Indicator - Current,
+357,Related Loan 3 - Mortgage Type - Current,
+358,Related Loan 3 - UPB Amount - Current,
+359,Appraiser License Identifier,AR015018
+360,Appraiser Supervisor License Identifier,RCR.0000537
+361,HOA or Coop Housing Corp Taxpayer Identifier Type,
+362,HOA or Coop Housing Corp Taxpayer Identifier Value,
+363,Primary Borrower Address Line Text,157 COUNTY ROAD 4535
+364,Primary Borrower Address Type,Mailing
+365,Primary Borrower City Name,DAYTON
+366,Primary Borrower Country Code,US
+367,Primary Borrower Postal Code,77535
+368,Primary Borrower State Code,TX
+369,Primary Borrower Mail To Address Same as Property Indicator,true
+370,Primary Borrower Qualifying Income Amount,30519
+371,Primary Borrower Age At Application Years Count,49
+372,Primary Borrower Birth Date,09/01/1976
+373,Primary Borrower Classification Type,Primary
+374,Primary Borrower Counseling Confirmation Type,GovernmentAgency
+375,Primary Borrower Counseling Format Type,Individual
+376,Primary Borrower Credit Report Identifier,CCF55680
+377,Primary Borrower Credit Repository Source Indicator,true
+378,Primary Borrower Credit Repository Source Type,MergedData
+379,Primary Borrower Credit Score Value,793
+380,Primary Borrower Credit Score Provider Name,1000
+381,Primary Borrower Bankruptcy Indicator,false
+382,Primary Borrower Citizenship Residency Type,USCitizen
+383,Primary Borrower First Time Homebuyer Indicator,false
+384,Primary Borrower Loan Foreclosure Or Judgment Indicator,false
+385,Primary Borrower Employment Borrower Self Employed Indicator,false
+386,Primary Borrower Gender Type,
+387,Primary Borrower HMDA Ethnicity Collected Based On Visual Observation Or Surname Indicator,false
+388,Primary Borrower HMDA Ethnicity Origin Type 1,Mexican
+389,Primary Borrower HMDA Ethnicity Origin Type 2,
+390,Primary Borrower HMDA Ethnicity Origin Type 3,
+391,Primary Borrower HMDA Ethnicity Origin Type 4,
+392,Primary Borrower HMDA Ethnicity Origin Type Other Description,
+393,Primary Borrower HMDA Ethnicity Refusal Indicator,false
+394,Primary Borrower HMDA Ethnicity Type,
+395,Primary Borrower HMDA Ethnicity Type 1 (Sort ID 609.1-HMDAEthnicityType),NotHispanicOrLatino
+396,Primary Borrower HMDA Ethnicity Type 2 (Sort ID 609.1-HMDAEthnicityType),
+397,Primary Borrower HMDA Ethnicity Type 3 (Sort ID 609.1-HMDAEthnicityType),
+398,Primary Borrower HMDA Gender Collected Based On Visual Observation Or Name Indicator,false
+399,Primary Borrower HMDA Gender Refusal Indicator,false
+400,Primary Borrower HMDA Gender Type (Sort ID 608.3-HMDAGenderType),Female
+401,Primary Borrower HMDA Race Collected Based On Visual Observation Or Surname Indicator,false
+402,Primary Borrower HMDA Race Designation Other Asian Description,
+403,Primary Borrower HMDA Race Designation Other Pacific Islander Description,
+404,Primary Borrower HMDA Race Designation Type 1,Vietnamese
+405,Primary Borrower HMDA Race Designation Type 2,
+406,Primary Borrower HMDA Race Designation Type 3,
+407,Primary Borrower HMDA Race Designation Type 4,
+408,Primary Borrower HMDA Race Designation Type 5,
+409,Primary Borrower HMDA Race Designation Type 6,
+410,Primary Borrower HMDA Race Designation Type 7,
+411,Primary Borrower HMDA Race Designation Type 8,
+412,Primary Borrower HMDA Race Designation Type 9,
+413,Primary Borrower HMDA Race Designation Type 10,
+414,Primary Borrower HMDA Race Designation Type 11,
+415,Primary Borrower HMDA Race Designation Type 12,
+416,Primary Borrower HMDA Race Designation Type 13,
+417,Primary Borrower HMDA Race Refusal Indicator,false
+418,Primary Borrower HMDA Race Type 1,
+419,Primary Borrower HMDA Race Type 2,
+420,Primary Borrower HMDA Race Type 3,
+421,Primary Borrower HMDA Race Type 4,
+422,Primary Borrower HMDA Race Type 5,
+423,Primary Borrower HMDA Race Type 1 (Sort ID 610.5-HMDARaceType),Asian
+424,Primary Borrower HMDA Race Type 2 (Sort ID 610.5-HMDARaceType),White
+425,Primary Borrower HMDA Race Type 3 (Sort ID 610.5-HMDARaceType),
+426,Primary Borrower HMDA Race Type 4 (Sort ID 610.5-HMDARaceType),
+427,Primary Borrower HMDA Race Type 5 (Sort ID 610.5-HMDARaceType),
+428,Primary Borrower HMDA Race Type 6 (Sort ID 610.5-HMDARaceType),
+429,Primary Borrower HMDA Race Type 7 (Sort ID 610.5-HMDARaceType),
+430,Primary Borrower HMDA Race Type Additional Description,
+431,Non-Individual Borrower 1 Name,
+432,Non-Individual Borrower 2 Name,
+433,Non-Individual Borrower 3 Name,
+434,Non-Individual Borrower 4 Name,
+435,Non-Individual Borrower 5 Name,
+436,Non-Individual Borrower 1 Type,
+437,Non-Individual Borrower 2 Type,
+438,Non-Individual Borrower 3 Type,
+439,Non-Individual Borrower 4 Type,
+440,Non-Individual Borrower 5 Type,
+441,Primary Borrower First Name,TO-KHUYEN
+442,Primary Borrower Last Name,TRAN
+443,Primary Borrower Middle Name,DINH
+444,Primary Borrower Suffix Name,III
+445,Primary Borrower Taxpayer Identifier Type,SocialSecurityNumber
+446,Primary Borrower Taxpayer Identifier Value,559457512
+447,Secondary Borrower 1 Address Line Text,
+448,Secondary Borrower 1 Address Type,
+449,Secondary Borrower 1 City Name,
+450,Secondary Borrower 1 Country Code,
+451,Secondary Borrower 1 Postal Code,
+452,Secondary Borrower 1 State Code,
+453,Secondary Borrower 1 Mail To Address Same as Property Indicator,
+454,Secondary Borrower 1 Age At Application Years Count,49
+455,Secondary Borrower 1 Birth Date,04/07/1976
+456,Secondary Borrower 1 Classification Type,Secondary
+457,Secondary Borrower 1 Qualifying Income Amount,0
+458,Secondary Borrower 1 Counseling Confirmation Type,GovernmentAgency
+459,Secondary Borrower 1 Counseling Format Type,Individual
+460,Secondary Borrower 1 Credit Report Identifier,CCF55680
+461,Secondary Borrower 1 Credit Repository Source Indicator,true
+462,Secondary Borrower 1 Credit Repository Source Type,MergedData
+463,Secondary Borrower 1 Credit Score Value,800
+464,Secondary Borrower 1 Credit Score Provider Name,5226
+465,Secondary Borrower 1 Bankruptcy Indicator,false
+466,Secondary Borrower 1 Citizenship Residency Type,USCitizen
+467,Secondary Borrower 1 First Time Homebuyer Indicator,true
+468,Secondary Borrower 1 Loan Foreclosure Or Judgment Indicator,false
+469,Secondary Borrower 1 Employment Borrower Self Employed Indicator,false
+470,Secondary Borrower 1 Gender Type,
+471,Secondary Borrower 1 HMDA Ethnicity Collected Based On Visual Observation Or Surname Indicator,false
+472,Secondary Borrower 1 HMDA Ethnicity Origin Type 1,Mexican
+473,Secondary Borrower 1 HMDA Ethnicity Origin Type 2,
+474,Secondary Borrower 1 HMDA Ethnicity Origin Type 3,
+475,Secondary Borrower 1 HMDA Ethnicity Origin Type 4,
+476,Secondary Borrower 1 HMDA Ethnicity Origin Type Other Description,
+477,Secondary Borrower 1 HMDA Ethnicity Refusal Indicator,false
+478,Secondary Borrower 1 HMDA Ethnicity Type,
+479,Secondary Borrower 1 HMDA Ethnicity Type 1 (Sort ID 609.1-HMDAEthnicityType),NotHispanicOrLatino
+480,Secondary Borrower 1 HMDA Ethnicity Type 2 (Sort ID 609.1-HMDAEthnicityType),
+481,Secondary Borrower 1 HMDA Ethnicity Type 3 (Sort ID 609.1-HMDAEthnicityType),
+482,Secondary Borrower 1 HMDA Gender Collected Based On Visual Observation Or Name Indicator,false
+483,Secondary Borrower 1 HMDA Gender Refusal Indicator,false
+484,Secondary Borrower 1 HMDA Gender Type (Sort ID 608.3-HMDAGenderType),Male
+485,Secondary Borrower 1 HMDA Race Collected Based On Visual Observation Or Surname Indicator,false
+486,Secondary Borrower 1 HMDA Race Designation Other Asian Description,
+487,Secondary Borrower 1 HMDA Race Designation Other Pacific Islander Description,
+488,Secondary Borrower 1 HMDA Race Designation Type 1,Vietnamese
+489,Secondary Borrower 1 HMDA Race Designation Type 2,
+490,Secondary Borrower 1 HMDA Race Designation Type 3,
+491,Secondary Borrower 1 HMDA Race Designation Type 4,
+492,Secondary Borrower 1 HMDA Race Designation Type 5,
+493,Secondary Borrower 1 HMDA Race Designation Type 6,
+494,Secondary Borrower 1 HMDA Race Designation Type 7,
+495,Secondary Borrower 1 HMDA Race Designation Type 8,
+496,Secondary Borrower 1 HMDA Race Designation Type 9,
+497,Secondary Borrower 1 HMDA Race Designation Type 10,
+498,Secondary Borrower 1 HMDA Race Designation Type 11,
+499,Secondary Borrower 1 HMDA Race Designation Type 12,
+500,Secondary Borrower 1 HMDA Race Designation Type 13,
+501,Secondary Borrower 1 HMDA Race Refusal Indicator,false
+502,Secondary Borrower 1 HMDA Race Type 1,
+503,Secondary Borrower 1 HMDA Race Type 2,
+504,Secondary Borrower 1 HMDA Race Type 3,
+505,Secondary Borrower 1 HMDA Race Type 4,
+506,Secondary Borrower 1 HMDA Race Type 5,
+507,Secondary Borrower 1 HMDA Race Type 1 (Sort ID 610.5-HMDARaceType),Asian
+508,Secondary Borrower 1 HMDA Race Type 2 (Sort ID 610.5-HMDARaceType),White
+509,Secondary Borrower 1 HMDA Race Type 3 (Sort ID 610.5-HMDARaceType),
+510,Secondary Borrower 1 HMDA Race Type 4 (Sort ID 610.5-HMDARaceType),
+511,Secondary Borrower 1 HMDA Race Type 5 (Sort ID 610.5-HMDARaceType),
+512,Secondary Borrower 1 HMDA Race Type 6 (Sort ID 610.5-HMDARaceType),
+513,Secondary Borrower 1 HMDA Race Type 7 (Sort ID 610.5-HMDARaceType),
+514,Secondary Borrower 1 HMDA Race Type Additional Description,InformationNotProvidedByApplicantInMailInternetOrTelephoneApplication
+515,Secondary Borrower 1 First Name,RAYMOND
+516,Secondary Borrower 1 Last Name,KIM
+517,Secondary Borrower 1 Middle Name,SOO
+518,Secondary Borrower 1 Suffix Name,
+519,Secondary Borrower 1 Taxpayer Identifier Type,SocialSecurityNumber
+520,Secondary Borrower 1 Taxpayer Identifier Value,623075953
+521,Secondary Borrower 2 Address Line Text,
+522,Secondary Borrower 2 Address Type,
+523,Secondary Borrower 2 City Name,
+524,Secondary Borrower 2 Country Code,
+525,Secondary Borrower 2 Postal Code,
+526,Secondary Borrower 2 State Code,
+527,Secondary Borrower 2 Mail To Address Same as Property Indicator,
+528,Secondary Borrower 2 Age At Application Years Count,
+529,Secondary Borrower 2 Birth Date,
+530,Secondary Borrower 2 Classification Type,
+531,Secondary Borrower 2 Qualifying Income Amount,
+532,Secondary Borrower 2 Counseling Confirmation Type,
+533,Secondary Borrower 2 Counseling Format Type,
+534,Secondary Borrower 2 Credit Report Identifier,
+535,Secondary Borrower 2 Credit Repository Source Indicator,
+536,Secondary Borrower 2 Credit Repository Source Type,
+537,Secondary Borrower 2 Credit Score Value,
+538,Secondary Borrower 2 Credit Score Provider Name,
+539,Secondary Borrower 2 Bankruptcy Indicator,
+540,Secondary Borrower 2 Citizenship Residency Type,
+541,Secondary Borrower 2 First Time Homebuyer Indicator,
+542,Secondary Borrower 2 Loan Foreclosure Or Judgment Indicator,
+543,Secondary Borrower 2 Employment Borrower Self Employed Indicator,
+544,Secondary Borrower 2 Gender Type,
+545,Secondary Borrower 2 HMDA Ethnicity Collected Based On Visual Observation Or Surname Indicator,
+546,Secondary Borrower 2 HMDA Ethnicity Origin Type 1,
+547,Secondary Borrower 2 HMDA Ethnicity Origin Type 2,
+548,Secondary Borrower 2 HMDA Ethnicity Origin Type 3,
+549,Secondary Borrower 2 HMDA Ethnicity Origin Type 4,
+550,Secondary Borrower 2 HMDA Ethnicity Origin Type Other Description,
+551,Secondary Borrower 2 HMDA Ethnicity Refusal Indicator,
+552,Secondary Borrower 2 HMDA Ethnicity Type,
+553,Secondary Borrower 2 HMDA Ethnicity Type 1 (Sort ID 609.1-HMDAEthnicityType),
+554,Secondary Borrower 2 HMDA Ethnicity Type 2 (Sort ID 609.1-HMDAEthnicityType),
+555,Secondary Borrower 2 HMDA Ethnicity Type 3 (Sort ID 609.1-HMDAEthnicityType),
+556,Secondary Borrower 2 HMDA Gender Collected Based On Visual Observation Or Name Indicator,
+557,Secondary Borrower 2 HMDA Gender Refusal Indicator,
+558,Secondary Borrower 2 HMDA Gender Type (Sort ID 608.3-HMDAGenderType),
+559,Secondary Borrower 2 HMDA Race Collected Based On Visual Observation Or Surname Indicator,
+560,Secondary Borrower 2 HMDA Race Designation Other Asian Description,
+561,Secondary Borrower 2 HMDA Race Designation Other Pacific Islander Description,
+562,Secondary Borrower 2 HMDA Race Designation Type 1,
+563,Secondary Borrower 2 HMDA Race Designation Type 2,
+564,Secondary Borrower 2 HMDA Race Designation Type 3,
+565,Secondary Borrower 2 HMDA Race Designation Type 4,
+566,Secondary Borrower 2 HMDA Race Designation Type 5,
+567,Secondary Borrower 2 HMDA Race Designation Type 6,
+568,Secondary Borrower 2 HMDA Race Designation Type 7,
+569,Secondary Borrower 2 HMDA Race Designation Type 8,
+570,Secondary Borrower 2 HMDA Race Designation Type 9,
+571,Secondary Borrower 2 HMDA Race Designation Type 10,
+572,Secondary Borrower 2 HMDA Race Designation Type 11,
+573,Secondary Borrower 2 HMDA Race Designation Type 12,
+574,Secondary Borrower 2 HMDA Race Designation Type 13,
+575,Secondary Borrower 2 HMDA Race Refusal Indicator,
+576,Secondary Borrower 2 HMDA Race Type 1,
+577,Secondary Borrower 2 HMDA Race Type 2,
+578,Secondary Borrower 2 HMDA Race Type 3,
+579,Secondary Borrower 2 HMDA Race Type 4,
+580,Secondary Borrower 2 HMDA Race Type 5,
+581,Secondary Borrower 2 HMDA Race Type 1 (Sort ID 610.5-HMDARaceType),
+582,Secondary Borrower 2 HMDA Race Type 2 (Sort ID 610.5-HMDARaceType),
+583,Secondary Borrower 2 HMDA Race Type 3 (Sort ID 610.5-HMDARaceType),
+584,Secondary Borrower 2 HMDA Race Type 4 (Sort ID 610.5-HMDARaceType),
+585,Secondary Borrower 2 HMDA Race Type 5 (Sort ID 610.5-HMDARaceType),
+586,Secondary Borrower 2 HMDA Race Type 6 (Sort ID 610.5-HMDARaceType),
+587,Secondary Borrower 2 HMDA Race Type 7 (Sort ID 610.5-HMDARaceType),
+588,Secondary Borrower 2 HMDA Race Type Additional Description,
+589,Secondary Borrower 2 First Name,
+590,Secondary Borrower 2 Last Name,
+591,Secondary Borrower 2 Middle Name,
+592,Secondary Borrower 2 Suffix Name,
+593,Secondary Borrower 2 Taxpayer Identifier Type,
+594,Secondary Borrower 2 Taxpayer Identifier Value,
+595,Secondary Borrower 3 Address Line Text,
+596,Secondary Borrower 3 Address Type,
+597,Secondary Borrower 3 City Name,
+598,Secondary Borrower 3 Country Code,
+599,Secondary Borrower 3 Postal Code,
+600,Secondary Borrower 3 State Code,
+601,Secondary Borrower 3 Mail To Address Same as Property Indicator,
+602,Secondary Borrower 3 Age At Application Years Count,
+603,Secondary Borrower 3 Birth Date,
+604,Secondary Borrower 3 Classification Type,
+605,Secondary Borrower 3 Qualifying Income Amount,
+606,Secondary Borrower 3 Counseling Confirmation Type,
+607,Secondary Borrower 3 Counseling Format Type,
+608,Secondary Borrower 3 Credit Report Identifier,
+609,Secondary Borrower 3 Credit Repository Source Indicator,
+610,Secondary Borrower 3 Credit Repository Source Type,
+611,Secondary Borrower 3 Credit Score Value,
+612,Secondary Borrower 3 Credit Score Provider Name,
+613,Secondary Borrower 3 Bankruptcy Indicator,
+614,Secondary Borrower 3 Citizenship Residency Type,
+615,Secondary Borrower 3 First Time Homebuyer Indicator,
+616,Secondary Borrower 3 Loan Foreclosure Or Judgment Indicator,
+617,Secondary Borrower 3 Employment Borrower Self Employed Indicator,
+618,Secondary Borrower 3 Gender Type,
+619,Secondary Borrower 3 HMDA Ethnicity Collected Based On Visual Observation Or Surname Indicator,
+620,Secondary Borrower 3 HMDA Ethnicity Origin Type 1,
+621,Secondary Borrower 3 HMDA Ethnicity Origin Type 2,
+622,Secondary Borrower 3 HMDA Ethnicity Origin Type 3,
+623,Secondary Borrower 3 HMDA Ethnicity Origin Type 4,
+624,Secondary Borrower 3 HMDA Ethnicity Origin Type Other Description,
+625,Secondary Borrower 3 HMDA Ethnicity Refusal Indicator,
+626,Secondary Borrower 3 HMDA Ethnicity Type,
+627,Secondary Borrower 3 HMDA Ethnicity Type 1 (Sort ID 609.1-HMDAEthnicityType),
+628,Secondary Borrower 3 HMDA Ethnicity Type 2 (Sort ID 609.1-HMDAEthnicityType),
+629,Secondary Borrower 3 HMDA Ethnicity Type 3 (Sort ID 609.1-HMDAEthnicityType),
+630,Secondary Borrower 3 HMDA Gender Collected Based On Visual Observation Or Name Indicator,
+631,Secondary Borrower 3 HMDA Gender Refusal Indicator,
+632,Secondary Borrower 3 HMDA Gender Type (Sort ID 608.3-HMDAGenderType),
+633,Secondary Borrower 3 HMDA Race Collected Based On Visual Observation Or Surname Indicator,
+634,Secondary Borrower 3 HMDA Race Designation Other Asian Description,
+635,Secondary Borrower 3 HMDA Race Designation Other Pacific Islander Description,
+636,Secondary Borrower 3 HMDA Race Designation Type 1,
+637,Secondary Borrower 3 HMDA Race Designation Type 2,
+638,Secondary Borrower 3 HMDA Race Designation Type 3,
+639,Secondary Borrower 3 HMDA Race Designation Type 4,
+640,Secondary Borrower 3 HMDA Race Designation Type 5,
+641,Secondary Borrower 3 HMDA Race Designation Type 6,
+642,Secondary Borrower 3 HMDA Race Designation Type 7,
+643,Secondary Borrower 3 HMDA Race Designation Type 8,
+644,Secondary Borrower 3 HMDA Race Designation Type 9,
+645,Secondary Borrower 3 HMDA Race Designation Type 10,
+646,Secondary Borrower 3 HMDA Race Designation Type 11,
+647,Secondary Borrower 3 HMDA Race Designation Type 12,
+648,Secondary Borrower 3 HMDA Race Designation Type 13,
+649,Secondary Borrower 3 HMDA Race Refusal Indicator,
+650,Secondary Borrower 3 HMDA Race Type 1,
+651,Secondary Borrower 3 HMDA Race Type 2,
+652,Secondary Borrower 3 HMDA Race Type 3,
+653,Secondary Borrower 3 HMDA Race Type 4,
+654,Secondary Borrower 3 HMDA Race Type 5,
+655,Secondary Borrower 3 HMDA Race Type 1 (Sort ID 610.5-HMDARaceType),
+656,Secondary Borrower 3 HMDA Race Type 2 (Sort ID 610.5-HMDARaceType),
+657,Secondary Borrower 3 HMDA Race Type 3 (Sort ID 610.5-HMDARaceType),
+658,Secondary Borrower 3 HMDA Race Type 4 (Sort ID 610.5-HMDARaceType),
+659,Secondary Borrower 3 HMDA Race Type 5 (Sort ID 610.5-HMDARaceType),
+660,Secondary Borrower 3 HMDA Race Type 6 (Sort ID 610.5-HMDARaceType),
+661,Secondary Borrower 3 HMDA Race Type 7 (Sort ID 610.5-HMDARaceType),
+662,Secondary Borrower 3 HMDA Race Type Additional Description,
+663,Secondary Borrower 3 First Name,
+664,Secondary Borrower 3 Last Name,
+665,Secondary Borrower 3 Middle Name,
+666,Secondary Borrower 3 Suffix Name,
+667,Secondary Borrower 3 Taxpayer Identifier Type,
+668,Secondary Borrower 3 Taxpayer Identifier Value,
+669,Secondary Borrower 4 Address Line Text,
+670,Secondary Borrower 4 Address Type,
+671,Secondary Borrower 4 City Name,
+672,Secondary Borrower 4 Country Code,
+673,Secondary Borrower 4 Postal Code,
+674,Secondary Borrower 4 State Code,
+675,Secondary Borrower 4 Mail To Address Same as Property Indicator,
+676,Secondary Borrower 4 Age At Application Years Count,
+677,Secondary Borrower 4 Birth Date,
+678,Secondary Borrower 4 Classification Type,
+679,Secondary Borrower 4 Qualifying Income Amount,
+680,Secondary Borrower 4 Counseling Confirmation Type,
+681,Secondary Borrower 4 Counseling Format Type,
+682,Secondary Borrower 4 Credit Report Identifier,
+683,Secondary Borrower 4 Credit Repository Source Indicator,
+684,Secondary Borrower 4 Credit Repository Source Type,
+685,Secondary Borrower 4 Credit Score Value,
+686,Secondary Borrower 4 Credit Score Provider Name,
+687,Secondary Borrower 4 Bankruptcy Indicator,
+688,Secondary Borrower 4 Citizenship Residency Type,
+689,Secondary Borrower 4 First Time Homebuyer Indicator,
+690,Secondary Borrower 4 Loan Foreclosure Or Judgment Indicator,
+691,Secondary Borrower 4 Employment Borrower Self Employed Indicator,
+692,Secondary Borrower 4 Gender Type,
+693,Secondary Borrower 4 HMDA Ethnicity Collected Based On Visual Observation Or Surname Indicator,
+694,Secondary Borrower 4 HMDA Ethnicity Origin Type 1,
+695,Secondary Borrower 4 HMDA Ethnicity Origin Type 2,
+696,Secondary Borrower 4 HMDA Ethnicity Origin Type 3,
+697,Secondary Borrower 4 HMDA Ethnicity Origin Type 4,
+698,Secondary Borrower 4 HMDA Ethnicity Origin Type Other Description,
+699,Secondary Borrower 4 HMDA Ethnicity Refusal Indicator,
+700,Secondary Borrower 4 HMDA Ethnicity Type,
+701,Secondary Borrower 4 HMDA Ethnicity Type 1 (Sort ID 609.1-HMDAEthnicityType),
+702,Secondary Borrower 4 HMDA Ethnicity Type 2 (Sort ID 609.1-HMDAEthnicityType),
+703,Secondary Borrower 4 HMDA Ethnicity Type 3 (Sort ID 609.1-HMDAEthnicityType),
+704,Secondary Borrower 4 HMDA Gender Collected Based On Visual Observation Or Name Indicator,
+705,Secondary Borrower 4 HMDA Gender Refusal Indicator,
+706,Secondary Borrower 4 HMDA Gender Type (Sort ID 608.3-HMDAGenderType),
+707,Secondary Borrower 4 HMDA Race Collected Based On Visual Observation Or Surname Indicator,
+708,Secondary Borrower 4 HMDA Race Designation Other Asian Description,
+709,Secondary Borrower 4 HMDA Race Designation Other Pacific Islander Description,
+710,Secondary Borrower 4 HMDA Race Designation Type 1,
+711,Secondary Borrower 4 HMDA Race Designation Type 2,
+712,Secondary Borrower 4 HMDA Race Designation Type 3,
+713,Secondary Borrower 4 HMDA Race Designation Type 4,
+714,Secondary Borrower 4 HMDA Race Designation Type 5,
+715,Secondary Borrower 4 HMDA Race Designation Type 6,
+716,Secondary Borrower 4 HMDA Race Designation Type 7,
+717,Secondary Borrower 4 HMDA Race Designation Type 8,
+718,Secondary Borrower 4 HMDA Race Designation Type 9,
+719,Secondary Borrower 4 HMDA Race Designation Type 10,
+720,Secondary Borrower 4 HMDA Race Designation Type 11,
+721,Secondary Borrower 4 HMDA Race Designation Type 12,
+722,Secondary Borrower 4 HMDA Race Designation Type 13,
+723,Secondary Borrower 4 HMDA Race Refusal Indicator,
+724,Secondary Borrower 4 HMDA Race Type 1,
+725,Secondary Borrower 4 HMDA Race Type 2,
+726,Secondary Borrower 4 HMDA Race Type 3,
+727,Secondary Borrower 4 HMDA Race Type 4,
+728,Secondary Borrower 4 HMDA Race Type 5,
+729,Secondary Borrower 4 HMDA Race Type 1 (Sort ID 610.5-HMDARaceType),
+730,Secondary Borrower 4 HMDA Race Type 2 (Sort ID 610.5-HMDARaceType),
+731,Secondary Borrower 4 HMDA Race Type 3 (Sort ID 610.5-HMDARaceType),
+732,Secondary Borrower 4 HMDA Race Type 4 (Sort ID 610.5-HMDARaceType),
+733,Secondary Borrower 4 HMDA Race Type 5 (Sort ID 610.5-HMDARaceType),
+734,Secondary Borrower 4 HMDA Race Type 6 (Sort ID 610.5-HMDARaceType),
+735,Secondary Borrower 4 HMDA Race Type 7 (Sort ID 610.5-HMDARaceType),
+736,Secondary Borrower 4 HMDA Race Type Additional Description,
+737,Secondary Borrower 4 First Name,
+738,Secondary Borrower 4 Last Name,
+739,Secondary Borrower 4 Middle Name,
+740,Secondary Borrower 4 Suffix Name,
+741,Secondary Borrower 4 Taxpayer Identifier Type,
+742,Secondary Borrower 4 Taxpayer Identifier Value,
+743,Loan Origination Company Identifier,1850
+744,Loan Originator Type,Lender
+745,Loan Originator Identifier,221971
+746,Note Pay To (Company Name),AMERICAN PACIFIC MTG CORP DBA AMERICAN PACIFIC MORTGAGE
+747,Seller Identifier,139930
+748,Warehouse Lender Identifier,258129
+749,Property Address Line Text,1005 Peralta Ave
+750,Property City Name,Albany
+751,Property Postal Code,94706
+752,Property State Code,CA
+753,AVM Model Name Type,
+754,Special Flood Hazard Area Indicator,false
+755,Manufactured Home Width Type,
+756,Condominium Project Status Type,Established
+757,Project Attachment Type,Attached
+758,Project Classification Identifier,FullReview
+759,Project Design Type,MidriseProject
+760,Project Dwelling Unit Count,0
+761,Project Dwelling Units Sold Count,0
+762,Project Legal Structure Type,Condominium
+763,Project Name,Gateway Towers
+764,PUD Indicator,false
+765,Attachment Type,Detached
+766,Construction Method Type,SiteBuilt
+767,Financed Unit Count,1
+768,Property Estate Type,FeeSimple
+769,Property Flood Insurance Indicator,false
+770,Property Structure Built Year,1925
+771,Property Usage Type,PrimaryResidence
+772,Bedroom Count 1,3
+773,Bedroom Count 2,1
+774,Bedroom Count 3,
+775,Bedroom Count 4,
+776,Property Dwelling Unit Eligible Rent Amount 1,30000
+777,Property Dwelling Unit Eligible Rent Amount 2,1000
+778,Property Dwelling Unit Eligible Rent Amount 3,
+779,Property Dwelling Unit Eligible Rent Amount 4,
+780,Appraisal Identifier,1102535A6D
+781,Property Valuation Amount,1800000
+782,Property Valuation Effective Date,01/23/2026
+783,Property Valuation Form Type,UniformResidentialAppraisalReport
+784,Property Valuation Method Type,FullAppraisal
