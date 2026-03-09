@@ -2,7 +2,7 @@
 
 ## Summary
 
-Demo prep + stakeholder demo + post-demo improvements. Shipped 20+ changes across dashboard, review UX, generation quality, BigQuery, SOT bundling, transfer workflow, and admin stratification.
+Demo prep + stakeholder demo + post-demo improvements. Shipped 30+ changes across dashboard, review UX, generation quality, BigQuery, SOT bundling, transfer workflow, admin stratification, reviewer collaboration, and UI unification.
 
 ## Demo Prep (Pre-Demo)
 
@@ -101,3 +101,30 @@ Demo prep + stakeholder demo + post-demo improvements. Shipped 20+ changes acros
 - `src/app/settings/bigquery/page.tsx` — dataset options
 - `src/app/api/auth/register/route.ts` — @valon.com auto-join
 - `scripts/run-transfer-generation.ts` — ACDC context, mapping_context, samples
+
+## Reviewer Collaboration Features
+
+### Field Claiming (Both Workflows)
+- **Field-level checkboxes**: Reviewers can claim individual fields by clicking checkboxes on mapping cards. Claimed fields show the reviewer's assignment; fields claimed by others are dimmed with an amber icon.
+- **Entity-level select-all**: Checkbox on entity group headers claims/releases all fields in that entity. Supports indeterminate state when partially claimed.
+- **Admin assignment**: Owners see a user picker dropdown on entity group headers (transfer workflow) to assign all fields in an entity to any workspace member.
+- **Batch assign API**: `POST /mappings/batch-assign` accepts array of mapping IDs + assignee.
+
+### Skip + Punt
+- **Skip button**: Navigates to next actionable field without recording a verdict. Reviewer can come back later.
+- **Punt button**: Opens dialog for a reason, sets status to "punted", auto-reassigns to least-loaded editor. Punted fields appear in the "punted" status filter on both review queues.
+
+### Transfer Review UI Unification
+- **Shared components**: Transfer review page rewritten to use the same `EntityGroup` and `ReviewCard` components as the SDT workflow. Both workflows now have identical card-based UI with expandable entity groups, confidence dots, status badges, reasoning preview, claim checkboxes, and discuss navigation.
+- **Clickable rows**: Entire mapping card navigates to discuss page (before this, only a small chevron arrow was clickable).
+- **Entity exclusion preserved**: "Not needed" / "Restore" buttons still available via entity metadata toggle.
+
+## Files Created (Additional)
+- `src/app/api/workspaces/[workspaceId]/mappings/batch-assign/route.ts`
+
+## Files Modified (Additional)
+- `src/app/transfers/[transferId]/review/page.tsx` — rewritten to use shared ReviewCard/EntityGroup
+- `src/components/review/review-card.tsx` — claim checkbox, admin assignment
+- `src/components/review/entity-group.tsx` — entity-level claim, batch assign
+- `src/components/review/review-queue-list.tsx` — session/claim/batch wiring
+- `src/app/mapping/discuss/[fieldMappingId]/discuss-client.tsx` — skip button, punt dialog
