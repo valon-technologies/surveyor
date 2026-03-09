@@ -352,8 +352,8 @@ export function DiscussClient() {
 
       {/* Main content — vertical stack */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Row 1: Current mapping (full width) */}
-        <div className="border-b bg-muted/20 shrink-0">
+        {/* Row 1: Current mapping (full width) — capped height with scroll for long transforms */}
+        <div className="border-b bg-muted/20 shrink-0 max-h-40 overflow-y-auto">
           {mappingState ? (
             <MappingSummary targetFieldName={targetFieldName} mapping={mappingState} />
           ) : (
