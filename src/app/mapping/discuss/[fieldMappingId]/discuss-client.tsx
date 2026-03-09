@@ -350,10 +350,10 @@ export function DiscussClient() {
         </Button>
       </div>
 
-      {/* Main content — vertical stack */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Row 1: Current mapping (full width) — capped height with scroll for long transforms */}
-        <div className="border-b bg-muted/20 shrink-0 max-h-40 overflow-y-auto">
+      {/* Main content — single scrollable area */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Row 1: Current mapping (full width) */}
+        <div className="border-b bg-muted/20">
           {mappingState ? (
             <MappingSummary targetFieldName={targetFieldName} mapping={mappingState} />
           ) : (
@@ -362,12 +362,12 @@ export function DiscussClient() {
         </div>
 
         {/* Context used panel — collapsible, shows docs that informed this mapping */}
-        <div className="shrink-0">
+        <div>
           <ContextUsedPanel mappingId={activeMappingId} reasoning={mapping?.reasoning} />
         </div>
 
         {/* Row 2: Source | Transform | Question — with layered AI proposals */}
-        <div className="flex-1 overflow-y-auto">
+        <div>
           <div className="grid grid-cols-3 divide-x divide-blue-200 dark:divide-blue-800 bg-blue-50 dark:bg-blue-950/40 min-h-full">
             {/* Source column */}
             <div className="flex flex-col">
