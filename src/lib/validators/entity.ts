@@ -6,6 +6,7 @@ export const updateEntitySchema = z.object({
   description: z.string().optional(),
   status: z.enum(ENTITY_STATUSES).optional(),
   sortOrder: z.number().int().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type UpdateEntityInput = z.infer<typeof updateEntitySchema>;

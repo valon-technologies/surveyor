@@ -54,6 +54,7 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { workspaceId }) => 
     strictDomainMatch = false,
     strategy = "round_robin",
     dryRun = false,
+    transferId,
   } = body;
 
   // ── 1. Load eligible mappings ──────────────────────────────────────────────
@@ -77,7 +78,9 @@ export const POST = withAuth(async (req: NextRequest, _ctx, { workspaceId }) => 
         eq(fieldMapping.workspaceId, workspaceId),
         eq(fieldMapping.isLatest, true),
         inArray(fieldMapping.status, eligibleStatuses),
-        isNull(fieldMapping.transferId),
+        transferId
+          ? eq(fieldMapping.transferId, transferId)
+          : isNull(fieldMapping.transferId),
         entityIds?.length ? inArray(field.entityId, entityIds) : undefined,
       )
     )

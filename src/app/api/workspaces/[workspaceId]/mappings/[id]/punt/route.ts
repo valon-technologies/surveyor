@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { fieldMapping, question, field } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { fieldMapping, question, field, userWorkspace } from "@/lib/db/schema";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { puntMappingSchema } from "@/lib/validators/review";
 import { logActivity } from "@/lib/activity/log-activity";
 
@@ -37,7 +37,7 @@ export const POST = withAuth(
 
     const now = new Date().toISOString();
 
-    // Update mapping
+    // Update mapping status
     await db.update(fieldMapping)
       .set({
         status: "punted",
@@ -46,6 +46,56 @@ export const POST = withAuth(
       })
       .where(eq(fieldMapping.id, id))
       ;
+
+    // Auto-reassign to the least-loaded editor (excluding current assignee)
+    let newAssigneeId: string | null = null;
+    const members = await db
+      .select({ userId: userWorkspace.userId, role: userWorkspace.role })
+      .from(userWorkspace)
+      .where(
+        and(
+          eq(userWorkspace.workspaceId, workspaceId),
+          inArray(userWorkspace.role, ["editor", "owner"]),
+        )
+      );
+
+    const candidates = members.filter((m) => m.userId !== mapping.assigneeId);
+
+    if (candidates.length > 0) {
+      // Count active assignments per candidate (non-terminal statuses)
+      const counts = await db
+        .select({
+          assigneeId: fieldMapping.assigneeId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(fieldMapping)
+        .where(
+          and(
+            eq(fieldMapping.workspaceId, workspaceId),
+            eq(fieldMapping.isLatest, true),
+            inArray(
+              fieldMapping.assigneeId,
+              candidates.map((c) => c.userId)
+            ),
+          )
+        )
+        .groupBy(fieldMapping.assigneeId);
+
+      const countMap: Record<string, number> = {};
+      for (const c of candidates) countMap[c.userId] = 0;
+      for (const row of counts) {
+        if (row.assigneeId) countMap[row.assigneeId] = row.count;
+      }
+
+      // Pick least-loaded candidate
+      newAssigneeId = candidates.reduce((best, cur) =>
+        (countMap[cur.userId] ?? 0) < (countMap[best.userId] ?? 0) ? cur : best
+      ).userId;
+
+      await db.update(fieldMapping)
+        .set({ assigneeId: newAssigneeId, updatedAt: now })
+        .where(eq(fieldMapping.id, id));
+    }
 
     // Optionally create a question for SM team
     if (parsed.data.assignToSM) {
@@ -83,6 +133,7 @@ export const POST = withAuth(
         reviewAction: "punted",
         note: parsed.data.note,
         assignedToSM: parsed.data.assignToSM,
+        reassignedTo: newAssigneeId,
       },
     });
 

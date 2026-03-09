@@ -184,9 +184,20 @@ export const PATCH = withAuth(
       );
     }
 
+    // If metadata is provided, merge with existing instead of replacing
+    let setData: Record<string, unknown> = { ...parsed.data, updatedAt: new Date().toISOString() };
+    if (parsed.data.metadata) {
+      const existing = (await db
+        .select({ metadata: entity.metadata })
+        .from(entity)
+        .where(and(eq(entity.id, id), eq(entity.workspaceId, workspaceId)))
+      )[0];
+      setData.metadata = { ...(existing?.metadata || {}), ...parsed.data.metadata };
+    }
+
     const [updated] = await db
       .update(entity)
-      .set({ ...parsed.data, updatedAt: new Date().toISOString() })
+      .set(setData)
       .where(and(eq(entity.id, id), eq(entity.workspaceId, workspaceId)))
       .returning()
       ;

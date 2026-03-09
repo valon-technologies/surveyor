@@ -109,6 +109,7 @@ export const GET = withAuth(async (req, _ctx, { workspaceId }) => {
       milestone: targetField.milestone,
       entityId: targetEntity.id,
       entityName: targetEntity.displayName || targetEntity.name,
+      entityMetadata: targetEntity.metadata ?? null,
       parentEntityId: targetEntity.parentEntityId ?? null,
       parentEntityName: parentEntity?.displayName || parentEntity?.name || null,
       status: m.status as ReviewCardData["status"],

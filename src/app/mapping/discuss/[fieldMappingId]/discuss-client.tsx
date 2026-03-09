@@ -51,6 +51,9 @@ export function DiscussClient() {
   const createSession = useCreateChatSession();
   const updateMapping = useUpdateMapping();
   const excludeMutation = useExcludeMapping();
+  const puntMutation = usePuntMapping();
+  const [showPuntDialog, setShowPuntDialog] = useState(false);
+  const [puntNote, setPuntNote] = useState("");
 
   const { data: linkedQuestion } = useFieldMappingQuestion(fieldMappingId);
 
@@ -336,23 +339,34 @@ export function DiscussClient() {
             )}
           </div>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() =>
-            excludeMutation.mutate({ mappingId: activeMappingId }, {
-              onSuccess: () => {
-                const tid = mapping?.transferId;
-                router.push(tid ? `/transfers/${tid}/review` : "/mapping");
-              },
-            })
-          }
-          disabled={excludeMutation.isPending}
-          className="text-muted-foreground hover:text-destructive hover:border-destructive"
-        >
-          <Ban className="h-3.5 w-3.5 mr-1" />
-          Exclude
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowPuntDialog(true)}
+            className="text-muted-foreground hover:text-amber-600 hover:border-amber-400"
+          >
+            <SkipForward className="h-3.5 w-3.5 mr-1" />
+            Punt
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              excludeMutation.mutate({ mappingId: activeMappingId }, {
+                onSuccess: () => {
+                  const tid = mapping?.transferId;
+                  router.push(tid ? `/transfers/${tid}/review` : "/mapping");
+                },
+              })
+            }
+            disabled={excludeMutation.isPending}
+            className="text-muted-foreground hover:text-destructive hover:border-destructive"
+          >
+            <Ban className="h-3.5 w-3.5 mr-1" />
+            Exclude
+          </Button>
+        </div>
       </div>
 
       {/* Main content — single scrollable area */}
@@ -697,6 +711,63 @@ export function DiscussClient() {
               setRippleMappingId(null);
             }}
           />
+        )}
+
+        {/* Punt dialog */}
+        {showPuntDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setShowPuntDialog(false)} />
+            <div className="relative bg-background rounded-xl shadow-lg w-full max-w-md p-6 space-y-4">
+              <h3 className="text-lg font-semibold">Punt Mapping</h3>
+              <p className="text-sm text-muted-foreground">
+                Pass <strong>{entityName}.{targetFieldName}</strong> to another reviewer.
+                It will be auto-assigned to the least-loaded team member.
+              </p>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Reason</label>
+                <textarea
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Why are you punting this mapping?"
+                  value={puntNote}
+                  onChange={(e) => setPuntNote(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => { setShowPuntDialog(false); setPuntNote(""); }}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!puntNote.trim()) return;
+                    puntMutation.mutate(
+                      { mappingId: activeMappingId, note: puntNote.trim() },
+                      {
+                        onSuccess: () => {
+                          setShowPuntDialog(false);
+                          setPuntNote("");
+                          const tid = mapping?.transferId;
+                          const next = siblingNav?.nextFields?.[0];
+                          if (next?.mappingId) {
+                            router.push(`/mapping/discuss/${next.mappingId}`);
+                          } else {
+                            router.push(tid ? `/transfers/${tid}/review` : "/mapping");
+                          }
+                        },
+                      }
+                    );
+                  }}
+                  disabled={!puntNote.trim() || puntMutation.isPending}
+                >
+                  {puntMutation.isPending ? "Punting..." : "Punt"}
+                </Button>
+              </div>
+              {puntMutation.isError && (
+                <p className="text-sm text-destructive">
+                  {puntMutation.error.message}
+                </p>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>

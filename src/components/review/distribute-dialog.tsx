@@ -14,9 +14,11 @@ import type { DistributeResponse } from "@/types/distribute";
 
 interface DistributeDialogProps {
   onClose: () => void;
+  /** When set, distribution is scoped to this transfer's mappings. */
+  transferId?: string;
 }
 
-export function DistributeDialog({ onClose }: DistributeDialogProps) {
+export function DistributeDialog({ onClose, transferId }: DistributeDialogProps) {
   const { workspaceId } = useWorkspace();
   const [strategy, setStrategy] = useState<"round_robin" | "least_loaded">("least_loaded");
   const [preview, setPreview] = useState<DistributeResponse | null>(null);
@@ -39,6 +41,7 @@ export function DistributeDialog({ onClose }: DistributeDialogProps) {
             strategy,
             dryRun,
             eligibleStatuses: ["unmapped", "unreviewed"],
+            ...(transferId ? { transferId } : {}),
           }),
         }
       );

@@ -9,6 +9,7 @@ export interface ReviewCardData {
   milestone: string | null;
   entityId: string;
   entityName: string;
+  entityMetadata: Record<string, unknown> | null;
   parentEntityId: string | null;
   parentEntityName: string | null;
   status: MappingStatus;

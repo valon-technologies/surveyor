@@ -36,6 +36,13 @@ export interface DistributeRequest {
 
   /** Dry run — compute the plan but do not write any assignments. */
   dryRun?: boolean;
+
+  /**
+   * Scope distribution to a specific transfer.
+   * If provided, only mappings belonging to this transfer are eligible.
+   * If omitted, transfer mappings are excluded (default main workflow).
+   */
+  transferId?: string;
 }
 
 export interface DistributeAssignment {
