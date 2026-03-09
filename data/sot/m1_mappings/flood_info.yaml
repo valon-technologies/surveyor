@@ -1,0 +1,191 @@
+table: flood_info
+version: 1
+primary_key: [flood_info_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: li}
+    right: {source: ed}
+    "on": ["li.LoanNumber == ed.LoanNumber"]
+    how: left 
+  - left: {source: li}
+    right: {source: fi}
+    "on": ["li.LoanNumber == fi.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: flood_info_id
+    hash_columns: ["li.LoanNumber", "l.loan_id", "flood_info"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: cbra_effective_date
+    source: ed.CbraDate
+    transform: identity
+    dtype: date
+
+  - target_column: flood_certificate_date
+    source: ed.FloodLomaDeterminationDate
+    transform: identity
+    dtype: date
+
+  - target_column: flood_certificate_number
+    source: li.FloodCertificationNumber
+    transform: identity
+    dtype: string
+
+  - target_column: flood_certificate_provider
+    expression: |
+      li.FloodComplianceCompanyId.map({
+        "CLGFD": "CORELOGIC",
+       "SLNFD": "SERVICELINK"
+      }).fillna("OTHER")
+    transform: expression
+    dtype: string
+
+  - target_column: flood_map_cid
+    source: li.FloodCommunityNumber
+    transform: identity
+    dtype: string
+
+  - target_column: flood_map_date_effective
+    source: ed.FloodFirmEffectiveDate
+    transform: identity
+    dtype: date
+
+  - target_column: flood_map_number
+    expression: |
+      np.where(
+        li.FloodCommunityNumber.str.endswith("C"),
+        li.FloodCommunityNumber,
+        li.FloodCommunityNumber + "C"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: flood_map_panel_number
+    source: li.FloodPanelNumber
+    transform: identity
+    dtype: string
+
+  - target_column: flood_map_panel_suffix
+    source: fi.FloodSuffixNumber
+    transform: identity
+    dtype: string
+
+  - target_column: flood_zone
+    expression: |
+      fi.FloodZonePosition1.replace({
+        "N": "NONE"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: life_of_loan_status
+    expression: |
+      fi.FloodInsuranceCode.map({
+        "0": "False",
+        "1": "True"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: lomc_case_number
+    source: {literal: ""}
+    transform: literal
+    dtype: string
+
+  - target_column: lomc_change_date
+    source: ed.FloodLomaDeterminationDate
+    transform: identity
+    dtype: date
+
+  - target_column: lomc_status
+    expression: |
+      fi.FloodLomaRevisionCode.map({
+      "A": "APPROVED",
+      "R": "APPROVED",
+      "N": "NOT_APPLICABLE"
+      }).fillna("NOT_APPLICABLE")
+    transform: expression
+    dtype: string
+
+  - target_column: nfip_community_number
+    source: li.FloodCommunityNumber
+    transform: identity
+    dtype: string
+
+  - target_column: nfip_community_participation_date
+    source: ed.FloodCommunityStartDate
+    transform: identity
+    dtype: date
+
+  - target_column: nfip_participation_status
+    expression: |
+      fi.FloodProgramType.map({
+        "E": "PARTICIPATING_EMERGENCY",
+        "N": "NOT_PARTICIPATING",
+        "P": "PROBATION",
+        "R": "PARTICIPATING_REGULAR",
+        "S": "SUSPENDED"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: partial_zone
+    expression: |
+      fi.FloodZonePartialIndicator.map({
+        "N": "False",
+        "Y": "True",
+        "0": "False"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: sfha_zone
+    expression: |
+      fi.FloodZonePosition1.map({
+        "X": "OUTSIDE",
+        "N": "OUTSIDE",
+        "B": "OUTSIDE",
+        "C": "OUTSIDE",
+        "D": "OUTSIDE", 
+        "V": "WITHIN_STRUCTURE_INSIDE",
+        "A": "WITHIN_STRUCTURE_INSIDE"
+      }).fillna("OUTSIDE")
+    transform: expression
+    dtype: string
+
+  - target_column: start_date
+    source: ed.FloodProcessingDate
+    transform: identity
+    dtype: date
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "flood_info"
+  entity_id_col: "flood_info_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

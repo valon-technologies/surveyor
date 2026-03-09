@@ -1,0 +1,66 @@
+table: property_registration_deregis
+version: 1
+primary_key: [property_registration_id]
+
+sources: 
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+    filters:
+      - column: "PresVprDeregistrationDate"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: ed}
+    right: {source: l}
+    "on": ["ed.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: property_registration_id
+    hash_columns: ["ed.LoanNumber", "l.loan_id", "ed.PresVprDeregistrationDate", "property_registration_deregis"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: action_type
+    source: {literal: "DEREGISTRATION"}
+    transform: literal
+    dtype: string
+
+  - target_column: ordinance_type
+    source: {literal: "VACANT_ONLY"}
+    transform: literal
+    dtype: string
+
+  - target_column: completed_date
+    source: ed.PresVprDeregistrationDate
+    transform: identity
+    dtype: date
+
+  - target_column: comments
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: municipality
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: registration_frequency
+    source: {literal: "ONE_TIME"}
+    transform: literal
+    dtype: string
+
+  - target_column: status
+    source: {literal: "COMPLETED"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

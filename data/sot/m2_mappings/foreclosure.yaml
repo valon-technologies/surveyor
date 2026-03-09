@@ -1,0 +1,528 @@
+table: foreclosure
+version: 1
+primary_key: [foreclosure_id]
+
+sources: 
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "FcStatusCode"
+        operator: "is_not_null"
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: property_staging
+    alias: p
+    staging: {table: "property"}
+  - name: debtor_attorney_staging
+    alias: da
+    staging: {table: "debtor_attorney"}
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "FORE"
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+  - name: property_valuation_staging
+    alias: pv
+    staging: {table: "property_valuation"}
+    filters:
+      - column: "valuation_purpose"
+        operator: "in"
+        value: ["EQUITY ANALYSIS", "FORECLOSURE BID INST"]
+  - name: servicer_attorney_staging
+    alias: sa
+    staging: {table: "servicer_attorney_fore"}
+    filters:
+      - column: ["loan_id", "servicer_attorney_id"]
+        operator: "dedup"
+        keep: "last"
+
+joins:
+  - left: {source: dw}
+    right: {source: l}
+    "on": ["dw.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: dw}
+    right: {source: ed}
+    "on": ["dw.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: dw}
+    right: {source: p}
+    "on": ["l.loan_id == p.loan_id"]
+    how: left
+  - left: {source: dw}
+    right: {source: da}
+    "on": ["l.loan_id == da.loan_id"]
+    how: left
+  - left: {source: dw}
+    right: {source: s}
+    "on": ["dw.LoanNumber == s.LoanNumber"]
+    how: left
+  - left: {source: dw}
+    right: {source: pv}
+    "on": ["l.loan_id == pv.loan_id"]
+    how: left
+  - left: {source: dw}
+    right: {source: sa}
+    "on": 
+      - "l.loan_id == sa.loan_id"
+      - "dw.FcAttorneyPayeeId == sa.FcAttorneyPayeeId"
+    how: left
+
+columns: 
+  - target_column: foreclosure_id
+    hash_columns: ["l.loan_id", "dw.LoanNumber", "foreclosure"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: actual_sale_date
+    source: dw.FcSaleDate
+    transform: identity
+    dtype: date
+
+  # - target_column: adr_scheduled_sale_report_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: assignment_recording_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column:  auction_firm_email
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  # - target_column: auction_firm_name
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  # - target_column: auction_firm_phone_number
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  # - target_column: contested
+  #   source: []
+  #   transform: null
+  #   dtype: boolean
+
+  # - target_column: contested_foreclosure_end_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: contested_foreclosure_start_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: court_complaint_verification_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: deficiency_judgement_due_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: deficiency_judgement_included
+  #   source: []
+  #   transform: null
+  #   dtype: boolean
+
+  # - target_column: deficiency_judgement_intent_to_pursue
+  #   source: []
+  #   transform: null
+  #   dtype: boolean
+
+  # - target_column: deficiency_judgment_amount
+  #   source: []
+  #   transform: null
+  #   dtype: float
+
+  # - target_column: dra_actual_sale_report_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: dra_scheduled_sale_report_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: end_exclusive_date
+    source: dw.FcRemovalDate
+    transform: identity
+    dtype: date
+  
+  - target_column: end_reason
+    expression: |
+      np.where(dw.FcRemovalDate.notnull(),
+        np.select(
+          condlist=[
+            dw.FcRemovalCode.isin(["1", "3", "4", "17", "20", "21", "24", "BC", "BK", "HF", "MD", "RN", "RP"]),
+            dw.FcRemovalCode.isin(["2", "PO"]),
+            dw.FcRemovalCode.isin(["7", "10", "29", "CL", "PR", "PS", "RO", "SS"]),
+            dw.FcRemovalCode.isin(["31", "LT"]),
+            dw.FcRemovalCode == "32",
+            dw.FcRemovalCode == "33",
+            dw.FcRemovalCode == "ER"
+          ],
+          choicelist=[
+            "REINSTATED",
+            "PAID_OFF",
+            "SALE_COMPLETED",
+            "WITHDRAWN",
+            "DISMISSED",
+            "RESTART",
+            "REMOVED_FROM_ONBOARDING"
+          ],
+          default="REINSTATED"
+        ),
+      pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: first_legal_action_date
+    source: ed.ActualFirstLegalActionDate
+    transform: identity
+    dtype: string
+
+  - target_column: hfa_assistance_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: judgement_entered_date
+    expression: |
+      np.where(dw.FcStopCode == "3", dw.FcStopChangeDate, pd.NA)
+    transform: expression
+    dtype: date
+
+  # - target_column: judgement_filing_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: judgement_order_prepared_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: judgement_transfer_of_title_included
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: judicial_standing
+    expression: |
+      np.select(
+        condlist=[
+          dw.FcType == "1",
+          dw.FcType == "2"
+        ],
+        choicelist=[
+          "JUDICIAL",
+          "NON_JUDICIAL"
+        ],
+      default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  # - target_column: law_firm_fees_and_costs_total_amount
+  #   source: []
+  #   transform: null
+  #   dtype: float
+
+  - target_column: servicer_attorney_id
+    source: sa.servicer_attorney_id
+    transform: identity
+    dtype: string
+  
+  - target_column: debtor_attorney_id
+    source: da.debtor_attorney_id
+    transform: identity
+    dtype: string
+
+  # - target_column: mediation_meeting_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: mediation_result
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  - target_column: mediation_result_report_date
+    expression: df.get('ActualCompletionDate_F98', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date
+
+  - target_column: minimum_due_lien_position
+    source: []
+    transform: null
+    dtype: int
+
+  - target_column: mortgagee_of_record
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: notice_of_default_date
+    expression: df.get('ActualCompletionDate_420', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date
+
+  - target_column: notice_of_sale_publication_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: notice_of_sale_recorded_date
+    expression: df.get('ActualCompletionDate_F58', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date
+
+  - target_column: post_foreclosure_title_owner
+    expression: |
+      np.select(
+        condlist=[
+          dw.FcPropertyDispCode == "1",
+          dw.FcPropertyDispCode == "2",
+          dw.FcPropertyDispCode == "3",
+          dw.FcPropertyDispCode == "4"
+        ],
+        choicelist=[
+          "INVESTOR",
+          "MORTGAGE_INSURER",
+          "INVESTOR",
+          "THIRD_PARTY"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: post_sale_redemption_period_end_date
+    expression: df.get('ActualCompletionDate_275', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date 
+
+  - target_column: pre_foreclosure_review_completed_date
+    expression: df.get('ActualCompletionDate_F01', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date
+
+  # - target_column: pre_sale_redemption_period_end_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: property_id
+    source: p.property_id
+    transform: identity
+    dtype: string
+
+  - target_column: property_valuation_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: redemption_period_expiry_date
+    expression: df.get('ActualCompletionDate_428', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date
+
+  # - target_column: redemption_request_received_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: redemption_date
+    expression: df.get('ActualCompletionDate_303', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date
+
+  - target_column: redemption_status
+    expression:
+      np.select(
+        condlist=[
+          (df.get('ScheduledCompletionDate_303', pd.Series(pd.NA, index=df.index)).notna() & df.get('ActualCompletionDate_303', pd.Series(pd.NA, index=df.index)).isna()),
+          df.get('ActualCompletionDate_303', pd.Series(pd.NA, index=df.index)).notna(),
+        ],
+        choicelist=[
+          "NOT_REDEEMED",
+          "REDEEMED"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: referral_date
+    expression: df.get('ActualCompletionDate_F02', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date
+      # np.where(dw.FcStopCode == "1", dw.FcStopChangeDate, pd.NA)
+
+  - target_column: rescission_date
+    expression: df.get('ActualCompletionDate_F88', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date 
+
+  # - target_column: rescission_justification
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  # - target_column: rescission_reason
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  # - target_column: reserved_price
+  #   source: []
+  #   transform: null
+  #   dtype: float
+
+  - target_column: service_completion_date
+    expression: df.get('ActualCompletionDate_F09', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date
+
+  - target_column: settlement_conference_completed_date
+    source: []
+    transform: null
+    dtype: date
+
+  # - target_column: settlement_conference_release_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: settlement_conference_scheduled_date
+    expression: df.get('ActualCompletionDate_F59', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date 
+
+  - target_column: status
+    expression: |
+      (lambda get_col, np, pd: (
+        lambda dates_df: (
+          lambda latest_step_code: np.select(
+            condlist=[
+              (get_col('FcRemovalCode') == "32") & (get_col('FcRemovalDate').notna()),
+              get_col('FcRemovalDate').notna(),
+              latest_step_code == '288',
+              latest_step_code.isin(['262', '263']),
+              latest_step_code.isin(['310', '289', '272']),
+              latest_step_code.isin(['F87', 'F88']),
+              latest_step_code == 'F06',
+              latest_step_code == 'F05',
+              latest_step_code == 'F11',
+              latest_step_code.isin(['F35', 'J01']),
+              latest_step_code.isin(['F97', 'F98']),
+              latest_step_code == 'F47',
+              latest_step_code.isin(['F40', 'F41']),
+              latest_step_code == 'F09',
+              latest_step_code == 'F04',
+              latest_step_code == 'F08',
+              latest_step_code == 'F60',
+              latest_step_code == 'F03',
+              latest_step_code == 'F02',
+              latest_step_code == 'E03',
+              latest_step_code == 'F01',
+            ],
+            choicelist=[
+              "DISMISSED",
+              "CASE_CLOSED",
+              "TITLE_CONVEYED",
+              "CONVEY_TITLE",
+              "FORECLOSURE_SUSPENDED",
+              "FORECLOSURE_SALE_RESCINDED",
+              "FORECLOSURE_SALE_HELD",
+              "SALE_SCHEDULED",
+              "JUDGEMENT_SALE_ENTERED",
+              "JUDGEMENT_SALE_SENT",
+              "MEDIATION",
+              "OATH_REPORT_SENT",
+              "ORDER_REFERENCE_RECEIVED",
+              "SERVICE_COMPLETE",
+              "FIRST_LEGAL_FILED",
+              "TITLE_RECEIVED",
+              "TITLE_ORDERED",
+              "REFERRAL_CONFIRMED",
+              "REFERRED",
+              "PENDING_REFERRAL",
+              "PREREFERRAL",
+            ],
+            default=pd.NA
+          )
+        )(dates_df.idxmax(axis=1, skipna=True).where(dates_df.notna().any(axis=1), pd.NA))
+      )(
+        pd.DataFrame({
+          '288': pd.to_datetime(get_col('ActualCompletionDate_288'), errors='coerce'),
+          '262': pd.to_datetime(get_col('ActualCompletionDate_262'), errors='coerce'),
+          '263': pd.to_datetime(get_col('ActualCompletionDate_263'), errors='coerce'),
+          '310': pd.to_datetime(get_col('ActualCompletionDate_310'), errors='coerce'),
+          '289': pd.to_datetime(get_col('ActualCompletionDate_289'), errors='coerce'),
+          '272': pd.to_datetime(get_col('ActualCompletionDate_272'), errors='coerce'),
+          'F87': pd.to_datetime(get_col('ActualCompletionDate_F87'), errors='coerce'),
+          'F88': pd.to_datetime(get_col('ActualCompletionDate_F88'), errors='coerce'),
+          'F06': pd.to_datetime(get_col('ActualCompletionDate_F06'), errors='coerce'),
+          'F05': pd.to_datetime(get_col('ActualCompletionDate_F05'), errors='coerce'),
+          'F11': pd.to_datetime(get_col('ActualCompletionDate_F11'), errors='coerce'),
+          'F35': pd.to_datetime(get_col('ActualCompletionDate_F35'), errors='coerce'),
+          'J01': pd.to_datetime(get_col('ActualCompletionDate_J01'), errors='coerce'),
+          'F97': pd.to_datetime(get_col('ActualCompletionDate_F97'), errors='coerce'),
+          'F98': pd.to_datetime(get_col('ActualCompletionDate_F98'), errors='coerce'),
+          'F47': pd.to_datetime(get_col('ActualCompletionDate_F47'), errors='coerce'),
+          'F40': pd.to_datetime(get_col('ActualCompletionDate_F40'), errors='coerce'),
+          'F41': pd.to_datetime(get_col('ActualCompletionDate_F41'), errors='coerce'),
+          'F09': pd.to_datetime(get_col('ActualCompletionDate_F09'), errors='coerce'),
+          'F04': pd.to_datetime(get_col('ActualCompletionDate_F04'), errors='coerce'),
+          'F08': pd.to_datetime(get_col('ActualCompletionDate_F08'), errors='coerce'),
+          'F60': pd.to_datetime(get_col('ActualCompletionDate_F60'), errors='coerce'),
+          'F03': pd.to_datetime(get_col('ActualCompletionDate_F03'), errors='coerce'),
+          'F02': pd.to_datetime(get_col('ActualCompletionDate_F02'), errors='coerce'),
+          'E03': pd.to_datetime(get_col('ActualCompletionDate_E03'), errors='coerce'),
+          'F01': pd.to_datetime(get_col('ActualCompletionDate_F01'), errors='coerce'),
+        })
+      ))((lambda df, pd: lambda col: df.get(col, pd.Series(pd.NA, index=df.index)))(df, pd), np, pd)
+    transform: expression
+    dtype: string
+
+  - target_column: voluntary_conveyance_accepted_date
+    expression: df.get('ActualCompletionDate_F81', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date
+  
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "foreclosure"
+  entity_id_col: "foreclosure_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

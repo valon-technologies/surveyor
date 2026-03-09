@@ -1,0 +1,49 @@
+table: property_insurance_period_to_coverage_type
+version: 1
+primary_key: [property_insurance_period_to_coverage_type_id]
+
+sources:
+  - name: property_insurance_period_staging
+    alias: pip
+    staging: {table: "property_insurance_period_2"}
+  - name: property_insurance_coverage_type_staging
+    alias: pci
+    staging: {table: "property_insurance_coverage_type_1"}
+
+joins:
+  - left: {source: pip}
+    right: {source: pci}
+    "on": 
+      - "pip.loan_id == pci.loan_id"
+      #- "pip.HazardCoverageType == pci.HazardCoverageType"
+      - "pip.HazardSequenceNumber == pci.HazardSequenceNumber"
+      # - "pip.HazardTypeOfPaymentCode == pci.HazardTypeOfPaymentCode"
+      - "pip.HazardDisbursementType == pci.HazardDisbursementType"
+    how: inner
+
+columns:
+  - target_column: property_insurance_period_to_coverage_type_id
+    hash_columns: ["pci.property_insurance_coverage_type_id", "pip.property_insurance_period_id", "property_insurance_period_to_coverage_type"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: property_insurance_coverage_type_id
+    source: pci.property_insurance_coverage_type_id
+    transform: identity
+    dtype: string
+
+  - target_column: property_insurance_period_id
+    source: pip.property_insurance_period_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: pip.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "property_insurance_period_to_coverage_type"
+  entity_id_col: "property_insurance_period_to_coverage_type_id"
+  loan_id_col: "loan_id" 
+  loan_id_col_required: false

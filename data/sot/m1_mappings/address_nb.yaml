@@ -1,0 +1,79 @@
+table: address_nb
+version: 1
+
+sources:
+  - name: NonBorrower
+    alias: nb
+    pipe_file: {table: "NonBorrower"}
+    filters:
+      - column: "NonborrowerType"
+        operator: "in"
+        value: ["PA", "RO"]
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: nb}
+    right: {source: l}
+    "on": ["nb.LoanNumber == l.loan_number"]
+    how: left  
+  
+columns:
+  - target_column: address_id
+    expression: |
+      hash_address_id(
+        "ACDC",
+        nb.NonborrowerStreetAddress.str.strip(),
+        nb.NonborrowerExtraAddressLine2.str.strip(), 
+        nb.NonborrowerCity.str.strip(), 
+        nb.NonborrowerState.str.strip(), 
+        nb.NonborrowerZipCode.fillna('').astype(str).str.replace('nan', '').str.slice(0, 5).str.zfill(5).replace('00000', '').str.strip()
+      )
+    transform: expression
+    dtype: string
+    
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: city
+    expression: nb.NonborrowerCity.str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: county
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: state
+    expression: nb.NonborrowerState.str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: street_address_1
+    expression: nb.NonborrowerStreetAddress.str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: street_address_2
+    expression: nb.NonborrowerExtraAddressLine2.str.strip()
+    transform: null
+    dtype: string
+
+  - target_column: zip_code
+    expression: nb.NonborrowerZipCode.fillna('').astype(str).str.replace('nan', '').str.slice(0, 5).str.zfill(5).replace('00000', '').str.strip()
+    transform: expression
+    dtype: string
+  
+  - target_column: last_name
+    source: nb.NbLastName
+    transform: identity
+    dtype: string
+  
+  - target_column: first_name
+    source: nb.NbFirstName
+    transform: identity
+    dtype: string

@@ -1,0 +1,149 @@
+table: task
+version: 1
+primary_key: [id]
+
+sources:
+  - name: TaskTracking
+    alias: tt
+    pipe_file: {table: "TaskTracking"}
+    filters:
+      - column: "TaskStatusFlag"
+        operator: "neq"
+        value: "D"
+  - name: TaskId
+    alias: ti
+    pipe_file: {table: "TaskId"}
+  - name: Notes
+    alias: n
+    pipe_file: {table: "Notes"}
+    read_options:
+      lineterminator: "\n"
+    filters:
+      - column: "TaskId"
+        operator: "is_not_null"
+      - column: ["TaskId"]
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: user_taskresponsible_staging
+    alias: utr
+    staging: {table: "user_taskresponsible"}
+    filters:
+      - column: ["loan_id", "TaskResponsibleId"]
+        operator: "dedup"
+        keep: "last"
+  - name: user_taskcontact_staging
+    alias: utc
+    staging: {table: "user_taskcontact"}
+    filters:
+      - column: ["loan_id", "TaskContactId"]
+        operator: "dedup"
+        keep: "last"
+
+joins:
+  - left: {source: tt}
+    right: {source: ti}
+    "on": ["tt.TaskId == ti.TaskId"]
+    how: left
+  - left: {source: tt}
+    right: {source: l}
+    "on": ["tt.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: tt}
+    right: {source: utr}
+    "on": 
+      - "l.loan_id == utr.loan_id"
+      - "tt.TaskResponsibleId == utr.TaskResponsibleId"
+    how: left
+  - left: {source: tt}
+    right: {source: utc}
+    "on": 
+      - "l.loan_id == utc.loan_id"
+      - "tt.TaskContactId == utc.TaskContactId"
+    how: left
+  - left: {source: tt}
+    right: {source: n}
+    "on": 
+      - "tt.TaskId == n.TaskId"
+    how: left
+
+columns:
+  - target_column: task_id
+    hash_columns: ["tt.LoanNumber", "tt.TaskId", "tt.TaskStartDate", "task"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: completed_at
+    source: tt.TaskActualCloseDate
+    transform: identity
+    dtype: datetime
+
+  - target_column: content
+    source: tt.TaskSourceDescription
+    transform: identity
+    dtype: string
+
+  - target_column: due_at
+    source: tt.TaskExpectedCloseDate
+    transform: identity
+    dtype: datetime
+
+  - target_column: name
+    expression: ti.TaskIdDescription.fillna(n.TaskIdDescription)
+    transform: expression
+    dtype: string
+
+  - target_column: priority
+    expression: |
+      tt.TaskPriorityCode.map({
+        "N": "LOW",
+      }).fillna("MEDIUM")
+    transform: expression
+    dtype: string
+
+  - target_column: status
+    expression: | 
+      tt.TaskStatusFlag.map({
+        "C": "COMPLETED",
+        "O": "IN_PROGRESS"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: started_at
+    source: tt.TaskStartDate
+    transform: identity
+    dtype: datetime
+
+  - target_column: task_number
+    expression: assign_row_number(prefix="TASK_")
+    transform: expression
+    dtype: string
+
+  - target_column: assignee_user_id
+    source: utr.user_id
+    transform: identity 
+    dtype: string
+
+  - target_column: created_by_user_id
+    source: utc.user_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: task_process_id
+    source: []
+    transform: null
+    dtype: string
+
+entity:
+  entity_type: "task"
+  entity_id_col: "task_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

@@ -1,0 +1,127 @@
+table: loan_payment_amortization_schedule
+version: 1
+primary_key: [loan_payment_amortization_schedule_id]
+
+sources:
+  - name: PaymentFactors
+    alias: pf
+    pipe_file: {table: "PaymentFactors"}
+    dtypes:
+      PfEffectiveDate: "date"
+    computed_columns:
+      - column: "PfEndDate"
+        expression: |
+          pd.to_datetime(
+            np.where(
+              df.PfEndDate == '12/31/9999',
+              '12/31/2099',
+              df.PfEndDate
+            ),
+            format='mixed'
+          )
+    groupby:
+      by: ["LoanNumber", "PfPiAmount"]
+      agg:
+        PfEffectiveDate: "min"
+        PfEndDate: "max"
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: pf}
+    right: {source: li}
+    "on": ["pf.LoanNumber == li.LoanNumber"]
+    how: left
+  - left: {source: pf}
+    right: {source: l}
+    "on": ["pf.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: pf}
+    right: {source: ed}
+    "on": ["pf.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: pf}
+    right: {source: fi}
+    "on": ["pf.LoanNumber == fi.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: loan_payment_amortization_schedule_id
+    hash_columns: ["pf.LoanNumber", "l.loan_id", "pf.PfEffectiveDate", "pf.PfEndDate", "loan_payment_amortization_schedule"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: first_payment_due_date
+    source: pf.PfEffectiveDate
+    transform: identity
+    dtype: date
+
+  - target_column: grouping_entity_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: grouping_entity_type
+    expression: |
+      fi.Eloc.map({
+        "0": "LOAN"
+      }).fillna('LOAN')
+    transform: expression
+    dtype: string
+
+  - target_column: last_payment_due_date
+    expression: | 
+      pd.to_datetime(
+        pd.Series(
+          np.where(
+            pf.PfEndDate == pd.Timestamp('2099-12-31'),
+            ed.LoanMaturesDate,
+            pf.PfEndDate
+          ),
+          index=pf.index
+        ),
+        format='mixed'
+      ).dt.to_period('M').dt.to_timestamp()
+    transform: expression
+    dtype: date
+
+  - target_column: payment_frequency
+    expression: |
+      li.PaymentPeriod.map({
+        "12": "MONTHLY"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: principal_and_interest_amount
+    source: pf.PfPiAmount
+    transform: identity
+    dtype: float
+
+  - target_column: start_date
+    expression: |
+      date_add(pf.PfEffectiveDate, -1, "month")
+    transform: expression
+    dtype: date
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_payment_amortization_schedule"
+  entity_id_col: "loan_payment_amortization_schedule_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

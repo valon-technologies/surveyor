@@ -1,0 +1,97 @@
+table: loss_draft_claim
+version: 1
+primary_key: [loss_draft_claim_id]
+
+sources:
+  - name: Notes
+    alias: n
+    pipe_file: {table: "Notes"}
+    read_options:
+      lineterminator: "\n"
+    dtypes:
+      CommentDate: "date"
+    filters:
+      - column: "CommentWorkstationDescription"
+        operator: "eq"
+        value: "HAZARD WORKSTATION"
+      - operator: "expression"
+        expression: df["CommentText"].str.contains(r'\bNGL', case=False, na=False)
+    computed_columns:
+      - column: "NGL_Value"
+        expression: df['CommentText'].str.extract(r'(?i)(NGL\d+)', expand=False)
+      - column: "Claim_Number"
+        expression: df['CommentText'].str.extract(r'CLAIM NUMBER:\s*([\w\-]+)', expand=False)
+    groupby:
+      by: ["LoanNumber", "NGL_Value"]
+      agg:
+        Claim_Number: "first_non_null"
+        CommentDate: "min"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: property_insurance_period_staging
+    alias: pip
+    staging: {table: "property_insurance_period"}
+    dtypes:
+      policy_start_date: "date"
+      policy_end_date: "date"
+
+joins:
+  - left: {source: n}
+    right: {source: l}
+    "on": ["n.LoanNumber == l.loan_number"]
+    how: left
+
+merge_asof:
+  - right:
+      source: pip
+    left_on: "CommentDate"
+    right_on: "policy_start_date"
+    direction: "backward"  
+    left_by: ["loan_id"]
+    right_by: ["loan_id"]
+    left_sort_by: ["CommentDate"]
+    right_sort_by: ["policy_start_date"]  # Additional sort column
+    right_sort_ascending: true
+
+# post_merge_filters:
+#   - operator: "expression"
+#     expression: df["CommentDate"] <= df["policy_end_date"]
+
+columns:
+  - target_column: loss_draft_claim_id
+    hash_columns: ["NGL_Value", "Claim_Number", "CommentDate", "l.loan_id", "pip.property_insurance_period_id", "loss_draft_claim"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: effective_date
+    source: CommentDate
+    transform: identity
+    dtype: date
+
+  - target_column: external_claim_number
+    expression: Claim_Number.fillna(NGL_Value)
+    transform: expression
+    dtype: string
+
+  - target_column: property_insurance_period_id
+    expression: |
+      np.where(
+        CommentDate <= policy_end_date,
+        pip.property_insurance_period_id,
+        pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loss_draft_claim"
+  entity_id_col: "loss_draft_claim_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

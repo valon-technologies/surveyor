@@ -1,0 +1,42 @@
+table: loan_assumption
+version: 1
+primary_key: [loan_assumption_id]
+
+sources:
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+    filters:
+      - column: "AssumptionClosingDate"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: l}
+    right: {source: ed}
+    "on": ["l.loan_number == ed.LoanNumber"]
+    how: inner
+
+columns:
+  - target_column: loan_assumption_id
+    hash_columns: ["ed.LoanNumber", "l.loan_id", "loan_assumption"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: completed_date
+    source: ed.AssumptionClosingDate
+    transform: identity
+    dtype: date
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_assumption"
+  entity_id_col: "loan_assumption_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

@@ -1,0 +1,66 @@
+table: mortgage_insurance_company
+version: 1
+primary_key: [mortgage_insurance_company_id]
+
+sources:
+  - name: LoanInfo 
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+    filters:
+      - column: "MiCertificateNumberExp"
+        operator: "is_not_null"
+      - column: "MiCompanyCodeExp"
+        operator: "not_in"
+        value: ["904", "905"]
+  - name: Payee
+    alias: p
+    pipe_file: {table: "Payee"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: address_staging
+    alias: a
+    staging: {table: "address_mi"}
+
+joins:
+  - left: {source: li}
+    right: {source: p}
+    "on": ["li.MiCompanyCodeExp == p.PayeeId"]
+    how: left
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: li}
+    right: {source: a}
+    "on": 
+      - "l.loan_id == a.loan_id"
+      - "p.PayeeId == a.payeeid"
+    how: left
+
+columns:
+  - target_column: mortgage_insurance_company_id
+    hash_columns: ["p.PayeeId", "mortgage_insurance_company"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: name
+    source: p.PayeeAddressLine1
+    transform: identity
+    dtype: string
+
+  - target_column: address_id
+    source: a.address_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "mortgage_insurance_company"
+  entity_id_col: "mortgage_insurance_company_id"
+  loan_id_col: "loan_id"  
+  loan_id_col_required: false

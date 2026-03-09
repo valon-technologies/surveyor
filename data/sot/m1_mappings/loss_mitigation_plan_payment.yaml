@@ -1,0 +1,147 @@
+table: loss_mitigation_plan_payment
+version: 1
+primary_key: [loss_mitigation_plan_payment_id]
+
+sources:
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "LossMitTypeCode"
+        operator: "is_not_null"
+      - column: "LossMitTypeCode"
+        operator: "neq"
+        value: "SOLI"
+  - name: loss_mitigation_plan_staging
+    alias: lmp
+    staging: {table: "loss_mitigation_plan"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: Transaction
+    alias: ts
+    pipe_file: {table: "Transaction"}
+    dtypes:
+      TransactionDate: "date"
+      DueDate: "date"
+      EffectiveDate: "date"
+      TransactionRowNumber: "int"
+      InterestPaidAmount: "float:2"
+      PrincipalAmount: "float:2"
+      FirstPrincipalBalance: "float:2"
+      NonRecoverableAdvBalance: "float:2"
+      ThirdPartyAdvBalance: "float:2"
+      RecoverableAdvBalance: "float:2"
+      EscrowBalance: "float:2"
+    filters:
+      - column: "TransactionType"
+        operator: "eq"
+        value: "Payment"
+      - column: "TotalAmountPaid"
+        operator: "gt"
+        value: 0.0
+    computed_columns:
+      - column: "date_paid_through"
+        expression: |
+          (
+            lambda ts:
+              ts.assign(
+                date_paid_through=pd.NaT
+              )
+              .assign(
+                date_paid_through=lambda x: np.where(
+                  (x.TransactionType == "Payment")
+                  & (x.InterestPaidAmount > 0)
+                  & (x.PrincipalAmount > 0),
+                  x.DueDate + pd.DateOffset(months=1),
+                  x.date_paid_through
+                )
+              )
+              .assign(
+                date_paid_through=lambda x: np.where(
+                  (x.TransactionDescription == "Misapp Rev")
+                  & (x.InterestPaidAmount < 0)
+                  & (x.PrincipalAmount < 0)
+                  & pd.isna(x.date_paid_through),
+                  x.DueDate,
+                  x.date_paid_through
+                )
+              )
+              .groupby("LoanNumber", group_keys=False)
+              .apply(
+                lambda g:
+                  g.assign(
+                    date_paid_through=(
+                      lambda s:
+                        (
+                          s.ffill()
+                          .pipe(
+                            lambda t:
+                              t.fillna(
+                                t.dropna().iloc[0] - pd.DateOffset(months=1)
+                              )
+                              if t.notna().any()
+                              else t
+                          )
+                        )
+                    )(g.date_paid_through)
+                  )
+              )["date_paid_through"]
+          )(df)
+
+joins:
+  - left: {source: dw}
+    right: {source: l}
+    "on": ["dw.LoanNumber == l.loan_number"]
+    how: inner
+  - left: {source: dw}
+    right: {source: lmp}
+    "on": ["l.loan_id == lmp.loan_id"]
+    how: left
+  - left: {source: dw}
+    right: {source: ts}
+    "on": ["dw.LoanNumber == ts.LoanNumber"]
+    how: left
+
+post_merge_filters:
+  - operator: "expression"
+    expression: (df["evaluated_date"].isna()) | (df["evaluated_date"] <= df["TransactionDate"])
+  - operator: "expression"
+    expression: (df["cancelled_date"].isna() & df["completed_date"].isna()) | (df["cancelled_date"].notna() & (df["cancelled_date"] >= df["TransactionDate"])) | (df["completed_date"].notna() & (df["completed_date"] >= df["TransactionDate"]))
+
+columns:
+  - target_column: loss_mitigation_plan_payment_id
+    hash_columns: ["lmp.loss_mitigation_plan_id", "ts.TransactionDate", "ts.TransactionRowNumber", "l.loan_id", "loss_mitigation_plan_payment"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: payment_due_date
+    source: ts.date_paid_through
+    transform: identity
+    dtype: date
+  
+  - target_column: payment_received_date
+    source: ts.TransactionDate
+    transform: identity
+    dtype: date
+
+  - target_column: plan_payment_amount
+    source: ts.TotalAmountPaid
+    transform: identity
+    dtype: float
+
+  - target_column: loss_mitigation_plan_id
+    source: lmp.loss_mitigation_plan_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loss_mitigation_plan_payment"
+  entity_id_col: "loss_mitigation_plan_payment_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

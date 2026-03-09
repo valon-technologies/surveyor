@@ -1,0 +1,53 @@
+table: user_call
+version: 1
+primary_key: [user_id]
+
+sources:
+  - name: CallLog
+    alias: cl
+    pipe_file: {table: "CallLog"}
+    filters:
+      - column: "AgentName"
+        operator: "is_not_null"
+      - column: ["LoanNumber", "AgentName"]
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: cl}
+    right: {source: l}
+    "on": ["cl.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: user_id
+    expression: |
+      hash_user_id(
+        "ACDC",
+        cl.AgentName
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: first_name
+    expression: cl.AgentName.str.rsplit(pat=" ", n=1).str[0].str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: last_name
+    expression: cl.AgentName.str.rsplit(pat=" ", n=1).str[-1].str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: AgentName
+    source: cl.AgentName
+    transform: identity
+    dtype: string

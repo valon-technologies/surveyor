@@ -1,0 +1,152 @@
+table: portfolio
+version: 1
+primary_key: [portfolio_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: Investor
+    alias: iv
+    pipe_file: {table: "Investor"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: servicing_client_staging
+    alias: sc
+    staging: {table: "servicing_client"}
+
+joins:
+  - left: {source: li}
+    right: {source: iv}
+    "on": 
+      - "li.InvestorId == iv.InvestorId"
+      - "li.CategoryCode == iv.CategoryCode"
+    how: left
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: li}
+    right: {source: sc}
+    "on": ["l.loan_id == sc.loan_id"]
+    how: left
+
+columns:
+  - target_column: portfolio_id
+    expression: |
+      np.select(
+        condlist=[
+          iv.InvestorId.isin(["KN8", "KN9", "KN1", "KN2"]),
+          iv.InvestorId.isin(["KNA", "KNB"]),
+          iv.InvestorId.isin(["KNU", "KNX", "KNC", "KNF"]),
+          iv.InvestorId.isin(["KND", "KNE"]),
+          iv.InvestorId.isin(["KKG"]),
+          iv.InvestorId.isin(["LK3"]),
+          iv.InvestorId.isin(["LN3", "LNA"]),
+          iv.InvestorId.isin(["LN4"]),
+          iv.InvestorId.isin(["LNF", "LNG"]),
+          iv.InvestorId.isin(["YN1"]),
+        ],
+        choicelist=[
+          "p1", # NexusNova FNMA A/A 347640000
+          "p2", # NexusNova FNMA 347640000 MBS S/S
+          "p3", # NexusNova FNMA A/A 347640018
+          "p4", # NexusNova FNMA 347640018 MBS S/S
+          "p5", # NexusNova FNMA A/A 335380002 MBS S/S
+          "p6", # NexusNova FHLMC S/A 146048
+          "p7", # NexusNova FHLMC S/A 195237
+          "p8", # NexusNova FHLMC S/A 195245
+          "p9", # NexusNova FHLMC S/A 142765
+          "p10", # NexusNova Asset Portfolio
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: portfolio_name
+    expression: |
+      np.select(
+        condlist=[
+          iv.InvestorId.isin(["KN8", "KN9", "KN1", "KN2"]),
+          iv.InvestorId.isin(["KNA", "KNB"]),
+          iv.InvestorId.isin(["KNU", "KNX", "KNC", "KNF"]),
+          iv.InvestorId.isin(["KND", "KNE"]),
+          iv.InvestorId.isin(["KKG"]),
+          iv.InvestorId.isin(["LK3"]),
+          iv.InvestorId.isin(["LN3", "LNA"]),
+          iv.InvestorId.isin(["LN4"]),
+          iv.InvestorId.isin(["LNF", "LNG"]),
+          iv.InvestorId.isin(["YN1"]),
+        ],
+        choicelist=[
+          "NexusNova FNMA A/A 347640000",
+          "NexusNova FNMA 347640000 MBS S/S",
+          "NexusNova FNMA A/A 347640018",
+          "NexusNova FNMA 347640018 MBS S/S",
+          "NexusNova FNMA 335380002 MBS S/S",
+          "NexusNova FHLMC S/A 146048",
+          "NexusNova FHLMC S/A 195237",
+          "NexusNova FHLMC S/A 195245",
+          "NexusNova FHLMC S/A 142765",
+          "NexusNova Asset Portfolio"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: remittance_type
+    expression: | 
+      np.select(
+        condlist=[
+          iv.ReconMethod.eq("139"),
+          iv.ReconMethod.eq("253"),
+          iv.ReconMethod.eq("540"),
+          iv.ReconMethod.eq("660"),
+          iv.ReconMethod.eq("759"),
+          iv.ReconMethod.eq("817")
+        ],
+        choicelist=[
+          "ACTUAL_ACTUAL",
+          "ACTUAL_ACTUAL",
+          "SCHEDULED_SCHEDULED",
+          "ACTUAL_ACTUAL",
+          "SCHEDULED_ACTUAL",
+          "SCHEDULED_SCHEDULED"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: investor_type
+    expression: |
+      iv.InvestorName.map({
+                "FREDDIE MAC": "FREDDIE",
+                "FANNIE MAE": "FANNIE"
+              })
+    transform: expression
+    dtype: string
+
+  - target_column: seller_servicer_number
+    source: iv.InvestorServicerNumber
+    transform: identity
+    dtype: string
+
+  - target_column: servicing_client_id
+    source: sc.servicing_client_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "portfolio"
+  entity_id_col: "portfolio_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

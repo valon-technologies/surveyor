@@ -1,0 +1,167 @@
+table: arm_loan_info
+version: 1
+primary_key: [arm_loan_info_id]
+
+sources:
+  - name: ARM
+    alias: arm
+    pipe_file: {table: "Arm"}
+    dtypes:
+      # Dates - for filtering/sorting
+      ArmOriginalInterestRateChangeDate: "date"
+      ArmOriginalPiChangeDate: "date"
+
+      # Floats - for calculations
+      ArmOriginalInterestRate: "float"
+      ArmInterestRateMaxIncreaseRate: "float"
+      ArmInterestRateMaxDecreaseRate: "float"
+      ArmInterestRateRoundingFactor: "float"
+      ArmInterestRateMarginRate: "float"
+      ArmInterestRateMaxLifeCeilingRate: "float"
+      ArmInterestRateMaxLifeFloorRate: "float"
+
+      # Integers
+      ArmPaymentsInInterestRateChgPeriod: "int"
+      ArmPaymentsInPiChgPeriod: "int"
+      ArmIndexLeadDays1: "int"
+
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: arm}
+    right: {source: l}
+    "on": ["arm.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: arm_loan_info_id
+    hash_columns: ["l.loan_id", "arm.LoanNumber", "ARM_LOAN_INFO"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: carryover_type
+    expression: |
+      arm.ArmInterestRateCarryoverCode.map({
+        "N": "NONE",
+        "Y": "INCREASE_AND_DECREASE"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: first_interest_change_date
+    source: arm.ArmOriginalInterestRateChangeDate
+    transform: identity
+    dtype: date
+
+  - target_column: first_payment_change_date
+    source: arm.ArmOriginalPiChangeDate
+    transform: identity
+    dtype: date
+
+  - target_column: index_name
+    expression: |
+      arm.ArmIndexCode1.map({
+        "COFI": "COFI",
+        "11CF": "COFI",
+        "PRM1": "PRIME",
+        "1YTW": "TSEC_1Y",
+        "CMT1": "TSEC_1Y",
+        "CMT3": "TSEC_3Y",
+        "CMT5": "TSEC_5Y",
+        "CM10": "TSEC_10Y",
+        "1MLB": "LIBOR_1M",
+        "LIB6": "LIBOR_6M",
+        "LFB6": "LIBOR_6M",
+        "LIB1": "LIBOR_1Y",
+        "SOFR": "SOFR",
+        "SO30": "SOFR_30D",
+        "SO90": "SOFR_3M",
+        "S180": "SOFR_6M"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: index_rounding_factor
+    source: arm.ArmInterestRateRoundingFactor
+    transform: identity
+    dtype: float
+
+  - target_column: index_rounding_method
+    expression: |
+      arm.ArmInterestRateRoundingType.map({
+        "U": "UP",
+        "N": "ROUND",
+        "D": "DOWN"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: interest_rate_change_frequency_months
+    source: arm.ArmPaymentsInInterestRateChgPeriod
+    transform: identity
+    dtype: int
+
+  - target_column: lifetime_max_interest_rate_ceiling
+    source: arm.ArmInterestRateMaxLifeCeilingRate
+    transform: identity
+    dtype: float
+
+  - target_column: lifetime_min_interest_rate_floor
+    source: arm.ArmInterestRateMaxLifeFloorRate
+    transform: identity
+    dtype: float
+
+  - target_column: look_back_period_number_of_periods
+    source: arm.ArmIndexLeadDays1
+    transform: identity
+    dtype: int
+
+  - target_column: look_back_period_time_unit
+    source: {literal: "DAYS"}
+    transform: literal
+    dtype: string
+
+  - target_column: margin_percent
+    source: arm.ArmInterestRateMarginRate
+    transform: identity
+    dtype: float
+
+  - target_column: max_interest_rate_after_initial_rate_change
+    expression: |
+      arm.ArmOriginalInterestRate + arm.ArmInterestRateMaxIncreaseRate
+    transform: expression
+    dtype: float
+
+  - target_column: max_interest_rate_decrease_subsequent_change
+    source: arm.ArmInterestRateMaxDecreaseRate
+    transform: identity
+    dtype: float
+
+  - target_column: max_interest_rate_increase_subsequent_change
+    source: arm.ArmInterestRateMaxIncreaseRate
+    transform: identity
+    dtype: float
+
+  - target_column: min_interest_rate_after_initial_rate_change
+    expression: |
+      arm.ArmOriginalInterestRate - arm.ArmInterestRateMaxDecreaseRate
+    transform: expression
+    dtype: float
+
+  - target_column: payment_change_frequency_months
+    source: arm.ArmPaymentsInPiChgPeriod
+    transform: identity
+    dtype: int
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "arm_loan_info"
+  entity_id_col: "arm_loan_info_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

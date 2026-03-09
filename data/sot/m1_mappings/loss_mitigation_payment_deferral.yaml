@@ -1,0 +1,159 @@
+table: loss_mitigation_payment_deferral
+version: 1
+primary_key: [loss_mitigation_payment_deferral_id]
+
+sources:
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "LSMT"
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "ModInfoEffectiveDate"
+        operator: "is_not_null"
+      - column: "LossMitTypeCode"
+        operator: "eq"
+        value: "DEFR"
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: loss_mitigation_plan
+    alias: lmp
+    staging: {table: "loss_mitigation_plan"}
+    filters:
+      - column: "plan_type"
+        operator: "eq"
+        value: "DEFERRAL"
+
+joins:
+  - left: {source: s}
+    right: {source: fi}
+    "on": ["s.LoanNumber == fi.LoanNumber"]
+    how: left
+  - left: {source: s}
+    right: {source: dw}
+    "on": ["s.LoanNumber == dw.LoanNumber"]
+    how: inner
+  - left: {source: s}
+    right: {source: l}
+    "on": ["s.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: s}
+    right: {source: lmp}
+    "on": ["l.loan_id == lmp.loan_id"]
+    how: left
+
+columns:
+  - target_column: loss_mitigation_payment_deferral_id
+    hash_columns: ["l.loan_id", "s.LoanNumber", "dw.ModInfoEffectiveDate", "loss_mitigation_payment_deferral"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: amount_deferred_escrow_advance
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: amount_deferred_interest
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: amount_deferred_pni_heloc
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: amount_deferred_principal
+    source: dw.ModDeferredPrincipalAmount
+    transform: identity
+    dtype: float
+
+  - target_column: amount_deferred_servicing_advance
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: amount_escrow_shortage
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: amount_suspense_balance
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: amount_waived_late_fees
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: agreement_received_from_homeowner_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: effective_date
+    source: dw.ModInfoEffectiveDate
+    transform: identity
+    dtype: date
+
+  - target_column: plan_booked_date
+    source: s.ActualCompletionDate_L66
+    transform: identity
+    dtype: date
+
+  - target_column: num_escrow_shortage_repayment_months
+    source: []
+    transform: null
+    dtype: int
+
+  - target_column: num_principal_and_interest_payments_deferred
+    source: []
+    transform: null
+    dtype: int
+
+  - target_column: post_deferral_tni
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: previously_deferred_balance
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: solicitation_type
+    expression: fi.ModSolicitationType.fillna("NON_SOLICITATION")
+    transform: expression
+    dtype: string
+    
+  - target_column: loss_mitigation_plan_id
+    source: lmp.loss_mitigation_plan_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loss_mitigation_payment_deferral"
+  entity_id_col: "loss_mitigation_payment_deferral_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

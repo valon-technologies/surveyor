@@ -1,0 +1,218 @@
+table: property
+version: 1
+primary_key: [property_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: address_staging
+    alias: a
+    staging: {table: "address_property"}
+
+joins:
+  - left: {source: l}
+    right: {source: a}
+    "on": ["l.loan_id == a.loan_id"]
+    how: left
+  - left: {source: l}
+    right: {source: li}
+    "on": ["l.loan_number == li.LoanNumber"]
+    how: left
+  - left: {source: l}
+    right: {source: fi}
+    "on": ["li.LoanNumber == fi.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: property_id
+    hash_columns: ["li.LoanNumber", "l.loan_id", "a.address_id", "property"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: address_id
+    source: a.address_id
+    transform: identity
+    dtype: string
+
+  - target_column: is_prefabricated
+    source: {literal: "FALSE"}
+    transform: literal
+    dtype: boolean
+
+  - target_column: legal_property_description
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: number_of_units
+    source: fi.NumberOfUnits
+    transform: identity
+    dtype: float
+
+  - target_column: occupancy_type
+    expression: |
+      fi.OccupancyCode.map({
+        "1": "PRIMARY_RESIDENCE",
+        "2": "SECOND_HOME",
+        "3": "INVESTMENT"
+      }).fillna("UNKNOWN")
+    transform: expression
+    dtype: string
+
+  - target_column: prefabricated_type
+    expression: | 
+      np.select(
+        condlist=[
+          li.PropertyType.eq("MFH"),
+          li.PropertyType.eq("MBH"),
+          fi.PropertyTypeFnmaCode.eq("6"),
+          fi.PropertyTypeFnmaCode.eq("7"),
+          li.PresMobileHomeVinNumber.notna()
+        ],
+        choicelist=[
+          "MANUFACTURED_HOME",
+          "MOBILE_HOME",
+          "OTHER",
+          "MOBILE_HOME",
+          "OTHER"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: property_type
+    expression: |
+      np.select(
+        condlist=[
+          (fi.PropertyTypeFnmaCode == '1') & (fi.DevelopmentType.isin(['1','2'])),
+          (fi.PropertyTypeFnmaCode == '4') & (fi.DevelopmentType.isin(['1','2'])),
+          (fi.PropertyTypeFnmaCode == '3') & (fi.DevelopmentType.isin(['1','2'])),
+          (fi.PropertyTypeFnmaCode == '8') & (fi.DevelopmentType.isin(['1','2'])),
+          # (fi.PropertyTypeFnmaCode.isin(['C','D'])) & (fi.DevelopmentType.isin(['1','2'])),  # FARM
+          (fi.PropertyTypeFnmaCode == '7') & (fi.DevelopmentType.isin(['1','2'])),
+          (fi.PropertyTypeFnmaCode == '6') & (fi.DevelopmentType.isin(['1','2'])),
+          (fi.PropertyTypeFnmaCode == '5') & (fi.DevelopmentType.isin(['1','2'])),
+          (fi.PropertyTypeFnmaCode == '2') & (fi.DevelopmentType.isin(['1','2'])),
+          fi.PropertyTypeFnmaCode == '1',
+          fi.PropertyTypeFnmaCode == '4',
+          fi.PropertyTypeFnmaCode == '3',
+          fi.PropertyTypeFnmaCode == '8',
+          # fi.PropertyTypeFnmaCode.isin(['C','D']),  # FARM
+          fi.PropertyTypeFnmaCode == '7',
+          fi.PropertyTypeFnmaCode == '6',
+          fi.PropertyTypeFnmaCode == '5',
+          fi.PropertyTypeFnmaCode == '2'
+        ],
+        choicelist=[
+          # PUD Development
+          'PUD_DETACHED',   # 1 + PUD
+          'PUD',            # 4 + PUD
+          'PUD',            # 3 + PUD
+          'COOP',           # 8 + PUD
+          # 'FARM',         # C,D + PUD
+          'MOBILE_HOME',    # 7 + PUD
+          'MANUFACTURED',   # 6 + PUD
+          'PUD_DETACHED',   # 5 + PUD
+          'PUD',            # 2 + PUD
+          # NOT PUD
+          'DETACHED',       # 1
+          'ATTACHED',       # 4
+          'CONDO',          # 3
+          'COOP',           # 8
+          # 'FARM',         # C,D
+          'MOBILE_HOME',    # 7
+          'MANUFACTURED',   # 6
+          'DETACHED',       # 5
+          'TOWNHOUSE'       # 2
+        ],
+        default='DETACHED'
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: purchase_price
+    source: li.FhlbbPurchasePrice
+    transform: identity
+    dtype: float
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "property"
+  entity_id_col: "property_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+
+      # np.select(
+      #   condlist=[
+      #     (li.PropertyType.eq("1FH") & fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("2FH") & fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("3FH") & fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("4FH") & fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("5FH") & fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("CON") & fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("COO") & fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("COP") & fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("LND") & fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("MBH") & fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("MFH") & fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("OTH") & fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("TWN") & fi.DevelopmentType.isin(["1","2"])),
+
+      #     # DevType NOT IN ('1','2')
+      #     (li.PropertyType.eq("1FH") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("2FH") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("3FH") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("4FH") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("5FH") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("CON") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("COO") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("COP") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("LND") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("MBH") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("MFH") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("OTH") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     (li.PropertyType.eq("TWN") & ~fi.DevelopmentType.isin(["1","2"])),
+      #     ],
+        
+      #   choicelist=[
+      #     "PUD_DETACHED",  # 1FH
+      #     "PUD",           # 2FH
+      #     "PUD",           # 3FH
+      #     "PUD",           # 4FH
+      #     "PUD",           # 5FH
+      #     "PUD",           # CON
+      #     "COOP",          # COO
+      #     "COOP",          # COP
+      #     "FARM",          # LND
+      #     "MOBILE_HOME",   # MBH
+      #     "MANUFACTURED",  # MFH
+      #     "PUD_DETACHED",  # OTH
+      #     "PUD",           # TWN
+      #     "DETACHED",      # 1FH
+      #     "ATTACHED",      # 2FH
+      #     "ATTACHED",      # 3FH
+      #     "ATTACHED",      # 4FH
+      #     "ATTACHED",      # 5FH
+      #     "CONDO",         # CON
+      #     "COOP",          # COO
+      #     "COOP",          # COP
+      #     "FARM",          # LND
+      #     "MOBILE_HOME",   # MBH
+      #     "MANUFACTURED",  # MFH
+      #     "DETACHED",      # OTH
+      #     "ATTACHED",      # TWN
+      #   ],
+      #   default="DETACHED"
+      # )

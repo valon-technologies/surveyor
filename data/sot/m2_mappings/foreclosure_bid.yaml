@@ -1,0 +1,77 @@
+table: foreclosure_bid
+version: 1
+primary_key: [foreclosure_bid_id]
+
+sources: 
+  - name: foreclosure_staging
+    alias: fs
+    staging: {table: "foreclosure"}
+  - name: foreclosure_sale_staging
+    alias: fss
+    staging: {table: "foreclosure_sale"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: fs}
+    right: {source: l}
+    "on": ["fs.loan_id == l.loan_id"]
+    how: left
+  - left: {source: fs}
+    right: {source: fss}
+    "on": ["fs.loan_id == fss.loan_id"]
+    how: left
+
+columns: 
+  - target_column: foreclosure_bid_id
+    hash_columns: ["fs.foreclosure_id", "fss.foreclosure_sale_id", "l.loan_id", "foreclosure_bid"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: attorney_acknowledgement_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: bid_type
+    source: []
+    transform: null
+    dtype: string
+  
+  # - target_column: final_bid_amount
+  #   source: []
+  #   transform: null
+  #   dtype: float
+
+  - target_column: foreclosure_id
+    source: fs.foreclosure_id
+    transform: identity
+    dtype: string
+  
+  - target_column: foreclosure_sale_id
+    source: fss.foreclosure_sale_id
+    transform: identity
+    dtype: string
+
+  - target_column: servicer_bid_amount
+    source: []
+    transform: null
+    dtype: float
+  
+  - target_column: servicer_sent_to_attorney_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "foreclosure_bid"
+  entity_id_col: "foreclosure_bid_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+

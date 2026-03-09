@@ -1,0 +1,241 @@
+table: loan_accounting_balance
+version: 1
+primary_key: [loan_accounting_balance_id]
+
+sources:
+  - name: loan_accounting_balance_ts
+    alias: ts
+    staging: {table: "loan_accounting_balance_ts"}
+  - name: loan_accounting_balance_li
+    alias: li
+    staging: {table: "loan_accounting_balance_li"}
+
+concat:
+  sources: [ts, li]
+
+columns:
+  - target_column: loan_accounting_balance_id
+    source: loan_accounting_balance_id
+    transform: identity
+    dtype: string
+
+  - target_column: action_datetime
+    source: action_datetime
+    transform: identity
+    dtype: datetime
+
+  - target_column: event_type
+    source: event_type
+    transform: identity
+    dtype: string
+
+  - target_column: event_subtype
+    source: event_subtype
+    transform: identity
+    dtype: string
+
+  - target_column: modification_type
+    source: modification_type
+    transform: identity
+    dtype: string
+
+  - target_column: date_effective
+    source: date_effective
+    transform: identity
+    dtype: date
+
+  - target_column: date_paid_through
+    source: date_paid_through
+    transform: identity
+    dtype: date
+
+  - target_column: deferred_principal_balance
+    source: deferred_principal_balance
+    transform: identity
+    dtype: float
+
+  - target_column: deferred_principal_balance_delta
+    source: deferred_principal_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: escrow_client_advance_balance
+    source: escrow_client_advance_balance
+    transform: identity
+    dtype: float
+
+  - target_column: escrow_client_advance_balance_delta
+    source: escrow_client_advance_balance_delta
+    transform: identity
+    dtype: float
+  
+  - target_column: escrow_holding_balance
+    source: escrow_holding_balance
+    transform: identity
+    dtype: float
+
+  - target_column: escrow_holding_balance_delta
+    source: escrow_holding_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: escrow_interest_accrued_balance
+    source: escrow_interest_accrued_balance
+    transform: identity
+    dtype: float
+
+  - target_column: escrow_interest_accrued_balance_delta
+    source: escrow_interest_accrued_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: fee_late_balance
+    source: fee_late_balance
+    transform: identity
+    dtype: float
+
+  - target_column: fee_late_balance_delta
+    source: fee_late_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: fee_nsf_balance
+    source: fee_nsf_balance
+    transform: identity
+    dtype: float
+
+  - target_column: fee_nsf_balance_delta
+    source: fee_nsf_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: fee_other_balance
+    source: fee_other_balance
+    transform: identity
+    dtype: float
+
+  - target_column: fee_other_balance_delta
+    source: fee_other_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: gse_servicing_strip_fee_expense_balance_delta
+    source: gse_servicing_strip_fee_expense_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: interest_bearing_principal_balance
+    source: interest_bearing_principal_balance
+    transform: identity
+    dtype: float
+  
+  - target_column: interest_bearing_principal_balance_delta
+    source: interest_bearing_principal_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: interest_holding_balance_delta
+    source: interest_holding_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: interest_expense_paid
+    source: interest_expense_paid
+    transform: identity
+    dtype: float
+
+  - target_column: interest_expense_paid_delta
+    source: interest_expense_paid_delta
+    transform: identity
+    dtype: float
+
+  - target_column: interest_rate_buydown_holding_balance
+    source: interest_rate_buydown_holding_balance
+    transform: identity
+    dtype: float
+
+  - target_column: loss_draft_holding_balance
+    source: loss_draft_holding_balance
+    transform: identity
+    dtype: float
+
+  - target_column: loss_draft_interest_accrued_balance
+    source: loss_draft_interest_accrued_balance  
+    transform: identity
+    dtype: float
+
+  - target_column: loss_mitigation_modified_date_paid_through
+    source: loss_mitigation_modified_date_paid_through
+    transform: identity
+    dtype: date
+
+  - target_column: non_recoverable_advance_balance
+    source: non_recoverable_advance_balance
+    transform: identity
+    dtype: float
+
+  - target_column: non_recoverable_advance_balance_delta
+    source: non_recoverable_advance_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: recoverable_servicing_advance_balance
+    source: recoverable_servicing_advance_balance
+    transform: identity
+    dtype: float
+
+  - target_column: recoverable_servicing_advance_balance_delta
+    source: recoverable_servicing_advance_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: suspense_holding_balance
+    source: suspense_holding_balance
+    transform: identity
+    dtype: float
+  
+  - target_column: suspense_holding_balance_delta
+    source: suspense_holding_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: third_party_advance_balance
+    source: third_party_advance_balance
+    transform: identity
+    dtype: float
+
+  - target_column: third_party_advance_balance_delta
+    source: third_party_advance_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: unpaid_principal_balance
+    source: unpaid_principal_balance
+    transform: identity
+    dtype: float
+
+  - target_column: unpaid_principal_balance_delta
+    source: unpaid_principal_balance_delta
+    transform: identity
+    dtype: float
+
+  - target_column: sequence_num
+    source: sequence_num
+    transform: identity
+    dtype: int
+
+  - target_column: servicing_activity_id
+    source: servicing_activity_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_accounting_balance"
+  entity_id_col: "loan_accounting_balance_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

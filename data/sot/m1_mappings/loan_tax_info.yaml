@@ -1,0 +1,82 @@
+table: loan_tax_info
+version: 1
+primary_key: [loan_tax_info_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: Tax
+    alias: t
+    pipe_file: {table: "Tax"}
+    filters:
+      - column: ["LoanNumber", "TaxServiceIdentifier"]
+        operator: "dedup"
+        keep: "last"
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+
+  - left: {source: li}
+    right: {source: t}
+    "on": ["li.LoanNumber == t.LoanNumber"]
+    how: left
+
+  - left: {source: li}
+    right: {source: fi}
+    "on": ["li.LoanNumber == fi.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: loan_tax_info_id
+    hash_columns: ["li.LoanNumber", "l.loan_id", "t.TaxDisbursementType", "t.TaxKeySequenceNumber", "t.TaxPayeeCode", "loan_tax_info"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: current_tax_provider
+    expression: | 
+      t.TaxServiceIdentifier.map({
+        "R": "CORELOGIC",
+        "E": "CORELOGIC"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: provider_customer_id
+    source: {literal: "13331"}
+    transform: literal
+    dtype: string
+
+  - target_column: provider_loan_number
+    source: li.TaxServiceContractNumber
+    transform: identity
+    dtype: string
+
+  - target_column: tax_service_type
+    expression: |
+      fi.TaxServiceContractIndicator.map({
+        "C": "ESCROWED", 
+        "B": "NON_ESCROWED"})
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_tax_info"
+  entity_id_col: "loan_tax_info_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

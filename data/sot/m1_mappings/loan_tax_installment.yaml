@@ -1,0 +1,84 @@
+table: loan_tax_installment
+version: 1
+primary_key: [loan_tax_installment_id]
+
+sources:
+  - name: loan_tax_installment_3
+    alias: t3
+    staging: {table: "loan_tax_installment_3_1"}
+  - name: loan_tax_installment_3_2
+    alias: t3_2
+    staging: {table: "loan_tax_installment_3_2"}
+  - name: loan_tax_installment_4
+    alias: t4
+    staging: {table: "loan_tax_installment_4_1"}
+  - name: loan_tax_installment_4_2
+    alias: t4_2
+    staging: {table: "loan_tax_installment_4_2"}
+  - name: loan_tax_installment_6
+    alias: t6
+    staging: {table: "loan_tax_installment_6_1"}
+  - name: loan_tax_installment_6_2
+    alias: t6_2
+    staging: {table: "loan_tax_installment_6_2"}
+  - name: loan_tax_installment_12
+    alias: t12
+    staging: {table: "loan_tax_installment_12_1"} 
+  - name: loan_tax_installment_12_2
+    alias: t12_2
+    staging: {table: "loan_tax_installment_12_2"}
+
+concat:
+  sources: [t3, t3_2, t4, t4_2, t6, t6_2, t12, t12_2]
+
+columns:
+  - target_column: loan_tax_installment_id
+    source: loan_tax_installment_id
+    transform: identity
+    dtype: string
+
+  - target_column: amount_base
+    source: amount_base
+    transform: identity
+    dtype: float
+
+  - target_column: amount_fee
+    source: amount_fee
+    transform: identity
+    dtype: float
+
+  - target_column: economic_loss_date
+    source: economic_loss_date
+    transform: identity
+    dtype: date
+
+  - target_column: installment_index
+    source: installment_index
+    transform: identity
+    dtype: string
+
+  - target_column: payment_status
+    source: payment_status
+    transform: identity
+    dtype: string
+
+  - target_column: year
+    source: year
+    transform: identity
+    dtype: int
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_tax_line_id
+    source: loan_tax_line_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_tax_installment"
+  entity_id_col: "loan_tax_installment_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

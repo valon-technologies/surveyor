@@ -21,6 +21,7 @@ import type {
 export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
   const url = new URL(req.url);
   const tab = url.searchParams.get("tab");
+  const milestone = url.searchParams.get("milestone");
 
   // ─── My Work Tab ──────────────────────────────────────────
   if (tab === "my-work") {
@@ -166,7 +167,11 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
     const fields = await db
       .select({ id: field.id })
       .from(field)
-      .where(eq(field.entityId, e.id))
+      .where(
+        milestone
+          ? and(eq(field.entityId, e.id), eq(field.milestone, milestone))
+          : eq(field.entityId, e.id)
+      )
       ;
 
     const fieldIds = fields.map((f) => f.id);
@@ -301,7 +306,8 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
         eq(entity.side, "target"),
         assemblyParentIds.size > 0
           ? sql`${entity.id} NOT IN (${sql.join([...assemblyParentIds].map(id => sql`${id}`), sql`, `)})`
-          : undefined
+          : undefined,
+        milestone ? eq(field.milestone, milestone) : undefined
       )
     )
     .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)

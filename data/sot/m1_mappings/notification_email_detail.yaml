@@ -1,0 +1,76 @@
+table: notification_email_detail
+version: 1
+primary_key: [notification_email_detail_id]
+
+sources:
+  - name: notification_staging
+    alias: n
+    staging: {table: "notification_1"}
+    dtypes:
+      MspEffectiveDate: "date"
+      LetterDate: "date"
+      LetterVersionNumber: "float"
+      LetterRecordNumber: "float"
+    filters:
+      - column: "delivery_method"
+        operator: "eq"
+        value: "EMAIL"
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: n}
+    right: {source: l}
+    "on": ["n.loan_id == l.loan_id"]
+    how: left
+  - left: {source: n}
+    right: {source: li}
+    "on": ["l.loan_number == li.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: notification_email_detail_id
+    hash_columns: ["l.loan_id", "n.notification_id", "n.MspEffectiveDate", "n.LetterDate", "n.LetterId", "n.LetterRecordNumber", "notification_email_detail"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: from_email_address
+    source: {literal: "noreply-Q@servicemacusa.com"}
+    transform: literal
+    dtype: string
+
+  - target_column: sent_at
+    source: n.LetterDate
+    transform: identity
+    dtype: datetime
+
+  - target_column: subject_line
+    source: n.LetterDescription
+    transform: identity
+    dtype: string
+
+  - target_column: to_email_address
+    expression: |
+      li.EmailAddress.str.lower().fillna(li.CoMortgagorEmailAddress.str.lower()).fillna("m1_ocean_2126@valon.com")
+    transform: expression
+    dtype: string
+
+  - target_column: notification_id
+    source: n.notification_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "notification_email_detail"
+  entity_id_col: "notification_email_detail_id"
+  loan_id_col: "loan_id"  
+  loan_id_col_required: false

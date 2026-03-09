@@ -1,0 +1,164 @@
+table: single_point_of_contact
+version: 1
+primary_key: [single_point_of_contact_id]
+
+sources:
+  - name: Letter
+    alias: le
+    pipe_file: {table: "Letter"}
+    dtypes:
+      LetterDate: "datetime"
+    sorting:
+      - column: "LetterDate"
+        ascending: true
+    filters:
+      - column: "LetterId"
+        operator: "eq"
+        value: "SP001"
+      - column: "LoanNumber"
+        operator: "dedup"
+        keep: "last"
+  - name: CallLog
+    alias: cl
+    pipe_file: {table: "CallLog"}
+    dtypes:
+      TimeStamp: "datetime"
+    filters:
+      - column: "AgentName"
+        operator: "is_not_null"
+      - column: 
+    sorting:
+      - column: "TimeStamp"
+        ascending: true
+  - name: user_call_staging
+    alias: uc
+    staging: {table: "user_call"}
+    filters:
+      - column: ["user_id", "loan_id"]
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: loss_mitigation_plan_staging
+    alias: lmp
+    staging: {table: "loss_mitigation_plan"}
+  - name: bankruptcy_case_staging
+    alias: bc
+    staging: {table: "bankruptcy_case"}
+  - name: foreclosure_staging
+    alias: fs
+    staging: {table: "foreclosure"}
+  - name: Transaction
+    alias: t
+    pipe_file: {table: "Transaction"}
+    dtypes:
+      TransactionDate: "date"
+    sorting:
+      - column: "TransactionDate"
+        ascending: true
+    filters:
+      - column: "DueDate"
+        operator: "is_not_null"
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+
+joins:
+  - left: {source: le}
+    right: {source: l}
+    "on": ["le.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: le}
+    right: {source: lmp}
+    "on": ["l.loan_id == lmp.loan_id"]
+    how: left
+  - left: {source: le}
+    right: {source: bc}
+    "on": ["l.loan_id == bc.loan_id"]
+    how: left
+  - left: {source: le}
+    right: {source: fs}
+    "on": ["l.loan_id == fs.loan_id"]
+    how: left
+  - left: {source: t}
+    right: {source: li}
+    "on": ["t.LoanNumber == li.LoanNumber"]
+    how: left
+
+merge_asof:
+  - right:
+      source: cl
+    left_on: "LetterDate"
+    right_on: "TimeStamp"
+    direction: "forward"
+    left_by: ["LoanNumber"]
+    right_by: ["LoanNumber"]
+
+post_asof_joins:
+  - right:
+      source: uc
+    "on": 
+      - "l.loan_id == uc.loan_id"
+      - "cl.AgentName == uc.AgentName"
+    how: inner
+
+columns:
+  - target_column: single_point_of_contact_id
+    hash_columns: ["le.LoanNumber", "l.loan_id", "le.MspEffectiveDate", "le.LetterDate", "le.LetterId", "le.LetterRecordNumber", "single_point_of_contact"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: assigned_date
+    source: le.MspEffectiveDate
+    transform: identity
+    dtype: string
+
+  - target_column: unassigned_date
+    expression: |
+      np.where(
+        pd.to_numeric(li.DelinquentDayCount, errors="coerce") > 0, 
+        pd.NA, 
+        np.maximum(date_add(pd.to_datetime(le.MspEffectiveDate), 3, "month"), pd.to_datetime(l.data_transfer_effective_date) - pd.Timedelta(days=1))
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: single_point_of_contact_type
+    expression: |
+      np.select(
+        condlist=[
+          lmp.loss_mitigation_plan_id.notna(),
+          bc.bankruptcy_case_id.notna(),
+          (fs.foreclosure_id.notna() | (pd.to_numeric(li.DelinquentDayCount, errors="coerce") > 90)),
+          pd.to_numeric(li.DelinquentDayCount, errors="coerce") > 30,
+          ((pd.to_numeric(li.DelinquentDayCount, errors="coerce") >= 30) & (bc.bankruptcy_case_id.notna())),
+        ],
+        choicelist=[
+          "MORTGAGE_ASSISTANCE",
+          "BANKRUPTCY",
+          "LATE_STAGE_COLLECTIONS",
+          "COLLECTIONS",
+          "EARLY_INTERVENTION_BK",
+        ],
+        default="COLLECTIONS"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: agent_user_id
+    source: uc.user_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "single_point_of_contact"
+  entity_id_col: "single_point_of_contact_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

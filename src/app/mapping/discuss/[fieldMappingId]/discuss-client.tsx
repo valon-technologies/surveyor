@@ -363,7 +363,7 @@ export function DiscussClient() {
 
         {/* Context used panel — collapsible, shows docs that informed this mapping */}
         <div className="shrink-0">
-          <ContextUsedPanel mappingId={activeMappingId} />
+          <ContextUsedPanel mappingId={activeMappingId} reasoning={mapping?.reasoning} />
         </div>
 
         {/* Row 2: Source | Transform | Question — with layered AI proposals */}

@@ -1,0 +1,84 @@
+table: loss_mitigation_application_individual
+version: 1
+primary_key: [loss_mitigation_application_individual_id]
+
+sources:
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "LSMT"
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: borrower_to_loan_staging
+    alias: btl
+    staging: {table: "borrower_to_loan"}
+    filters:
+      - column: "is_primary"
+        operator: "eq"
+        value: "True"
+  - name: borrower_staging
+    alias: b
+    staging: {table: "borrower"}
+
+joins:
+  - left: {source: s}
+    right: {source: l}
+    "on": ["s.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: s}
+    right: {source: btl}
+    "on": ["l.loan_id == btl.loan_id"]
+    how: left
+  - left: {source: s}
+    right: {source: b}
+    "on": 
+      - "btl.borrower_id == b.borrower_id"
+      - "l.loan_id == b.loan_id"
+    how: left
+
+columns:
+  - target_column: loss_mitigation_application_individual_id
+    hash_columns: ["l.loan_id", "btl.borrower_id", "loss_mitigation_application_individual"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: btl.borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: first_name
+    source: b.first_name
+    transform: identity
+    dtype: string
+
+  - target_column: last_name
+    source: b.last_name
+    transform: identity
+    dtype: string
+
+  - target_column: individual_type
+    source: {literal: "BORROWER"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: ld.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loss_mitigation_application_individual"
+  entity_id_col: "loss_mitigation_application_individual_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+
+

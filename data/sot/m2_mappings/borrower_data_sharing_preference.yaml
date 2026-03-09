@@ -1,0 +1,179 @@
+table: borrower_data_sharing_preference
+version: 1
+primary_key: [borrower_data_sharing_preference_id]
+
+sources:
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+    filters:
+      - column: "OptOutSolicitationStopCode"
+        operator: "in"
+        value: ["1", "2", "3"]
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: borrower_to_loan_staging
+    alias: btl
+    staging: {table: "borrower_to_loan"}
+  - name: servicing_client_staging
+    alias: sc
+    staging: {table: "servicing_client"}
+
+joins:
+  - left: {source: fi}
+    right: {source: ed}
+    "on": ["fi.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: fi}
+    right: {source: l}
+    "on": ["fi.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: fi}
+    right: {source: btl}
+    "on": ["l.loan_id == btl.loan_id"]
+    how: left
+  - left: {source: fi}
+    right: {source: sc}
+    "on": ["l.loan_id == sc.loan_id"]
+    how: left
+
+columns:
+  - target_column: borrower_data_sharing_preference_id
+    hash_columns: ["btl.borrower_id", "l.loan_id", "sc.servicing_client_id", "BORROWER_DATA_SHARING_PREFERENCE"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: btl.borrower_id
+    transform: identity
+    dtype: string
+  
+  - target_column: servicing_client_id
+    source: sc.servicing_client_id
+    transform: identity
+    dtype: string
+  
+  - target_column: requested_date
+    source: ed.OptOutStopChangeDate
+    transform: identity
+    dtype: date
+
+  - target_column: limit_sharing_creditworthiness_with_affiliates
+    expression: | 
+      np.select(
+        condlist=[
+          fi.OptOutSolicitationStopCode.eq("1"),
+          fi.OptOutSolicitationStopCode.eq("2"),
+          fi.OptOutSolicitationStopCode.eq("3")
+        ],
+        choicelist=[
+          "TRUE",
+          "TRUE",
+          "FALSE"
+        ],
+        default="FALSE"
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: limit_sharing_info_for_marketing_with_affiliates
+    expression: | 
+      np.select(
+        condlist=[
+          fi.OptOutSolicitationStopCode.eq("1"),
+          fi.OptOutSolicitationStopCode.eq("2"),
+          fi.OptOutSolicitationStopCode.eq("3")
+        ],
+        choicelist=[
+          "TRUE",
+          "TRUE",
+          "FALSE"
+        ],
+        default="FALSE"
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: limit_sharing_info_for_marketing_with_non_affiliates
+    expression: | 
+      np.select(
+        condlist=[
+          fi.OptOutSolicitationStopCode.eq("1"),
+          fi.OptOutSolicitationStopCode.eq("2"),
+          fi.OptOutSolicitationStopCode.eq("3")
+        ],
+        choicelist=[
+          "TRUE",
+          "TRUE",
+          "TRUE"
+        ],
+        default="FALSE"
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: limit_sharing_all_info_with_affiliates
+    expression: | 
+      np.select(
+        condlist=[
+          fi.OptOutSolicitationStopCode.eq("1"),
+          fi.OptOutSolicitationStopCode.eq("2"),
+          fi.OptOutSolicitationStopCode.eq("3")
+        ],
+        choicelist=[
+          "TRUE",
+          "TRUE",
+          "FALSE"
+        ],
+        default="FALSE"
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: limit_sharing_all_info_with_non_affiliates
+    expression: | 
+      np.select(
+        condlist=[
+          fi.OptOutSolicitationStopCode.eq("1"),
+          fi.OptOutSolicitationStopCode.eq("2"),
+          fi.OptOutSolicitationStopCode.eq("3")
+        ],
+        choicelist=[
+          "TRUE",
+          "TRUE",
+          "TRUE"
+        ],
+        default="FALSE"
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: allowed_info
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: authorized_parties
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: authorized_expiration_date
+    source: ed.OptOutStopExpireDate
+    transform: identity
+    dtype: date
+  
+  - target_column: loan_id
+    source: btl.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "borrower_data_sharing_preference"
+  entity_id_col: "borrower_data_sharing_preference_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

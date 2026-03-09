@@ -1,0 +1,95 @@
+table: loan_to_portfolio
+version: 1
+primary_key: [loan_to_portfolio_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: Investor
+    alias: iv
+    pipe_file: {table: "Investor"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: portfolio_staging
+    alias: p
+    staging: {table: "portfolio"}
+
+joins:
+
+  - left: {source: l}
+    right: {source: li}
+    "on": ["l.loan_number == li.LoanNumber"]
+    how: left
+  - left: {source: l}
+    right: {source: ed}
+    "on": ["l.loan_number == ed.LoanNumber"]
+    how: left
+  - left: {source: l}
+    right: {source: p}
+    "on": 
+      - "l.loan_id == p.loan_id"
+      # - "li.InvestorId == p.portfolio_name"
+    how: left
+  - left: {source: l}
+    right: {source: iv}
+    "on": 
+      - "li.InvestorId == iv.InvestorId"
+      - "li.CategoryCode == iv.CategoryCode"
+    how: left
+
+columns:
+  - target_column: loan_to_portfolio_id
+    hash_columns: ["l.loan_id", "p.portfolio_id", "loan_to_portfolio"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: portfolio_id
+    source: p.portfolio_id
+    transform: identity
+    dtype: string
+
+  - target_column: effective_transfer_date
+    source: ed.AcquisitionDate
+    transform: identity
+    dtype: date
+
+  - target_column: effective_transfer_out_date
+    source: li.ServicingSoldDate
+    transform: identity
+    dtype: date
+
+  - target_column: fannie_holding_type
+    expression: |
+      np.select(
+        condlist=[
+          (iv.ReconMethod=="253") & (iv.CategoryCode != '990'),
+          (iv.ReconMethod=="253") & (iv.CategoryCode == '990'),
+          (iv.ReconMethod=="817") & (iv.CategoryCode != '990'),
+          (iv.ReconMethod=="817") & (iv.CategoryCode == '990')
+        ],
+        choicelist=[
+          "PORTFOLIO_MORTGAGE_LOAN",
+          "POOLED_FROM_PORTFOLIO",
+          "MBS_MORTGAGE_LOAN", 
+          "POOLED_FROM_PORTFOLIO"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_to_portfolio"
+  entity_id_col: "loan_to_portfolio_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

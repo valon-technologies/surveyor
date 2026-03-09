@@ -1,0 +1,42 @@
+table: task_team_responsible
+version: 1
+primary_key: [task_team_id]
+
+sources:
+  - name: TaskTracking
+    alias: tt
+    pipe_file: {table: "TaskTracking"}
+    filters:
+      - column: ["LoanNumber", "TaskResponsibleDepartmentId"]
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: tt}
+    right: {source: l}
+    "on": ["tt.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: task_team_id
+    hash_columns: ["tt.TaskResponsibleDepartmentId", "task_team_responsible"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: description
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: name
+    source: tt.TaskResponsibleDepartmentId
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

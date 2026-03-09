@@ -2,10 +2,13 @@ import fs from "fs";
 import path from "path";
 import yaml from "js-yaml";
 
-const DEFAULT_SOT_DIR = "/Users/rob/code/sdt_mapping/acdc_to_vds";
-
 function getSotDir(): string {
-  return process.env.SOT_MAPPING_DIR || DEFAULT_SOT_DIR;
+  if (process.env.SOT_MAPPING_DIR) return process.env.SOT_MAPPING_DIR;
+  // Bundled SOT files in the repo (works on Vercel)
+  const bundled = path.join(process.cwd(), "data", "sot");
+  if (fs.existsSync(bundled)) return bundled;
+  // Fallback to local sdt_mapping checkout
+  return "/Users/rob/code/sdt_mapping/acdc_to_vds";
 }
 
 // ---------------------------------------------------------------------------

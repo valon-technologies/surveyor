@@ -1,0 +1,75 @@
+table: property_insurance_period
+version: 1
+primary_key: [property_insurance_period_id]
+
+sources:
+  - name: property_insurance_period
+    alias: pip
+    staging: {table: "property_insurance_period_2"}
+
+columns:
+  - target_column: property_insurance_period_id
+    source: pip.property_insurance_period_id
+    transform: identity
+    dtype: string
+
+  - target_column: amount_coverage
+    source: pip.amount_coverage
+    transform: identity
+    dtype: float
+
+  - target_column: amount_deductible
+    source: pip.amount_deductible
+    transform: identity
+    dtype: float
+
+  - target_column: amount_premium
+    source: pip.amount_premium
+    transform: identity
+    dtype: float
+
+  - target_column: archived_at
+    source: pip.archived_at
+    transform: identity
+    dtype: datetime
+
+  - target_column: is_force_placed
+    source: pip.is_force_placed
+    transform: identity
+    dtype: boolean
+
+  - target_column: policy_cancelled_date
+    source: pip.policy_cancelled_date
+    transform: identity
+    dtype: date
+
+  - target_column: policy_end_date
+    source: pip.policy_end_date
+    transform: identity
+    dtype: date
+
+  - target_column: policy_number
+    source: pip.policy_number
+    transform: identity
+    dtype: string
+
+  - target_column: policy_start_date
+    source: pip.policy_start_date
+    transform: identity
+    dtype: date
+
+  - target_column: property_insurance_company_id
+    source: pip.property_insurance_company_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: pip.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "property_insurance_period"
+  entity_id_col: "property_insurance_period_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

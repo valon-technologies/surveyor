@@ -84,7 +84,7 @@ MAPPING SCHEMA (every object in "mappings" must have these keys):
 - transform (string|null): SQL expression if transformation needed
 - defaultValue (string|null): default if no source exists
 - enumMapping (object|null): {"source_val": "target_val"} for enum mappings
-- reasoning (string): 1-2 sentence explanation. When a transform or expression is used, describe what it does in plain english (e.g., "Maps mortgagor first name from LoanInfo, using the expanded name variant"). For enum mappings, briefly describe the code-to-value translation. For unmapped fields, explain why no source exists. CITE your sources: include [ref:ctx_ID] tags from the reference documents that informed this mapping (e.g., "Based on [ref:ctx_abc123] field description...").
+- reasoning (string): Explain WHY this source field is the correct match — what semantic evidence confirms the mapping? For direct mappings, describe what the source field contains and why it corresponds to the target field's definition (e.g., "LoanInfo.OriginalLoanAmount stores the initial principal balance at origination, matching the VDS unpaid_principal_balance definition [ref:ctx_abc123]"). Do NOT just restate the mapping type or field names — that adds no value. For transforms, explain the business logic in plain english. For enum mappings, briefly describe the code-to-value translation. For unmapped fields, explain why no source exists. CITE your sources with [ref:ctx_ID] tags.
 - confidence (string): "high" | "medium" | "low"
 - uncertaintyType (string|null): REQUIRED when confidence is "medium" or "low". One of: "no_source_match" | "multiple_candidates" | "unclear_transform" | "incomplete_enum" | "domain_ambiguity" | "missing_context"
 - notes (string|null): caveats or open questions
@@ -302,13 +302,13 @@ columns:
       <pandas expression>
     transform: identity|expression|null|literal|hash_id
     dtype: string|int|float|date|datetime|boolean
-    note: |                        # REQUIRED — 1-2 sentence explanation. When a transform or expression
-                                   # is used, describe what it does in plain english (e.g., "Maps
-                                   # mortgagor first name from LoanInfo, using the expanded name
-                                   # variant"). For enum mappings, briefly describe the code-to-value
-                                   # translation. For unmapped fields, explain why no source exists.
-                                   # CITE your sources: include [ref:ctx_ID] tags from the reference
-                                   # documents that informed this mapping.
+    note: |                        # REQUIRED — Explain WHY this source field is the correct match.
+                                   # For direct mappings, describe what the source field contains and
+                                   # why it corresponds to the target field's definition. Do NOT just
+                                   # restate the mapping type or field names. For transforms, explain
+                                   # the business logic in plain english. For enum mappings, describe
+                                   # the code-to-value translation. For unmapped fields, explain why
+                                   # no source exists. CITE sources with [ref:ctx_ID] tags.
     confidence: high|medium|low    # REQUIRED — how confident you are in this mapping
     review_comment: |              # REQUIRED when confidence is medium or low — explain specifically
                                    # what additional info is needed to make this 100% certain.

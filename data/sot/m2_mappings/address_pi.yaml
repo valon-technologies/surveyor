@@ -1,0 +1,117 @@
+table: address_pi
+version: 1
+
+sources:
+  - name: HazardInsurance
+    alias: hi
+    pipe_file: {table: "HazardInsurance"}
+    filters:
+      - column: ['LoanNumber', 'HazardInsCompanyCode']
+        operator: "dedup"
+        keep: "last"
+      - column: "HazardPolicyNumber"
+        operator: "is_not_null"
+      - column: "HazardInsCompanyCode"
+        operator: "not_in"
+        value: ["NOCOV", "GAPCN", "FLINH", "INMIS", "FLGAP", "RSTRT", "CYCLE", "7WAIV", "NRNWL", "66666", "77777", "CANCO", "CANIR", "CANNP", "CANUK", "TLOSS", 'UPV00']
+  - name: Payee
+    alias: p
+    pipe_file: {table: "Payee"}
+    filters:
+      - column: "PayeeId"
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+
+joins:
+  - left: {source: hi}
+    right: {source: p}
+    "on": ["hi.HazardInsCompanyCode == p.PayeeId"]
+    how: left
+  - left: {source: hi}
+    right: {source: li}
+    "on": ["hi.LoanNumber == li.LoanNumber"]
+    how: left
+  - left: {source: hi}
+    right: {source: l}
+    "on": ["hi.LoanNumber == l.loan_number"]
+    how: left
+  
+columns:
+  - target_column: address_id
+    expression: |
+      hash_address_id(
+        "ACDC",
+        p.PayeeAddressLine2.str.strip().fillna(li.PropertyStreetAddress.str.strip()),
+        p.PayeeAddressLine3.str.strip(), 
+        p.PayeeAddressLine4.str.strip().replace(r"^\*+$", pd.NA, regex=True).pipe(lambda s: s.where(s.isna(), s.str.rsplit(" ", n=1, expand=True)[0].str.strip())).fillna(li.PropertyLine2.str.rsplit(pat=" ", n=1).str[0].str.strip()),
+        p.PayeeAddressLine4.str.strip().replace(r"^\*+$", pd.NA, regex=True).pipe(lambda s: s.where(s.isna(), s.str.rsplit(" ", n=1, expand=True)[1].str.strip())).fillna(li.PropertyAlphaStateCode.str.strip()), 
+        p.PayeeAddressZipCode.fillna('').astype(str).str.replace('nan', '').str.slice(0, 5).str.zfill(5).replace('00000', '').str.strip()
+      )
+    transform: expression
+    dtype: string
+    
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: city
+    expression: |
+      np.where(
+        p.PayeeId == "CONDO",
+        li.PropertyLine2.str.rsplit(pat=" ", n=1).str[0].str.strip(), 
+        p.PayeeAddressLine4.str.rsplit(pat=" ", n=1).str[0].str.strip()
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: county
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: state
+    expression: | 
+      np.where(
+        p.PayeeId == "CONDO",
+        li.PropertyAlphaStateCode.str.strip(), 
+        p.PayeeAddressLine4.str.rsplit(pat=" ", n=1).str[1].str.strip()
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: street_address_1
+    expression: |
+      pd.Series(np.where(
+        p.PayeeId == "CONDO",
+        li.PropertyStreetAddress.str.strip().str.replace(r"\s+", " ", regex=True), 
+        p.PayeeAddressLine2.str.strip().fillna(p.PayeeAddressLine3.str.strip())
+      )).fillna(p.PayeeAddressLine3.str.strip())
+    transform: expression
+    dtype: string
+
+  - target_column: street_address_2
+    expression: p.PayeeAddressLine3.str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: zip_code
+    expression: |
+      np.where(
+        p.PayeeId == "CONDO",
+        li.PropertyZipCode.fillna('').astype(str).str.replace('nan', '').str.slice(0, 5).str.zfill(5).replace('00000', '').str.strip(),
+        p.PayeeAddressZipCode.fillna('').str.replace('nan', '').str.slice(0, 5).str.zfill(5).replace('00000', '').str.strip()
+      )
+    transform: expression
+    dtype: string
+  
+  - target_column: payeeid
+    source: p.PayeeId
+    transform: identity
+    dtype: string

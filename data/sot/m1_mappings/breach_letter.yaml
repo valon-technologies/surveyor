@@ -1,0 +1,86 @@
+table: breach_letter
+version: 1
+primary_key: [breach_letter_id]
+
+sources:
+  - name: notification_staging
+    alias: n
+    staging: {table: "notification_1"}
+    filters:
+      - column: "LetterId"
+        operator: "in"
+        value: ["BR101", "BR201", "BR301", "BR401", "CL215", "CL315", "CL219", "CL319", "CL419", "CL519", "CL222", "CL322", "CL422", "CL522", "BR104", "BR105", "BR106", "BR107", "BR109", "BR204", "BR205", "BR206", "BR207", "BR209", "BR304", "BR305", "BR306", "BR307", "BR309", "BR404", "BR405", "BR406", "BR407", "BR408", "BR409", "CL318", "CL423", "CL523", "CL208", "CL209", "CL308", "CL309", "CL408", "CL409", "CL508", "CL509", "BR103", "BR203", "BR303", "BR403", "CL211", "CL311", "CL312", "BR001", "CL108"]
+      - column: ["loan_id", "LetterId", "LetterDate"]
+        operator: "dedup"
+        keep: "last"
+  - name: breachletter_matrix
+    alias: b
+    pipe_file: {table: "BreachLetterMatrix"}
+    filters:
+      - column: "LetterId"
+        operator: "dedup"
+        keep: "last"
+  - name: address_staging
+    alias: a
+    staging: {table: "address_property"}
+  - name: BR001
+    alias: br
+    pipe_file: {table: "BR001"}
+
+joins:
+  - left: {source: n}
+    right: {source: b}
+    "on": ["n.LetterId == b.LetterId"]
+    how: inner
+  - left: {source: n}
+    right: {source: a}
+    "on": ["n.loan_id == a.loan_id"]
+    how: left
+  - left: {source: n}
+    right: {source: br}
+    "on": 
+      - "n.notification_type == br.LetterId"
+      - "n.state == br.state"
+    how: left
+
+columns:
+  - target_column: breach_letter_id
+    hash_columns: ["n.notification_id", "breach_letter"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: notice_type
+    expression: n.notification_type.str.upper()
+    transform: expression
+    dtype: string
+
+  - target_column: sent_date
+    source: n.LetterDate
+    transform: identity
+    dtype: datetime
+  
+  - target_column: expiration_date
+    expression: |
+      np.where(
+        n.notification_type == "notice_of_intent_to_foreclose",
+        pd.to_datetime(n.LetterDate, errors='coerce') + pd.to_timedelta(pd.to_numeric(br.expiry_period_days, errors='coerce') + 10, unit='days'),
+        pd.to_datetime(n.LetterDate, errors='coerce') + pd.to_timedelta(pd.to_numeric(b.LetterExpirationDays, errors='coerce'), unit='days')
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: notification_id
+    source: n.notification_id
+    transform: identity
+    dtype: string
+  
+  - target_column: loan_id
+    source: n.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "breach_letter"
+  entity_id_col: "breach_letter_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

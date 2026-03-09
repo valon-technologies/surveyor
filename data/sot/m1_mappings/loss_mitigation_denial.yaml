@@ -1,0 +1,55 @@
+table: loss_mitigation_denial
+version: 1
+primary_key: [loss_mitigation_denial_id]
+
+sources:
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "LSMT"
+      - operator: "expression"
+        expression: |
+          df["LoanNumber"].map(
+            df.groupby("LoanNumber").apply(
+              lambda g: ((g["StepCode"] == "N13") & (g["ActualCompletionDate"].notna())).any()
+            )
+          ).fillna(False).astype('bool')
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: s}
+    right: {source: l}
+    "on": ["s.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: loss_mitigation_denial_id
+    transform: hash_id
+    hash_columns: ["l.loan_id", "s.ActualCompletionDate_N13", "denial"]
+    dtype: string
+
+  - target_column: evaluated_date
+    source: s.ActualCompletionDate_N13
+    transform: identity
+    dtype: date
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loss_mitigation_denial"
+  entity_id_col: "loss_mitigation_denial_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

@@ -1,0 +1,52 @@
+table: tax_option
+version: 1
+primary_key: [tax_option_id]
+
+sources:
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: fi}
+    right: {source: l}
+    "on": ["fi.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: tax_option_id
+    hash_columns: ["fi.LoanNumber", "l.loan_id", "fi.WisconsinTaxOption", "tax_option"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: option
+    expression: |
+      fi.WisconsinTaxOption.map({
+        "1": "OPTION_1",
+        "2": "OPTION_2",
+        "3": "OPTION_3",
+        "4": "OPTION_4",
+        "5": "OPTION_5"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: state
+    expression: |
+      np.where(fi.WisconsinTaxOption.isin(["1", "2", "3", "4", "5"]), "WI", pd.NA)
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "tax_option"
+  entity_id_col: "tax_option_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

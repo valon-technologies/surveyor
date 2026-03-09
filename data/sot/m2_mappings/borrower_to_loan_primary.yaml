@@ -1,0 +1,35 @@
+table: borrower_to_loan_primary
+version: 1
+primary_key: [borrower_to_loan_id]
+
+sources:
+  - name: borrower_primary
+    alias: bp
+    staging: {table: "borrower_primary"}
+  
+columns:
+  - target_column: borrower_to_loan_id
+    hash_columns: ["bp.loan_id", "bp.borrower_id", "BORROWER_TO_LOAN_PRIMARY"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: bp.borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: is_primary
+    source: {literal: "True"}
+    transform: literal
+    dtype: boolean
+
+  - target_column: loan_user_type
+    source: {literal: "BORROWER"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: bp.loan_id
+    transform: identity
+    dtype: string
+

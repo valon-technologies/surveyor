@@ -1,0 +1,194 @@
+table: borrower_comortgr
+version: 1
+primary_key: [borrower_id, loan_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+    filters:
+      - column: "CoMortgagorFirstName"
+        operator: "is_not_null"
+  - name: BorrowerDemographics
+    alias: bd
+    pipe_file: {table: "BorrowerDemographics"}
+    filters:
+      - column: "BorrowerIndicator"
+        operator: "neq"
+        value: "05"
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: address_staging
+    alias: a
+    staging: {table: "address_comrtgr"}
+  - name: address_billing_staging
+    alias: ab
+    staging: {table: "address_billing"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: li}
+    right: {source: bd}
+    "on": ["li.LoanNumber == bd.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: ed}
+    "on": ["li.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: fi}
+    "on": ["li.LoanNumber == fi.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: a}
+    "on": ["l.loan_id == a.loan_id"]
+    how: left
+  - left: {source: li}
+    right: {source: ab}
+    "on": ["l.loan_id == ab.loan_id"]
+    how: left
+
+columns:
+  - target_column: borrower_id
+    expression: |
+      hash_borrower_id(
+        "ACDC",
+        li.CoMortgagorSsNumber,
+        li.CoMrtgrExpandedFirstName,
+        li.CoMrtgrExpandedLastName
+      )
+    transform: expression
+    dtype: string
+    
+  - target_column: mailing_address_id
+    expression: |
+      a.address_id.fillna(ab.address_id)
+    transform: expression
+    dtype: string
+
+  - target_column: account_registration_completed_at
+    source: []
+    transform: null
+    dtype: datetime
+
+  - target_column: birth_date
+    source: ed.CoMortgagorBirthDate
+    transform: identity
+    dtype: date
+
+  - target_column: deceased_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: email_address
+    expression: li.CoMortgagorEmailAddress.str.lower()
+    transform: expression
+    dtype: string
+
+  - target_column: ethnicity
+    expression: |
+      bd.EthnicityCategory1.map({
+        "1": "HISPANIC_OR_LATINO",
+        "2": "NOT_HISPANIC_OR_LATINO",
+        "3": "DECLINE_TO_STATE",
+        "4": "DECLINE_TO_STATE",
+        "5": "DECLINE_TO_STATE",
+      }).fillna("DECLINE_TO_STATE")
+    transform: expression
+    dtype: string
+
+  - target_column: first_name
+    source: li.CoMrtgrExpandedFirstName
+    transform: identity
+    dtype: string
+
+  - target_column: gender
+    expression: |
+      bd.Gender.map({
+        "M": "MALE",
+        "F": "FEMALE",
+        "4": "NONE_OF_THESE",
+        "6": "NONE_OF_THESE",
+        "3": "DECLINE_TO_STATE",
+        "5": "DECLINE_TO_STATE"
+      }).fillna("DECLINE_TO_STATE")
+    transform: expression
+    dtype: string
+
+  - target_column: last_name
+    source: li.CoMrtgrExpandedLastName
+    transform: identity
+    dtype: string
+
+  - target_column: middle_name
+    expression: li.CoMrtgrExpandedMiddleName.str.upper()
+    transform: expression
+    dtype: string
+
+  - target_column: preferred_language
+    expression: | 
+      bd.LanguagePreference.map({
+        "ENG": "ENGLISH",
+        "CHI": "CHINESE",
+        "KOR": "KOREAN",
+        "SPA": "SPANISH",
+        "TGL": "TAGALOG",
+        "VIE": "VIETNAMESE",
+        "ZXX": "DECLINE_TO_STATE",
+        "REF": "DECLINE_TO_STATE"
+      }).fillna("ENGLISH")
+    transform: expression
+    dtype: string
+
+  - target_column: race
+    expression: |
+      bd.RaceCategory1.map({
+        "1": "AMERICAN_INDIAN_OR_ALASKA_NATIVE",
+        "2": "ASIAN",
+        "3": "BLACK_OR_AFRICAN_AMERICAN",
+        "4": "NATIVE_HAWAIIAN_OR_OTHER_PACIFIC_ISLANDER",
+        "5": "WHITE",
+        "6": "DECLINED_TO_STATE",
+        "7": "OTHER",
+        "8": "DECLINED_TO_STATE"
+      }).fillna("DECLINED_TO_STATE")
+    transform: expression
+    dtype: string
+
+  - target_column: suffix
+    expression: |
+     fi.CoMtgrGenerationalSfxCode.map({
+      "2": "II",
+      "3": "III",
+      "4": "IV",
+      "5": "V",
+      "6": "VI",
+      "7": "VII",
+      "8": "VIII",
+      "9": "IX",
+      "J": "JUNIOR",
+      "S": "SENIOR"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: tax_id_number
+    source: li.CoMortgagorSsNumber
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

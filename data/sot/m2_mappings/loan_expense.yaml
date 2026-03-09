@@ -1,0 +1,59 @@
+table: loan_expense
+version: 1
+primary_key: [loan_expense_id]
+
+sources:
+  - name: loan_expense_recov
+    alias: lr
+    staging: {table: "loan_expense_recov"}
+  - name: loan_expense_nonrecov
+    alias: ln
+    staging: {table: "loan_expense_nonrecov"}
+  - name: loan_expense_thirdp
+    alias: lt
+    staging: {table: "loan_expense_thirdp"}
+
+concat:
+  sources: [lr, ln, lt]
+
+columns:
+  - target_column: loan_expense_id
+    source: loan_expense_id
+    transform: identity
+    dtype: string
+
+  - target_column: amount
+    source: amount
+    transform: identity
+    dtype: float
+
+  - target_column: expense_type
+    source: {literal: "SERVICING_EXPENSE"}
+    transform: literal
+    dtype: string
+
+  - target_column: is_onboarded
+    source: is_onboarded
+    transform: identity
+    dtype: string
+
+  - target_column: recoverability_type
+    source: recoverability_type
+    transform: identity
+    dtype: string
+
+  - target_column: servicing_expense_type
+    source: servicing_expense_type
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_expense"
+  entity_id_col: "loan_expense_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

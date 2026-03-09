@@ -1,0 +1,53 @@
+table: user_taskcontact
+version: 1
+primary_key: [user_id]
+
+sources:
+  - name: TaskTracking
+    alias: tt
+    pipe_file: {table: "TaskTracking"}
+    filters:
+      - column: "TaskContactId"
+        operator: "is_not_null"
+      - column: ["LoanNumber", "TaskContactId"]
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: tt}
+    right: {source: l}
+    "on": ["tt.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: user_id
+    expression: |
+      hash_user_id(
+        "ACDC",
+        tt.TaskContactId
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: first_name
+    expression: tt.TaskContactId.str.rsplit(pat=" ", n=1).str[0].str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: last_name
+    expression: tt.TaskContactId.str.rsplit(pat=" ", n=1).str[-1].str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: TaskContactId
+    source: tt.TaskContactId
+    transform: identity
+    dtype: string

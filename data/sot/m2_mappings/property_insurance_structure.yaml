@@ -1,0 +1,59 @@
+table: property_insurance_structure
+version: 1
+primary_key: [property_insurance_structure_id]
+
+sources:
+  - name: HazardInsurance
+    alias: hi
+    pipe_file: {table: "HazardInsurance"}
+    filters:
+      - column: "HazardPolicyNumber"
+        operator: "is_not_null"
+      - column: "HazardInsCompanyCode"
+        operator: "not_in"
+        value: ["NOCOV", "GAPCN", "FLINH", "INMIS", "FLGAP", "RSTRT", "CYCLE", "7WAIV", "NRNWL", "66666", "77777", "CANCO", "CANIR", "CANNP", "CANUK", "TLOSS", 'UPV00']
+      - column: ['LoanNumber']
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: escrow_loan_info_staging
+    alias: eli
+    staging: {table: "escrow_loan_info"}
+
+joins:
+  - left: {source: hi}
+    right: {source: l}
+    "on": ["hi.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: hi}
+    right: {source: eli}
+    "on": ["l.loan_id == eli.loan_id"]
+    how: left
+
+post_merge_filters:
+  - operator: "expression"
+    expression: "~((df['escrow_loan_info_id'].isnull()) & (df['HazardTypeOfPaymentCode'].isin(['1','2','3','4','5','6'])))"
+
+columns:
+  - target_column: property_insurance_structure_id
+    hash_columns: ["hi.LoanNumber", "l.loan_id", "hi.HazardDisbursementType", "hi.HazardSequenceNumber", "property_insurance_structure"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: description
+    source: {literal: "Structure 1"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "property_insurance_structure"
+  entity_id_col: "property_insurance_structure_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

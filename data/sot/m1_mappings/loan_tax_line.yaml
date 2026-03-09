@@ -1,0 +1,73 @@
+table: loan_tax_line
+version: 1
+primary_key: [loan_tax_line_id]
+
+sources:
+  - name: loan_tax_line_12
+    alias: ltl12
+    staging: {table: "loan_tax_line_12"}
+  - name: loan_tax_line_6
+    alias: ltl6
+    staging: {table: "loan_tax_line_6"}
+  - name: loan_tax_line_3
+    alias: ltl3
+    staging: {table: "loan_tax_line_3"}
+  - name: loan_tax_line_4
+    alias: ltl4
+    staging: {table: "loan_tax_line_4"}
+
+concat:
+  sources: [ltl12, ltl6, ltl3, ltl4]
+
+columns:
+  - target_column: loan_tax_line_id
+    source: loan_tax_line_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_tax_parcel_id
+    source: loan_tax_parcel_id
+    transform: identity
+    dtype: string
+
+  - target_column: tax_authority_id
+    source: tax_authority_id
+    transform: identity
+    dtype: string
+
+  - target_column: installment_amount_1
+    source: installment_amount_1
+    transform: identity
+    dtype: float
+
+  - target_column: installment_amount_2
+    source: installment_amount_2
+    transform: identity
+    dtype: float
+
+  - target_column: installment_amount_3
+    source: installment_amount_3
+    transform: identity
+    dtype: float
+
+  - target_column: installment_amount_4
+    source: installment_amount_4
+    transform: identity
+    dtype: float
+
+  - target_column: status
+    source: status
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_tax_line"
+  entity_id_col: "loan_tax_line_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

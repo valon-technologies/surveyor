@@ -1,0 +1,14 @@
+table: initial_ginnie_pool_variance
+version: 1
+primary_key: [initial_ginnie_pool_variance_id]
+
+sources: []
+
+columns: []
+
+entity:
+  entity_type: "initial_ginnie_pool_variance"
+  entity_id_col: "initial_ginnie_pool_variance_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+

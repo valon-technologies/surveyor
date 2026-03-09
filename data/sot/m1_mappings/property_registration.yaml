@@ -1,0 +1,71 @@
+table: property_registration
+version: 1
+primary_key: [property_registration_id]
+
+sources: 
+  - name: property_registration_regis
+    alias: prregis
+    staging: {table: "property_registration_regis"}
+  - name: property_registration_renew
+    alias: prrenew
+    staging: {table: "property_registration_renew"}
+  - name: property_registration_deregis
+    alias: prderegis
+    staging: {table: "property_registration_deregis"}
+
+concat:
+  sources: [prregis, prrenew, prderegis]
+
+columns:
+  - target_column: property_registration_id
+    source: property_registration_id
+    transform: identity
+    dtype: string
+
+  - target_column: action_type
+    source: action_type
+    transform: identity
+    dtype: string
+
+  - target_column: ordinance_type
+    source: ordinance_type
+    transform: identity
+    dtype: string
+
+  - target_column: completed_date
+    source: completed_date
+    transform: identity
+    dtype: date
+
+  - target_column: comments
+    source: comments
+    transform: identity
+    dtype: string
+
+  - target_column: municipality
+    source: municipality
+    transform: identity
+    dtype: string
+
+  - target_column: registration_frequency
+    source: registration_frequency
+    transform: identity
+    dtype: string
+
+  - target_column: status
+    source: status
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+
+entity:
+  entity_type: "property_registration"
+  entity_id_col: "property_registration_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

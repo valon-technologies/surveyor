@@ -1,0 +1,68 @@
+table: borrower_credit_score
+version: 1
+primary_key: [borrower_credit_score_id]
+
+sources:
+  - name: borrower_credit_score_borr_original
+    alias: bo
+    staging: {table: "borrower_credit_score_borr_original"}
+  - name: borrower_credit_score_borr_latest
+    alias: bl
+    staging: {table: "borrower_credit_score_borr_latest"}
+  - name: borrower_credit_score_borr_prev
+    alias: bp
+    staging: {table: "borrower_credit_score_borr_prev"}
+  - name: borrower_credit_score_coborr_original
+    alias: co
+    staging: {table: "borrower_credit_score_coborr_original"}
+  - name: borrower_credit_score_coborr_latest
+    alias: cl
+    staging: {table: "borrower_credit_score_coborr_latest"}
+  - name: borrower_credit_score_coborr_prev
+    alias: cp
+    staging: {table: "borrower_credit_score_coborr_prev"}
+
+concat:
+  sources: [bo, bl, bp, co, cl, cp]
+
+columns:
+  - target_column: borrower_credit_score_id
+    source: borrower_credit_score_id
+    transform: identity
+    dtype: string
+
+  - target_column: borrower_id
+    source: borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: credit_score
+    source: credit_score
+    transform: identity
+    dtype: int
+
+  - target_column: credit_scoring_model
+    source: credit_scoring_model
+    transform: identity
+    dtype: string
+
+  - target_column: retrieved_date
+    source: retrieved_date
+    transform: identity
+    dtype: date
+
+  - target_column: source_type
+    source: source_type
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "borrower_credit_score"
+  entity_id_col: "borrower_credit_score_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

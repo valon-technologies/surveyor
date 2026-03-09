@@ -1,0 +1,43 @@
+table: loan_at_data_transfer_info
+version: 1
+primary_key: [loan_at_data_transfer_info_id]
+
+sources:
+
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+    filters:
+      - column: "CouponBillLastCreateDate"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: ed}
+    right: {source: l}
+    "on": ["ed.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: loan_at_data_transfer_info_id
+    hash_columns: ["ed.LoanNumber", "l.loan_id", "loan_at_data_transfer_info"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: last_periodic_billing_statement_created_date
+    source: ed.CouponBillLastCreateDate
+    transform: identity
+    dtype: date
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_at_data_transfer_info"
+  entity_id_col: "loan_at_data_transfer_info_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

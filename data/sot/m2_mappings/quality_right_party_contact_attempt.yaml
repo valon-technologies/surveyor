@@ -1,0 +1,61 @@
+table: quality_right_party_contact_attempt
+version: 1
+primary_key: [quality_right_party_contact_attempt_id]
+
+sources: 
+  - name: quality_right_party_contact_attempt_yes
+    alias: qrpc_yes
+    staging: {table: "quality_right_party_contact_attempt_yes"}
+  - name: quality_right_party_contact_attempt_no
+    alias: qrpc_no
+    staging: {table: "quality_right_party_contact_attempt_no"}
+
+concat:
+  sources: [qrpc_no, qrpc_yes]
+
+columns: 
+  - target_column: quality_right_party_contact_attempt_id
+    source: quality_right_party_contact_attempt_id
+    transform: identity
+    dtype: string
+
+  - target_column: ability_to_repay
+    source: ability_to_repay
+    transform: identity
+    dtype: string
+
+  - target_column: loan_support_call_id
+    source: loan_support_call_id
+    transform: identity
+    dtype: string
+  
+  - target_column: is_qrpc_achieved
+    source: is_qrpc_achieved
+    transform: identity
+    dtype: string
+
+  - target_column: property_occupancy_status
+    source: property_occupancy_status
+    transform: identity
+    dtype: string
+
+  - target_column: reason_for_delinquency_timeframe
+    source: reason_for_delinquency_timeframe
+    transform: identity
+    dtype: string
+
+  - target_column: resolution_commitment_type
+    source: resolution_commitment_type
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "quality_right_party_contact_attempt"
+  entity_id_col: "quality_right_party_contact_attempt_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

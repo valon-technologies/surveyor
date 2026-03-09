@@ -1,0 +1,71 @@
+table: loan_support_ticket
+version: 1
+primary_key: [loan_support_ticket_id]
+
+sources:
+  - name: loan_support_ticket_staging
+    alias: st
+    staging: {table: "loan_support_ticket_1"}
+
+columns:
+  - target_column: loan_support_ticket_id
+    source: st.loan_support_ticket_id
+    transform: identity
+    dtype: string
+
+  - target_column: group_name
+    source: st.group_name
+    transform: identity
+    dtype: string
+
+  - target_column: process
+    source: st.process
+    transform: identity
+    dtype: string
+
+  - target_column: ticket_status
+    source: st.ticket_status
+    transform: identity
+    dtype: string
+
+  - target_column: subject
+    source: st.subject
+    transform: identity
+    dtype: string
+
+  - target_column: subprocess
+    source: st.subprocess
+    transform: identity
+    dtype: string
+
+  - target_column: ticket_source
+    source: st.ticket_source
+    transform: identity
+    dtype: string
+
+  - target_column: first_resolved_at
+    source: []
+    transform: null
+    dtype: datetime
+
+  - target_column: last_resolved_at
+    source: []
+    transform: null
+    dtype: datetime
+
+  - target_column: agent_user_id
+    source: st.agent_user_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: st.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_support_ticket"
+  entity_id_col: "loan_support_ticket_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

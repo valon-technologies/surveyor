@@ -1,0 +1,79 @@
+table: property_valuation
+version: 1
+primary_key: [property_valuation_id]
+
+sources:
+  - name: property_valuation_loan_mod
+    alias: pvm
+    staging: {table: "property_valuation_loan_mod"}
+  - name: property_valuation_origination
+    alias: pov
+    staging: {table: "property_valuation_origination"}
+  - name: property_valuation_current
+    alias: pvc
+    staging: {table: "property_valuation_current"}
+    
+concat:
+  sources: [pov, pvm, pvc]
+
+columns:
+  - target_column: property_valuation_id
+    source: property_valuation_id
+    transform: identity
+    dtype: string
+
+  - target_column: completed_date
+    source: completed_date
+    transform: identity
+    dtype: date
+
+  - target_column: effective_date
+    source: effective_date
+    transform: identity
+    dtype: date
+
+  - target_column: ordered_date
+    source: ordered_date
+    transform: identity
+    dtype: date
+
+  - target_column: property_value
+    source: property_value
+    transform: identity
+    dtype: float
+
+  - target_column: substantial_improvements_amount
+    source: substantial_improvements_amount
+    transform: identity
+    dtype: float
+
+  - target_column: substantial_improvements_completion_date
+    source: substantial_improvements_completion_date
+    transform: identity
+    dtype: date
+
+  - target_column: valuation_method
+    source: valuation_method
+    transform: identity
+    dtype: string
+
+  - target_column: valuation_purpose
+    source: valuation_purpose
+    transform: identity
+    dtype: string
+
+  - target_column: valuation_status
+    source: valuation_status
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "property_valuation"
+  entity_id_col: "property_valuation_id"
+  loan_id_col: "loan_id"  
+  loan_id_col_required: true

@@ -1,0 +1,74 @@
+table: property_maintenance_status
+version: 1
+primary_key: [property_maintenance_status_id]
+
+sources:
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "FcStatusCode"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: property_staging
+    alias: p
+    staging: {table: "property"}
+
+joins:
+  - left: {source: dw}
+    right: {source: l}
+    "on": ["dw.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: dw}
+    right: {source: p}
+    "on": ["l.loan_id == p.loan_id"]
+    how: left
+
+columns:
+  - target_column: property_maintenance_status_id
+    hash_columns: ["dw.LoanNumber", "l.loan_id", "p.property_id", "property_maintenance_status"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: property_id
+    source: p.property_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: archived_at
+    source: []
+    transform: null
+    dtype: datetime
+
+  - target_column: effective_date
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: note
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: status
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: update_user_id
+    source: []
+    transform: null
+    dtype: string
+
+entity:
+  entity_type: "property_maintenance_status"
+  entity_id_col: "property_maintenance_status_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

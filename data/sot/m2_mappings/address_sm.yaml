@@ -1,0 +1,52 @@
+table: address_sm
+version: 1
+
+sources:
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+columns:
+  - target_column: address_id
+    expression: |
+      pd.Series(
+        [hash_address_id("ACDC", "P.O. Box 100043", "", "Duluth", "GA", "30096")] * len(df),
+        index=df.index
+      )
+    transform: expression
+    dtype: string
+    
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: city
+    source: {literal: "Duluth"}
+    transform: literal
+    dtype: string
+
+  - target_column: county
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: state
+    source: {literal: "GA"}
+    transform: literal
+    dtype: string
+
+  - target_column: street_address_1
+    source: {literal: "P.O. Box 100043"}
+    transform: literal
+    dtype: string
+
+  - target_column: street_address_2
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: zip_code
+    source: {literal: "30096"}
+    transform: literal
+    dtype: string

@@ -1,0 +1,64 @@
+table: collateral_file_custodian
+version: 1
+primary_key: [collateral_file_custodian_id]
+
+sources:
+  - name: Collateral
+    alias: c
+    pipe_file: {table: "Collateral"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: c}
+    right: {source: l}
+    "on": ["c.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: collateral_file_custodian_id
+    hash_columns: ["c.BARCODE", "l.loan_id", "COLLATERAL_FILE_CUSTODIAN"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: custodian_collateral_id
+    source: c.BARCODE
+    transform: identity
+    dtype: string
+
+  - target_column: custodian_name
+    expression: |
+      c.DEPTID.map({
+        "1.00": "Bank of New York Mellon",
+        "2.00": "Deutsche Bank National Trust Company",
+        "3.00": "Farmers State Bank",
+        "4.00": "JPMorgan Chase Bank",
+        "5.00": "People's United Bank",
+        "6.00": "PNC Bank",
+        "7.00": "Truist Bank",
+        "8.00": "U.S. Bank Clearwater",
+        "9.00": "U.S. Bank Florence",
+        "10.00": "U.S. Bank Frederick",
+        "11.00": "U.S. Bank Jacksonville",
+        "12.00": "U.S. Bank Rocklin",
+        "13.00": "U.S. Bank St. Paul",
+        "14.00": "Wells Fargo Bank",
+        "15.00": "Wilmington Trust, National Association",
+        "21.00": "U.S. Bank Waterloo",
+        "22.00": "Held By Client"
+      }).fillna("UNKNOWN")
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "collateral_file_custodian"
+  entity_id_col: "collateral_file_custodian_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

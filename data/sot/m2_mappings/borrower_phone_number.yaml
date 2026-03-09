@@ -1,0 +1,84 @@
+table: borrower_phone_number
+version: 1
+primary_key: [borrower_phone_number_id]
+
+sources:
+  - name: borrower_phone_number_primary
+    alias: bpp
+    staging: {table: "borrower_phone_number_primary"}
+    filters:
+      - column: "phone_number"
+        operator: "is_not_null"
+  - name: borrower_phone_number_secondary
+    alias: bps
+    staging: {table: "borrower_phone_number_secondary"}
+    filters:
+      - column: "phone_number"
+        operator: "is_not_null"
+  - name: borrower_phone_number_thirdparty
+    alias: bpt
+    staging: {table: "borrower_phone_number_thirdparty"}
+    filters:
+      - column: "phone_number"
+        operator: "is_not_null"
+  - name: borrower_phone_number_comrtgr
+    alias: bpc
+    staging: {table: "borrower_phone_number_comrtgr"}
+    filters:
+      - column: "phone_number"
+        operator: "is_not_null"
+
+concat:
+  sources: [bpp, bps, bpt, bpc]
+
+columns:
+  - target_column: borrower_phone_number_id
+    source: borrower_phone_number_id
+    transform: identity
+    dtype: string
+
+  - target_column: borrower_id
+    source: borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: confirmed_at
+    source: confirmed_at
+    transform: identity
+    dtype: datetime
+
+  - target_column: is_primary
+    expression: is_primary.astype(str).str.lower().isin(['true', '1', 'yes'])
+    transform: expression
+    dtype: boolean
+
+  - target_column: phone_number
+    source: phone_number
+    transform: identity
+    dtype: string
+
+  - target_column: phone_number_type
+    expression: phone_number_type.fillna("CELL")
+    transform: expression
+    dtype: string
+
+  - target_column: retrieval_source
+    source: retrieval_source
+    transform: identity
+    dtype: string
+
+  - target_column: verification_status
+    source: verification_status
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "borrower_phone_number"
+  entity_id_col: "borrower_phone_number_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

@@ -1,0 +1,77 @@
+table: task_team_member_responsible
+version: 1
+primary_key: [task_team_member_id]
+
+sources:
+  - name: TaskTracking
+    alias: tt
+    pipe_file: {table: "TaskTracking"}
+    filters:
+      - column: "TaskResponsibleId"
+        operator: "is_not_null"
+      - column: ["LoanNumber", "TaskResponsibleDepartmentId", "TaskResponsibleId"]
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: task_team_responsible_staging
+    alias: tr
+    staging: {table: "task_team_responsible"}
+  - name: user_taskresponsible_staging
+    alias: utr
+    staging: {table: "user_taskresponsible"}
+    filters:
+      - column: ["loan_id", "TaskResponsibleId"]
+        operator: "dedup"
+        keep: "last"
+
+joins:
+  - left: {source: tt}
+    right: {source: l}
+    "on": ["tt.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: tt}
+    right: {source: tr}
+    "on": 
+      - "l.loan_id == tr.loan_id"
+      - "tt.TaskResponsibleDepartmentId == tr.name"
+    how: left
+  - left: {source: tt}
+    right: {source: utr}
+    "on": 
+      - "l.loan_id == utr.loan_id"
+      - "tt.TaskResponsibleId == utr.TaskResponsibleId"
+    how: left
+  
+  
+columns:
+  - target_column: task_team_member_id
+    hash_columns: ["tr.task_team_id", "utr.user_id", "task_team_member_responsible"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: member_status
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: member_type
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: task_team_id
+    source: tr.task_team_id
+    transform: identity
+    dtype: string
+
+  - target_column: user_id
+    source: utr.user_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

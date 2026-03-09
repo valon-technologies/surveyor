@@ -1,0 +1,87 @@
+table: mortgage_insurance_installment
+version: 1
+primary_key: [mortgage_insurance_installment_id]
+
+sources:
+  - name: Transaction
+    alias: ts
+    pipe_file: {table: "Transaction"}
+    filters:
+      - column: "TransactionCode"
+        operator: "eq"
+        value: "310"
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+    filters:
+      - column: "MiCertificateNumberExp"
+        operator: "is_not_null"
+      - column: "MiCompanyCodeExp"
+        operator: "not_in"
+        value: ["904", "905"]
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: mortgage_insurance_staging
+    alias: mi
+    staging: {table: "mortgage_insurance"}
+
+joins:
+  - left: {source: ts}
+    right: {source: li}
+    "on": ["ts.LoanNumber == li.LoanNumber"]
+    how: inner
+  - left: {source: ts}
+    right: {source: l}
+    "on": ["ts.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: ts}
+    right: {source: mi}
+    "on": ["l.loan_id == mi.loan_id"]
+    how: left
+
+columns:
+  - target_column: mortgage_insurance_installment_id
+    hash_columns: ["ts.LoanNumber", "ts.TransactionDate", "ts.TransactionRowNumber", "l.loan_id", "mi.mortgage_insurance_id", "mortgage_insurance_installment"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: escrow_disbursement_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: amount_premium
+    expression: pd.to_numeric(ts.EscrowPaidAmount, errors="coerce") * -1
+    transform: expression
+    dtype: float
+
+  - target_column: due_date
+    source: ts.DueDate
+    transform: identity
+    dtype: date
+
+  - target_column: payment_status
+    expression: | 
+      ts.TransactionDescription.map({
+      "MIP/PMI Premium Disb": "PAID_BY_CURRENT_SERVICER",
+      "MIP/PMI Premium Disb (Prior Servicer)": "PAID_BY_PRIOR_SERVICER"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: mortgage_insurance_id
+    source: mi.mortgage_insurance_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "mortgage_insurance_installment"
+  entity_id_col: "mortgage_insurance_installment_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

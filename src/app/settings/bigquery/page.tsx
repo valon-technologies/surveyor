@@ -20,9 +20,19 @@ export default function BigQuerySettingsPage() {
   const { data: authStatus, refetch: refetchAuth } = useBqAuthStatus();
   const authLogin = useBqAuthLogin();
 
-  const PROJECT_DATASETS: Record<string, string> = {
-    "service-mac-stage": "raw_acdc_M2_trial1",
-    "service-mac-prod": "raw_acdc_m1",
+  const PROJECT_DATASETS: Record<string, string[]> = {
+    "service-mac-prod": [
+      "raw_acdc_m1",
+      "vds_production",
+    ],
+    "service-mac-stage": [
+      "raw_acdc_M2_Fay_trial1",
+      "raw_acdc_M2_Lakeview_trial1",
+      "raw_acdc_M1_0127",
+      "raw_acdc_M1_trial_2",
+      "raw_acdc_nexus_nova",
+      "vds_production",
+    ],
   };
 
   const [projectId, setProjectId] = useState("");
@@ -42,8 +52,9 @@ export default function BigQuerySettingsPage() {
 
   const handleProjectChange = (value: string) => {
     setProjectId(value);
-    // Auto-set the linked source dataset
-    setSourceDataset(PROJECT_DATASETS[value] || "");
+    // Auto-set to first available dataset
+    const datasets = PROJECT_DATASETS[value];
+    setSourceDataset(datasets?.[0] || "");
   };
 
   const handleTest = () => {
@@ -205,11 +216,11 @@ export default function BigQuerySettingsPage() {
               <option value="">
                 {projectId ? "Select a dataset..." : "Select a project first"}
               </option>
-              {projectId && PROJECT_DATASETS[projectId] && (
-                <option value={PROJECT_DATASETS[projectId]}>
-                  {PROJECT_DATASETS[projectId]}
+              {projectId && PROJECT_DATASETS[projectId]?.map((ds) => (
+                <option key={ds} value={ds}>
+                  {ds}
                 </option>
-              )}
+              ))}
             </select>
             <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>

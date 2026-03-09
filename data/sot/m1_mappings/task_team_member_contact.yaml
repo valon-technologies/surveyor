@@ -1,0 +1,74 @@
+table: task_team_member_contact
+version: 1
+primary_key: [task_team_member_id]
+
+sources:
+  - name: TaskTracking
+    alias: tt
+    pipe_file: {table: "TaskTracking"}
+    filters:
+      - column: ["LoanNumber", "TaskContactDepartmentId", "TaskContactUserId"]
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: task_team_contact_staging
+    alias: tc
+    staging: {table: "task_team_contact"}
+  - name: user_taskcontact_staging
+    alias: utc
+    staging: {table: "user_taskcontact"}
+    filters:
+      - column: ["loan_id", "TaskContactId"]
+        operator: "dedup"
+        keep: "last"
+
+joins:
+  - left: {source: tt}
+    right: {source: l}
+    "on": ["tt.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: tt}
+    right: {source: tc}
+    "on": 
+      - "l.loan_id == tc.loan_id"
+      - "tt.TaskContactDepartmentId == tc.name"
+    how: left
+  - left: {source: tt}
+    right: {source: utc}
+    "on": 
+      - "l.loan_id == utc.loan_id"
+      - "tt.TaskContactId == utc.TaskContactId"
+    how: left
+  
+columns:
+  - target_column: task_team_member_id
+    hash_columns: ["tc.task_team_id", "utc.user_id", "task_team_member_contact"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: member_status
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: member_type
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: task_team_id
+    source: tc.task_team_id
+    transform: identity
+    dtype: string
+
+  - target_column: user_id
+    source: utc.user_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

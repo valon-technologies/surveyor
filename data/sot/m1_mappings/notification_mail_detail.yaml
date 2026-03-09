@@ -1,0 +1,114 @@
+table: notification_mail_detail
+version: 1
+primary_key: [notification_mail_detail_id]
+
+sources:
+  - name: notification_staging
+    alias: n
+    staging: {table: "notification_1"}
+    dtypes:
+      MspEffectiveDate: "date"
+      LetterDate: "date"
+      LetterVersionNumber: "float"
+      LetterRecordNumber: "float"
+    filters:
+      - column: "delivery_method"
+        operator: "eq"
+        value: "MAIL"
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: address_staging
+    alias: a
+    staging: {table: "address_billing"}
+  - name: address_sm_staging
+    alias: sm
+    staging: {table: "address_sm"}
+
+joins:
+  - left: {source: n}
+    right: {source: l}
+    "on": ["n.loan_id == l.loan_id"]
+    how: left
+  - left: {source: n}
+    right: {source: li}
+    "on": ["l.loan_number == li.LoanNumber"]
+    how: left
+  - left: {source: n}
+    right: {source: a}
+    "on": ["l.loan_id == a.loan_id"]
+    how: left
+  - left: {source: n}
+    right: {source: sm}
+    "on": ["l.loan_id == sm.loan_id"]
+    how: left
+
+columns:
+  - target_column: notification_mail_detail_id
+    hash_columns: ["l.loan_id", "n.notification_id", "n.MspEffectiveDate", "n.LetterDate", "n.LetterId", "n.LetterRecordNumber", "notification_mail_detail"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: delivered_at
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: final_delivery_status
+    source: {literal: "DELIVERED"}
+    transform: literal
+    dtype: string
+
+  - target_column: from_address_id
+    source: sm.address_id
+    transform: identity
+    dtype: string
+
+  - target_column: from_name
+    expression: |
+      n.LetterSenderId.replace({
+        "VEN": "Venture",
+        "COV": "Covius",
+        "MCD": "MCDS"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: postmarked_date
+    source: n.MspEffectiveDate
+    transform: identity
+    dtype: date
+
+  - target_column: sent_at
+    source: n.LetterDate
+    transform: identity
+    dtype: date
+
+  - target_column: to_address_id
+    source: a.address_id
+    transform: identity
+    dtype: string
+
+  - target_column: to_name
+    expression: li.MortgagorExpandedFirstName + " " + li.MortgagorExpandedLastName
+    transform: expression
+    dtype: string
+
+  - target_column: notification_id
+    source: n.notification_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "notification_mail_detail"
+  entity_id_col: "notification_mail_detail_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

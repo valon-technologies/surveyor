@@ -1,0 +1,132 @@
+table: loan_tax_installment_4_2
+version: 1
+primary_key: [loan_tax_installment_id]
+
+sources:
+  - name: loan_tax_installment_4
+    alias: t4
+    staging: {table: "loan_tax_installment_4"}
+    computed_columns:
+      - column: "tax_year"
+        expression: |
+          df.groupby(['loan_id', 'loan_tax_line_id']).apply(
+            lambda g: (
+              g.sort_values('installment_index').copy().pipe(
+                lambda h: h.assign(
+                  _duedate_mmdd=h['duedate'].astype('int'),
+                  _seq=h['installment_index'].astype('int'),
+                  _upcoming_mmdd=pd.to_datetime(h['upcoming_duedate']).dt.strftime('%m%d').astype('int').iloc[0] if h['upcoming_duedate'].notna().any() else -1,
+                  _next_year=pd.to_numeric(h['year'].iloc[0])
+                )
+              ).pipe(
+                lambda h: h.assign(
+                  _pivot_seq=(h.loc[h['_duedate_mmdd'].eq(h['_upcoming_mmdd']), '_seq'].iloc[0] if h['_duedate_mmdd'].eq(h['_upcoming_mmdd']).any() else -1)
+                )
+              ).pipe(
+                lambda h: h.assign(
+                  tax_year=np.where(
+                    h['_pivot_seq'] == -1,
+                    h['_next_year'],
+                    np.where(
+                      h['_pivot_seq'] == 1,
+                      h['_next_year'],
+                      np.where(h['_seq'] < h['_pivot_seq'], h['_next_year'], h['_next_year'] - 1)
+                    )
+                  )
+                )
+              )
+            )
+          ).reset_index(drop=True)['tax_year'] - 1 
+      - column: "due_date_w_year"
+        expression: "pd.to_datetime((pd.to_numeric(df['year'])-1).astype('str') + df['duedate'], format='%Y%m%d', errors='coerce')"
+      - column: "year"
+        expression: "(pd.to_numeric(df['year']) - 1)"
+    filters:
+      - column: "tax_year"
+        operator: "eq"
+        value: 2025
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: Transaction
+    alias: tr
+    pipe_file: {table: "Transaction"}
+    dtypes:
+      TotalAmountPaid: "float"
+      DueDate: "date"
+    filters:
+      - operator: "expression"
+        expression: "TransactionDescription.str.contains('Tax Disb|Utilities Dist Disb', regex=True, na=False)"
+      - column: ['LoanNumber', 'DueDate']
+        operator: "dedup"
+        keep: "last"
+        
+joins:
+  - left: {source: t4}
+    right: {source: l}
+    "on": ["t4.loan_id == l.loan_id"]
+    how: left
+  - left: {source: t4}
+    right: {source: tr}
+    "on": 
+      - "l.loan_number == tr.LoanNumber"
+      - "t4.due_date_w_year == tr.DueDate"
+    how: left
+
+columns:
+  - target_column: loan_tax_installment_id
+    hash_columns: ["t4.loan_tax_installment_id", "loan_tax_installment_4_2025"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: amount_base
+    source: t4.amount_base
+    transform: identity
+    dtype: float
+
+  - target_column: amount_fee
+    source: t4.amount_fee
+    transform: identity
+    dtype: float
+
+  - target_column: economic_loss_date
+    expression: |
+      pd.to_datetime(t4.year.astype(str) + t4.economic_loss_date, format='%Y%m%d', errors='coerce')
+    transform: expression
+    dtype: date
+
+  - target_column: installment_index
+    source: t4.installment_index
+    transform: identity
+    dtype: string
+
+  - target_column: payment_status
+    expression: |
+      np.select(
+        condlist=[
+          (tr.TotalAmountPaid==0) & (pd.to_datetime(t4.due_date_w_year)<pd.to_datetime(l.data_transfer_effective_date)),
+          (tr.TotalAmountPaid.isnull()) & (pd.to_datetime(t4.due_date_w_year)>=pd.to_datetime(l.data_transfer_effective_date))
+        ],
+        choicelist=[
+          "DELINQUENT", 
+          "UNPAID"
+        ],
+        default="CONFIRMED"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: year
+    source: t4.tax_year
+    transform: identity
+    dtype: int
+
+  - target_column: loan_id
+    source: t4.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_tax_line_id
+    source: t4.loan_tax_line_id
+    transform: identity
+    dtype: string

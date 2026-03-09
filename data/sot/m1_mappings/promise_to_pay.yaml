@@ -1,0 +1,55 @@
+table: promise_to_pay
+version: 1
+primary_key: [promise_to_pay_id]
+
+sources: 
+  - name: PromiseToPay
+    alias: ptp
+    pipe_file: {table: "OutstandingPromiseToPays"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: ptp}
+    right: {source: l}
+    "on": ["ptp.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: promise_to_pay_id
+    hash_columns: ["ptp.PromiseToPayId", "ptp.CommentAddedDate", "ptp.CommentReminderDate", "promise_to_pay"]
+    transform: hash_id
+    dtype: string
+    
+  - target_column: payment_method
+    source: {literal: "UNKNOWN_AT_ONBOARDING"}
+    transform: literal
+    dtype: string
+
+  - target_column: amount_promised
+    source: ptp.CommentForbearanceAmount
+    transform: identity
+    dtype: float
+
+  - target_column: promised_date
+    source: ptp.CommentReminderDate
+    transform: identity
+    dtype: datetime
+
+  - target_column: status
+    source: {literal: "UNKNOWN_AT_ONBOARDING"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "promise_to_pay"
+  entity_id_col: "promise_to_pay_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

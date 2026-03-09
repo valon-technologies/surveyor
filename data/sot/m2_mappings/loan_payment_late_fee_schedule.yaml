@@ -1,0 +1,122 @@
+table: loan_payment_late_fee_schedule
+version: 1
+primary_key: [loan_payment_late_fee_schedule_id]
+
+sources:
+  - name: PaymentFactors
+    alias: pf
+    pipe_file: {table: "PaymentFactors"}
+    dtypes:
+      PfEffectiveDate: "date"
+    sorting:
+      - column: "PfEffectiveDate"
+        ascending: true
+    filters:
+      - column: "LoanNumber"
+        operator: "dedup"
+        keep: "first"
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: li}
+    right: {source: ed}
+    "on": ["li.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: fi}
+    "on": ["li.LoanNumber == fi.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: li}
+    right: {source: pf}
+    "on": ["li.LoanNumber == pf.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: loan_payment_late_fee_schedule_id
+    hash_columns: ["li.LoanNumber", "l.loan_id", "ed.FirstDueDate", "loan_payment_late_fee_schedule"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: first_payment_due_date
+    source: pf.PfEffectiveDate
+    transform: identity
+    dtype: date
+
+  - target_column: last_payment_due_date
+    source: ed.LoanMaturesDate 
+    transform: identity
+    dtype: date
+
+  - target_column: late_charge_max_amount
+    source: li.MaximumLateChargeAmount
+    transform: identity
+    dtype: float
+
+  - target_column: late_charge_min_amount
+    source: li.MinimumLateChargeAmount
+    transform: identity
+    dtype: float
+
+  - target_column: late_charge_type
+    expression: | 
+      fi.LateChargeCode.map({
+        "A": "PERCENT",
+        "B": pd.NA,
+        "C": pd.NA,
+        "D": "FIXED",
+        "E": "FIXED",
+        "F": "FIXED",
+        "G": pd.NA,
+        "H": "PERCENT",
+        "K": "FIXED",
+        "L": "PERCENT"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: late_charge_value
+    expression: |
+      np.select(
+        condlist=[
+          fi.LateChargeCode.isin(["D", "E", "F", "K"]),
+          fi.LateChargeCode.isin(["A", "H", "L"])
+        ],
+        choicelist=[
+          li.LateChargeAmount,
+          pd.to_numeric(li.LateChargeFactor)*100.0
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: float
+
+  - target_column: late_grace_days
+    source: li.GraceDays
+    transform: identity
+    dtype: int
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_payment_late_fee_schedule"
+  entity_id_col: "loan_payment_late_fee_schedule_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

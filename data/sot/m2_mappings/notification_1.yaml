@@ -1,0 +1,127 @@
+table: notification_1
+version: 1
+primary_key: [notification_id]
+
+sources:
+  - name: Letter
+    alias: le
+    pipe_file: {table: "Letter"}
+    filters:
+      - column: "LetterId"
+        operator: "not_in"
+        value: ["CL203", "CL303", "CL416", "CL516", "CL217", "CL317", "CL417", "CL517", "CL204", "CL304", "CL407", "CL507", "CL205", "CL305", "CL405", "CL413", "CL505", "CL513"]
+  - name: NotificationType
+    alias: lm
+    pipe_file: {table: "NotificationType"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: address_staging
+    alias: a
+    staging: {table: "address_property"}
+
+joins:
+  - left: {source: le}
+    right: {source: l}
+    "on": ["le.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: le}
+    right: {source: lm}
+    "on": ["le.LetterId == lm.LetterID"]
+    how: left
+  - left: {source: le}
+    right: {source: a}
+    "on": ["l.loan_id == a.loan_id"]
+    how: left
+
+columns:
+  - target_column: notification_id
+    hash_columns: ["le.LoanNumber", "l.loan_id", "le.MspEffectiveDate", "le.LetterDate", "le.LetterId", "le.LetterRecordNumber", "notification"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: notification_type
+    expression: | 
+      pd.Series(np.where(
+        le.LetterId.isin(['BR101', 'BR201', 'BR301', 'BR401', 'CL215', 'CL315', 'CL219', 'CL319', 'CL419', 'CL519', 'CL222', 'CL322', 'CL422', 'CL522', 'BR104', 'BR105', 'BR106', 'BR107', 'BR109', 'BR204', 'BR205', 'BR206', 'BR207', 'BR209', 'BR304', 'BR305', 'BR306', 'BR307', 'BR309', 'BR404', 'BR405', 'BR406', 'BR407', 'BR408', 'BR409', 'CL318', 'CL423', 'CL523', 'CL208', 'CL209', 'CL308', 'CL309', 'CL408', 'CL409', 'CL508', 'CL509', 'CL211', 'CL311', 'CL312', 'BR001', 'CL108', 'CL210', 'CL310', 'BR103', 'BR203', 'BR303', 'BR403']),
+        np.select(
+          condlist=[
+            le.LetterId == "BR001",
+            (le.LetterId.isin(["BR101", "BR201", "BR301", "BR401"]) & (a.state=="PA")),
+            (le.LetterId.isin(["BR101", "BR201", "BR301", "BR401"]) & (a.state!="PA")),
+            le.LetterId.isin(["BR103", "BR203", "BR303", "BR403"]),
+            ((le.LetterId!="BR001") & (a.state=="RI")),
+            ((le.LetterId!="BR001") & (a.state=="NY"))
+          ], 
+          choicelist=[
+            "notice_of_intent_to_foreclose",
+            "state_specific_demand_notice",
+            "notice_of_intent_to_foreclose",
+            "notice_of_intent_to_foreclose",
+            "state_specific_mediation_notice",
+            "state_specific_demand_notice"
+          ], 
+          default="state_specific_notice"
+        ),
+        lm.ACDCMapping.fillna("other")
+      ))
+    transform: expression
+    dtype: string
+
+  - target_column: MspEffectiveDate
+    source: le.MspEffectiveDate
+    transform: identity
+    dtype: date
+
+  - target_column: LetterDate
+    source: le.LetterDate
+    transform: identity
+    dtype: date
+
+  - target_column: LetterVersionNumber
+    source: le.LetterVersionNumber
+    transform: identity
+    dtype: int
+
+  - target_column: LetterRecordNumber
+    source: le.LetterRecordNumber
+    transform: identity
+    dtype: int
+
+  - target_column: LetterId
+    source: le.LetterId
+    transform: identity
+    dtype: string
+  
+  - target_column: LetterSenderId
+    source: le.LetterSenderId
+    transform: identity
+    dtype: string
+
+  - target_column: LetterDescription
+    source: le.LetterDescription
+    transform: identity
+    dtype: string
+
+  - target_column: delivery_method
+    expression: |
+      np.select(
+        condlist=[
+          lm.EmailFlag=="TRUE",
+          lm.SMSFlag=="TRUE"
+        ],
+        choicelist=["EMAIL", "SMS"],
+        default="MAIL"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: state
+    source: a.state
+    transform: identity
+    dtype: string

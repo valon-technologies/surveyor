@@ -1,0 +1,83 @@
+table: property_occupancy_status
+version: 1
+primary_key: [property_occupancy_status_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: property_staging
+    alias: p
+    staging: {table: "property"}
+
+joins:
+  - left: {source: p}
+    right: {source: l}
+    "on": ["p.loan_id == l.loan_id"]
+    how: left
+  - left: {source: p}
+    right: {source: li}
+    "on": ["l.loan_number == li.LoanNumber"]
+    how: left
+  - left: {source: p}
+    right: {source: fi}
+    "on": ["l.loan_number == fi.LoanNumber"]
+    how: left
+  - left: {source: p}
+    right: {source: ed}
+    "on": ["l.loan_number == ed.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: property_occupancy_status_id
+    hash_columns: ["l.loan_id", "p.property_id", "ed.LoanNumber", "property_occupancy_status"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: occupancy_status
+    expression: |
+      fi.OccupancyCurrentStatusCode.map({
+        "1": "BORROWER_OCCUPIED",      
+        "2": "BORROWER_OCCUPIED", 
+        "3": "TENANT_OCCUPIED",
+        "8": "TENANT_OCCUPIED",        
+        "4": "VACANT",     
+        "5": "VACANT",
+        "0": "UNKNOWN_OCCUPIED",       
+        "6": "UNKNOWN_OCCUPIED",       
+        "7": "UNKNOWN_OCCUPIED",       
+        "9": "UNKNOWN_OCCUPIED"        
+      }).fillna("UNKNOWN_OCCUPIED")
+    transform: expression
+    dtype: string
+
+  - target_column: source
+    source: {literal: "ONBOARDING"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: property_id
+    source: p.property_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "property_occupancy_status"
+  entity_id_col: "property_occupancy_status_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

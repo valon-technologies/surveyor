@@ -1,0 +1,88 @@
+table: borrower_credit_score_coborr_prev
+version: 1
+primary_key: [borrower_credit_score_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+    dtypes:
+      CsCoborrPrevCredQltyCode: "int"
+    filters:
+      - column: "CsCoborrPrevCredQltyCode"
+        operator: "is_not_null"
+      - column: "CsCoborrPrevCredQltyCode"
+        operator: "neq"
+        value: 0
+      - column: "CsCoborrPrevCredQltyCode"
+        operator: "neq"
+        value: 9999
+      - column: "CsCoborrPrevCredQltyCode"
+        operator: "neq"
+        value: 7777
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+    filters:
+      - column: "CsCoborrPrevCredQltyDate"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: borrower_to_loan_staging
+    alias: btl
+    staging: {table: "borrower_to_loan"}
+    filters:
+      - column: "is_primary"
+        operator: "eq"
+        value: "False"
+
+joins:
+  - left: {source: btl}
+    right: {source: l}
+    "on": ["btl.loan_id == l.loan_id"]
+    how: left
+  - left: {source: btl}
+    right: {source: li}
+    "on": ["l.loan_number == li.LoanNumber"]
+    how: inner
+  - left: {source: btl}
+    right: {source: ed}
+    "on": ["li.LoanNumber == ed.LoanNumber"]
+    how: inner
+
+columns:
+  - target_column: borrower_credit_score_id
+    hash_columns: ["btl.borrower_id", "l.loan_id", "borrower_credit_score_coborr_prev"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: btl.borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: credit_score
+    source: li.CsCoborrPrevCredQltyCode
+    transform: identity
+    dtype: int
+
+  - target_column: credit_scoring_model
+    source: {literal: "FICO"}
+    transform: literal
+    dtype: string
+
+  - target_column: retrieved_date
+    source: ed.CsCoborrPrevCredQltyDate
+    transform: identity
+    dtype: date
+
+  - target_column: source_type
+    source: {literal: "MANUAL_STM_ANNOTATION"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: btl.loan_id
+    transform: identity
+    dtype: string

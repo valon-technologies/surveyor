@@ -1,0 +1,85 @@
+table: escrow_disbursement_stop
+version: 1
+primary_key: [escrow_disbursement_stop_id]
+
+sources:
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+    filters:
+      - column: "DisbursementStop"
+        operator: "neq"
+        value: "0"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: fi}
+    right: {source: l}
+    "on": ["fi.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: fi}
+    right: {source: ed}
+    "on": ["fi.LoanNumber == ed.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: escrow_disbursement_stop_id
+    hash_columns: ["ed.LoanNumber", "l.loan_id", "ed.PreviousDisbursementStopEndDate", "escrow_disbursement_stop"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: created_reason
+    expression: |
+      fi.DisbursementStop.map({
+        "1": "STOP ALL",
+        "2": "STOP ALL DEFAULT",
+        "3": "THIRD PARTY SALE",
+        "4": "PENDING PAYOFF",
+        "5": "ESCROW RESEARCH",
+        "6": "SS/CO/DIL PENDING",
+        "7": "SS/CO/DIL APPROVED",
+        "8": "ACQUISITION",
+        "9": "BOARDING ERROR",
+        "A": "STOP PMI",
+        "B": "STOP INSURANCE",
+        "C": "STOP INS DEFAULT",
+        "D": "STOP INS ACQUISITION",
+        "E": "INS MIDTERM CHANGE",
+        "F": "CASH DISB ONLY",
+        "G": "STOP TAX",
+        "H": "STOP TAX DEFAULT",
+        "I": "STOP TAX-MANUAL RVW",
+        "L": "STOP ALL ESCROW"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: expired_at
+    source: ed.PreviousDisbursementStopEndDate
+    transform: identity
+    dtype: date
+
+  - target_column: disbursement_stop_type
+    expression: |
+      fi.DisbursementStop.map({
+        "E": "PROPERTY_INSURANCE"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "escrow_disbursement_stop"
+  entity_id_col: "escrow_disbursement_stop_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

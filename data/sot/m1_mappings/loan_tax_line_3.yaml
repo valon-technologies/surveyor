@@ -1,0 +1,105 @@
+table: loan_tax_line_3
+version: 1
+primary_key: [loan_tax_line_id]
+
+sources:
+  - name: Tax
+    alias: t
+    pipe_file: {table: "Tax"}
+    dtypes:
+      TaxKeySequenceNumber: "int"
+      TaxDisbursementDueDate: "date"
+    filters:
+      - column: "TaxTerm"
+        operator: "eq"
+        value: "3"
+    pivot:
+        year_column: "TaxDisbursementDueDate"
+        year_output_column: "TaxYear"
+        filter_max_year: true
+        filter_max_year_group_by: ["LoanNumber", "TaxId", "TaxPayeeCode"]
+        sort_by: "TaxDisbursementDueDate"
+        sort_ascending: true
+        group_by: ["LoanNumber", "TaxId", "TaxPayeeCode"]
+        sequence_column: "TaxKeySequenceNumberPerYear"
+        pivot_index: ["LoanNumber", "TaxId", "TaxPayeeCode"]
+        pivot_columns: "TaxKeySequenceNumberPerYear"
+        pivot_values: "TaxDisbursementAmount"
+        pivot_aggfunc: "sum"
+        max_columns: 4
+        pivot_prefix: "installment_amount"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: loan_tax_parcel_staging
+    alias: ltp
+    staging: {table: "loan_tax_parcel"}
+  - name: tax_authority_staging
+    alias: ta
+    staging: {table: "tax_authority"}
+
+joins:
+  - left: {source: t}
+    right: {source: l}
+    "on": ["t.LoanNumber == l.loan_number"]
+    how: left
+
+  - left: {source: t}
+    right: {source: ltp}
+    "on": 
+      - "l.loan_id == ltp.loan_id"
+      - "t.TaxId == ltp.parcel_id"
+    how: left
+
+  - left: {source: t}
+    right: {source: ta}
+    "on": 
+      - "l.loan_id == ta.loan_id"
+      - "t.TaxPayeeCode == ta.vendor_tax_authority_id"
+    how: left
+
+columns:
+  - target_column: loan_tax_line_id
+    hash_columns: ["t.LoanNumber", "l.loan_id", "ltp.loan_tax_parcel_id", "t.TaxDisbursementType", "t.TaxYear", "t.TaxKeySequenceNumberPerYear", "t.TaxPayeeCode", "ta.tax_authority_id", "loan_tax_line"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: loan_tax_parcel_id
+    source: ltp.loan_tax_parcel_id
+    transform: identity
+    dtype: string
+
+  - target_column: tax_authority_id
+    source: ta.tax_authority_id
+    transform: identity
+    dtype: string
+
+  - target_column: installment_amount_1
+    source: t.installment_amount_1
+    transform: identity
+    dtype: float
+
+  - target_column: installment_amount_2
+    source: t.installment_amount_1
+    transform: identity
+    dtype: float
+
+  - target_column: installment_amount_3
+    source: t.installment_amount_1
+    transform: identity
+    dtype: float
+
+  - target_column: installment_amount_4
+    source: t.installment_amount_1
+    transform: identity
+    dtype: float
+
+  - target_column: status
+    source: {literal: "ACTIVE"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

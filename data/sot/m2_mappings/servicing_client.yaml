@@ -1,0 +1,53 @@
+table: servicing_client
+version: 1
+primary_key: [servicing_client_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: servicing_client_id
+    expression: |
+      hash_servicing_client_id(
+        "ACDC",
+        li.SmClientName
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: name
+    source: li.SmClientName
+    transform: identity
+    dtype: string
+  
+  - target_column: nmls_id
+    source: {literal: "41578"}
+    transform: literal
+    dtype: string
+
+  - target_column: credit_reporting_id
+    source: {literal: "241FZ00470"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "servicing_client"
+  entity_id_col: "servicing_client_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

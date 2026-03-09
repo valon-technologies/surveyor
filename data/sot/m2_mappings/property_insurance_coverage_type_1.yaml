@@ -1,0 +1,165 @@
+table: property_insurance_coverage_type_1
+version: 1
+primary_key: [property_insurance_coverage_type_id]
+
+sources:
+  - name: HazardInsurance
+    alias: hi
+    pipe_file: {table: "HazardInsurance"}
+    filters:
+      - column: "HazardPolicyNumber"
+        operator: "is_not_null"
+      - column: "HazardInsCompanyCode"
+        operator: "not_in"
+        value: ["NOCOV", "GAPCN", "FLINH", "INMIS", "FLGAP", "RSTRT", "CYCLE", "7WAIV", "NRNWL", "66666", "77777", "CANCO", "CANIR", "CANNP", "CANUK", "TLOSS", 'UPV00']
+      - column: ["LoanNumber", "HazardDisbursementType", "HazardSequenceNumber"]
+        operator: "dedup"
+        keep: "last" 
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: property_insurance_structure_staging
+    alias: psi
+    staging: {table: "property_insurance_structure"}
+  - name: escrow_loan_info_staging
+    alias: eli
+    staging: {table: "escrow_loan_info"}
+  - name: property
+    alias: p
+    staging: {table: "property"}
+
+joins:
+  - left: {source: hi}
+    right: {source: l}
+    "on": ["hi.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: hi}
+    right: {source: psi}
+    "on": ["l.loan_id == psi.loan_id"]
+    how: left
+  - left: {source: hi}
+    right: {source: eli}
+    "on": ["l.loan_id == eli.loan_id"]
+    how: left
+  - left: {source: hi}
+    right: {source: p}
+    "on": ["l.loan_id == p.loan_id"]
+    how: left
+
+post_merge_filters:
+  - operator: "expression"
+    expression: "~((df['escrow_loan_info_id'].isnull()) & (df['HazardTypeOfPaymentCode'].isin(['1','2','3','4','5','6'])))"
+
+columns:
+  - target_column: property_insurance_coverage_type_id
+    hash_columns: ["hi.LoanNumber", "hi.HazardDisbursementType", "hi.HazardSequenceNumber", "hi.HazardCoverageType", "hi.HazardTypeOfPaymentCode", "l.loan_id", "psi.property_insurance_structure_id", "property_insurance_coverage_type"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: insurance_stream
+    expression: | 
+      np.where(
+        p.property_type.isin(['PUD','CONDO','ATTACHED']),
+        hi.HazardCoverageType.map({
+        "2": "FLOOD_GAP",          
+        "6": "CONDO_HAZARD",       
+        "B": "OTHER",
+        "C": "MASTER_HAZARD",      
+        "D": "CONDO_FLOOD",       
+        "E": "FLOOD",              
+        "F": "FLOOD",              
+        "H": "HAZARD",             
+        "I": "MASTER_FLOOD",       
+        "M": "OTHER",              
+        "N": "OTHER",              
+        "Q": "EARTHQUAKE",         
+        "T": "MASTER_WIND",        
+        "U": "CONDO_FLOOD_GAP",          
+        "W": "WIND",               
+        "Z": "FIRE"                
+        }).fillna("OTHER"),
+        hi.HazardCoverageType.map({
+          "2": "FLOOD_GAP",          
+          "6": "CONDO_HAZARD",       
+          "B": "OTHER",
+          "C": "MASTER_HAZARD",      
+          "D": "CONDO_FLOOD",       
+          "E": "FLOOD",              
+          "F": "FLOOD",              
+          "H": "HAZARD",             
+          "I": "MASTER_FLOOD",       
+          "M": "OTHER",              
+          "N": "OTHER",              
+          "Q": "EARTHQUAKE",         
+          "T": "MASTER_WIND",        
+          "U": "FLOOD_GAP",          
+          "W": "WIND",               
+          "Z": "FIRE"                
+        }).fillna("OTHER")
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: is_escrowed
+    expression: |
+      np.select(
+        condlist=[
+          hi.HazardCoverageType.isin(["Q", "C", "I", "T"]),
+          hi.HazardTypeOfPaymentCode.isin(["1", "2", "3", "4", "5", "6"])
+        ],
+        choicelist=[
+          False,
+          True
+        ],
+        default=False
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: is_required
+    expression: |
+      np.select(
+        condlist=[
+          hi.HazardCoverageType == "6",
+          hi.HazardCoverageType == "C",
+          hi.HazardCoverageType == "D",
+          hi.HazardCoverageType == "E",
+          hi.HazardCoverageType == "F",
+          hi.HazardCoverageType == "H",
+          hi.HazardCoverageType == "I"
+        ],
+        choicelist=[True, True, True, True, True, True, True],
+        default=True
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: structure_id
+    source: psi.property_insurance_structure_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: HazardCoverageType
+    source: hi.HazardCoverageType
+    transform: identity
+    dtype: string
+
+  - target_column: HazardTypeOfPaymentCode
+    source: hi.HazardTypeOfPaymentCode
+    transform: identity
+    dtype: string
+
+  - target_column: HazardDisbursementType
+    source: hi.HazardDisbursementType
+    transform: identity
+    dtype: string
+
+  - target_column: HazardSequenceNumber
+    source: hi.HazardSequenceNumber
+    transform: identity
+    dtype: string

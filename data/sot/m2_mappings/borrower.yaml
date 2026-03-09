@@ -1,0 +1,112 @@
+table: borrower
+version: 1
+primary_key: [borrower_id]
+
+sources:
+  - name: borrower_primary
+    alias: bp
+    staging: {table: "borrower_primary"}
+  - name: borrower_comortgr
+    alias: bc
+    staging: {table: "borrower_comortgr"}
+  # - name: borrower_succ
+  #   alias: bs
+  #   staging: {table: "borrower_succ"}
+
+concat:
+  # sources: [bp, bc, bs]
+  sources: [bp, bc]
+
+columns:
+  - target_column: borrower_id
+    source: borrower_id
+    transform: identity
+    dtype: string
+    
+  - target_column: mailing_address_id
+    source: mailing_address_id
+    transform: identity
+    dtype: string
+
+  - target_column: account_registration_completed_at
+    source: account_registration_completed_at
+    transform: identity
+    dtype: datetime
+
+  - target_column: birth_date
+    source: birth_date
+    transform: identity
+    dtype: date
+
+  - target_column: deceased_date
+    source: deceased_date
+    transform: identity
+    dtype: date
+
+  - target_column: email_address
+    source: email_address
+    transform: identity
+    dtype: string
+
+  - target_column: ethnicity
+    source: ethnicity
+    transform: identity
+    dtype: string
+
+  - target_column: first_name
+    source: first_name
+    transform: identity
+    dtype: string
+
+  - target_column: gender
+    source: gender
+    transform: identity
+    dtype: string
+
+  - target_column: last_name
+    source: last_name
+    transform: identity
+    dtype: string
+
+  - target_column: middle_name
+    source: middle_name
+    transform: identity
+    dtype: string
+
+  - target_column: preferred_language
+    source: preferred_language
+    transform: identity
+    dtype: string
+
+  - target_column: race
+    source: race
+    transform: identity
+    dtype: string
+
+  # - target_column: social_security_number
+  #   expression: |
+  #     social_security_number.astype("string").str.strip().replace(["", "0", "nan"], pd.NA).str.replace(".0", "", regex=False).where(lambda s: s.str.isdigit() & (s.str.len() <= 9)).str.zfill(9).where(social_security_number.notna(), pd.NA)
+  #   transform: expression
+  #   dtype: string
+
+  - target_column: suffix
+    source: suffix
+    transform: identity
+    dtype: string
+
+  - target_column: tax_id_number
+    expression: |
+      tax_id_number.astype("string").str.strip().replace(["", "0", "nan"], pd.NA).str.replace(".0", "", regex=False).where(lambda s: s.str.isdigit() & (s.str.len() <= 9)).str.zfill(9).where(tax_id_number.notna(), pd.NA)
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "borrower"
+  entity_id_col: "borrower_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

@@ -1,0 +1,84 @@
+table: loan_payment_deduction_schedule_4
+version: 1
+primary_key: [loan_payment_deduction_schedule_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: loan_payment_deduction_schedule_3
+    alias: lps3
+    staging: {table: "loan_payment_deduction_schedule_3"}
+
+joins:
+  - left: {source: li}
+    right: {source: ed}
+    "on": ["li.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: fi}
+    "on": ["li.LoanNumber == fi.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: li}
+    right: {source: lps3}
+    "on": ["l.loan_id == lps3.loan_id"]
+    how: inner
+
+columns:
+  - target_column: loan_payment_deduction_schedule_id
+    hash_columns: ["li.LoanNumber", "l.loan_id", "lps3.loan_payment_deduction_schedule_id", "loan_payment_deduction_schedule"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: deduction_amount
+    source: li.PaymentSubsidyAmount4
+    transform: identity
+    dtype: float
+
+  - target_column: deduction_type
+    expression: fi.SubsidySourceCode.fillna(li.BuydownType)
+    transform: expression
+    dtype: string
+
+  - target_column: first_due_date
+    expression: |
+      date_add(lps3.first_due_date, li.SubsidyPeriod3Term, "month")
+    transform: expression
+    dtype: date
+
+  - target_column: last_due_date
+    expression: |
+      date_add(
+        date_add(
+          date_add(lps3.first_due_date, li.SubsidyPeriod3Term, "month"),
+          li.SubsidyPeriod4Term,
+          "month"
+          ),
+        -1,
+        "month"
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: payment_frequency
+    source: {literal: "MONTHLY"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

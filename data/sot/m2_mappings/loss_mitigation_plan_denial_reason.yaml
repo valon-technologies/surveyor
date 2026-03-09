@@ -1,0 +1,160 @@
+table: loss_mitigation_plan_denial_reason
+version: 1
+primary_key: [loss_mitigation_plan_denial_reason_id]
+
+sources:
+- name: DefaultWorkstations
+  alias: dw
+  pipe_file: {table: "DefaultWorkstations"}
+  filters:
+  - column: LossMitDenialReasonCode
+    operator: is_not_null
+
+- name: loan_staging
+  alias: l
+  staging: {table: "loan"}
+
+- name: loss_mitigation_denial_staging
+  alias: lmd
+  staging: {table: "loss_mitigation_denial"}
+
+- name: loss_mitigation_plan_staging
+  alias: lmp
+  staging: {table: "loss_mitigation_plan"}
+
+joins:
+- left: {source: dw}
+  right: {source: l}
+  'on': [dw.LoanNumber == l.loan_number]
+  how: left
+
+- left: {source: dw}
+  right: {source: lmd}
+  'on': [l.loan_id == lmd.loan_id]
+  how: left
+
+- left: {source: dw}
+  right: {source: lmp}
+  'on': [l.loan_id == lmp.loan_id]
+  how: left
+
+columns:
+- target_column: loss_mitigation_plan_denial_reason_id
+  hash_columns:
+  - l.loan_id
+  - dw.LossMitDenialReasonCode
+  - "loss_mitigation_plan_denial_reason"
+  transform: hash_id
+  dtype: string
+
+- target_column: linked_entity_id
+  expression: lmd.loss_mitigation_denial_id.fillna(lmp.loss_mitigation_plan_id)
+  transform: expression
+  dtype: string
+
+- target_column: linked_entity_type
+  expression: |
+    np.where(
+      lmd.loss_mitigation_denial_id.notna(),
+      "DENIAL",
+      np.where(
+        lmp.loss_mitigation_plan_id.notna(),
+        "PLAN",
+        pd.NA
+      )
+    )
+  transform: expression
+  dtype: string
+
+- target_column: plan_type
+  source: lmp.plan_type
+  transform: identity
+  dtype: string
+
+- target_column: plan_subtype
+  source: lmp.subtype
+  transform: identity
+  dtype: string
+
+- target_column: reason
+  expression: |
+    dw.LossMitDenialReasonCode.map({
+      "01": "LOAN_REINSTATEMENT",
+      "02": "LOAN_PAID_IN_FULL",
+      "03": "ABILITY_TO_REPAY_ARREARAGES",
+      "04": "INELIGIBLE_WORKOUT_OPTION",
+      "07": "OTHER",
+      "10": "REQUEST_FOR_ALTERNATIVE_WORKOUT_SHORT_SALE",
+      "11": "REQUEST_FOR_ALTERNATIVE_WORKOUT_SHORT_SALE",
+      "13": "REQUEST_FOR_ALTERNATIVE_WORKOUT_SHORT_SALE",
+      "14": "NOT_EVALUATED_DUE_TO_RETENTION",
+      "15": "OTHER",
+      "16": "NOT_EVALUATED_DUE_TO_RETENTION",
+      "17": "NOT_EVALUATED_DUE_TO_RETENTION",
+      "18": "NOT_EVALUATED_DUE_TO_RETENTION",
+      "19": "REQUEST_FOR_ALTERNATIVE_WORKOUT_DEED_IN_LIEU",
+      "20": "NOT_EVALUATED_DUE_TO_RETENTION",
+      "21": "NOT_EVALUATED_DUE_TO_RETENTION",
+      "22": "NOT_EVALUATED_DUE_TO_RETENTION",
+      "23": "NOT_EVALUATED_DUE_TO_RETENTION",
+      "24": "ABILITY_TO_REPAY_ARREARAGES",
+      "25": "NOT_EVALUATED_DUE_TO_RETENTION",
+      "26": "OTHER",
+      "27": "CLEAR_TITLE_REQUIRED",
+      "28": "REQUESTED_MORTGAGE_ASSISTANCE_DOCUMENTS_NOT_RECEIVED",
+      "29": "REQUEST_FOR_ALTERNATIVE_WORKOUT_SHORT_SALE",
+      "31": "OTHER",
+      "32": "OTHER",
+      "33": "OTHER",
+      "40": "REQUEST_WITHDRAWN",
+      "41": "OTHER",
+      "42": "NOT_EVALUATED_DUE_TO_RETENTION",
+      "43": "PREVIOUSLY_FAILED_FLEX_MODIFICATION_TRIAL_PERIOD_PLAN",
+      "46": "OTHER",
+      "52": "OTHER",
+      "BC": "NOT_EVALUATED_DUE_TO_RETENTION",
+      "BK": "BANKRUPTCY_APPROVAL_REQUIRED",
+      "CA": "OTHER",
+      "CL": "PENDING_INSURANCE_CLAIM",
+      "CO": "CHARGE_OFFS",
+      "DS": "OTHER",
+      "ER": "OTHER",
+      "FM": "OTHER",
+      "HF": "OTHER",
+      "LT": "PENDING_LITIGATION",
+      "MD": "NOT_EVALUATED_DUE_TO_RETENTION",
+      "MR": "OTHER",
+      "OT": "OTHER",
+      "PO": "LOAN_PAID_IN_FULL",
+      "PR": "LOAN_REINSTATEMENT",
+      "PS": "OTHER",
+      "RN": "LOAN_REINSTATEMENT",
+      "RO": "OTHER",
+      "RP": "ABILITY_TO_REPAY_ARREARAGES",
+      "SC": "OTHER",
+      "SR": "OTHER",
+      "SS": "REQUEST_FOR_ALTERNATIVE_WORKOUT_SHORT_SALE"
+    }).fillna("OTHER")
+  transform: expression
+  dtype: string
+
+- target_column: loan_id
+  source: l.loan_id
+  transform: identity
+  dtype: string
+
+# - target_column: created_at
+#   source: []
+#   transform: 'null'
+#   dtype: datetime
+
+# - target_column: deleted_at
+#   source: []
+#   transform: 'null'
+#   dtype: datetime
+
+entity:
+  entity_type: "loss_mitigation_plan_denial_reason"
+  entity_id_col: "loss_mitigation_plan_denial_reason_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

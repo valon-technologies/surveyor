@@ -1,0 +1,55 @@
+table: notification_to_linked_entity
+version: 1
+primary_key: [notification_to_linked_entity_id]
+
+sources:
+  - name: notification_staging
+    alias: n
+    staging: {table: "notification_1"}
+    dtypes:
+      MspEffectiveDate: "date"
+      LetterDate: "date"
+      LetterVersionNumber: "float"
+      LetterRecordNumber: "float"
+      LetterId: "string"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: n}
+    right: {source: l}
+    "on": ["n.loan_id == l.loan_id"]
+    how: left
+
+columns:
+  - target_column: notification_to_linked_entity_id
+    hash_columns: ["l.loan_id", "n.notification_id", "n.MspEffectiveDate", "n.LetterDate", "n.LetterId", "n.LetterRecordNumber", "notification_to_linked_entity"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: linked_entity_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: linked_entity_type
+    source: {literal: "LOAN"}
+    transform: literal
+    dtype: string
+
+  - target_column: notification_id
+    source: n.notification_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "notification_to_linked_entity"
+  entity_id_col: "notification_to_linked_entity_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

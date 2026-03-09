@@ -1,0 +1,90 @@
+table: non_borrower_loan_participant
+version: 1
+primary_key: [non_borrower_loan_participant_id]
+
+sources:
+  - name: NonBorrower
+    alias: nb
+    pipe_file: {table: "NonBorrower"}
+    filters:
+      - column: "NonborrowerType"
+        operator: "in"
+        value: ["PA", "RO"]
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: address_nb
+    alias: a
+    staging: {table: "address_nb"}
+
+joins:
+  - left: {source: nb}
+    right: {source: l}
+    "on": ["nb.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: nb}
+    right: {source: a}
+    "on": 
+      - "l.loan_id == a.loan_id"
+      - "nb.NbLastName == a.last_name"
+      - "nb.NbFirstName == a.first_name"
+    how: left
+
+columns:
+  - target_column: non_borrower_loan_participant_id
+    hash_columns: ["nb.LoanNumber", "l.loan_id", "nb.NonborrowerTypeDescription", "nb.NbFirstName", "nb.NbLastName", "nb.NonborrowerSsnTinNumber", "non_borrower_loan_participant"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: mailing_address_id
+    source: a.address_id
+    transform: identity
+    dtype: string
+
+  - target_column: email_address
+    source: nb.NonborrowerEmail1Address
+    transform: identity
+    dtype: string
+
+  - target_column: first_name
+    source: nb.NbFirstName
+    transform: identity
+    dtype: string
+
+  - target_column: last_name
+    source: nb.NbLastName
+    transform: identity
+    dtype: string
+
+  - target_column: middle_name
+    source: nb.NbMiddleName
+    transform: identity
+    dtype: string
+
+  - target_column: phone_number
+    source: nb.NonborrowerPhone1Number
+    transform: identity
+    dtype: string
+
+  - target_column: tax_id_number
+    source: nb.NonborrowerSsnTinNumber
+    transform: identity
+    dtype: string
+
+  - target_column: tax_id_type
+    expression: |
+      np.where(nb.NonborrowerSsnTinNumber.notna(), "SSN", pd.NA)
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "non_borrower_loan_participant"
+  entity_id_col: "non_borrower_loan_participant_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

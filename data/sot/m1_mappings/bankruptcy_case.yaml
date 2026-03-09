@@ -1,0 +1,256 @@
+table: bankruptcy_case
+version: 1
+primary_key: [bankruptcy_case_id]
+
+sources:
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "BankruptcyCaseNumber"
+        operator: "is_not_null"
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: Courts
+    alias: c
+    pipe_file: {table: "Courts"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "BANK"
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+  - name: servicer_attorney_staging
+    alias: sa
+    staging: {table: "servicer_attorney_bank"}
+
+joins:
+  - left: {source: dw}
+    right: {source: li}
+    "on": ["dw.LoanNumber == li.LoanNumber"]
+    how: left
+  - left: {source: dw}
+    right: {source: ed}
+    "on": ["dw.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: dw}
+    right: {source: fi}
+    "on": ["dw.LoanNumber == fi.LoanNumber"]
+    how: left
+  - left: {source: dw}
+    right: {source: l}
+    "on": ["dw.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: dw}
+    right: {source: c}
+    "on": ["dw.BankruptcyCourtId == c.BankruptcyCourtId"]
+    how: left
+  - left: {source: dw}
+    right: {source: s}
+    "on": ["dw.LoanNumber == s.LoanNumber"]
+    how: left
+  - left: {source: dw}
+    right: {source: sa}
+    "on": ["l.loan_id == sa.loan_id"]
+    how: left
+
+columns:
+  - target_column: bankruptcy_case_id
+    hash_columns: ["l.loan_id", "li.LoanNumber", "dw.BankruptcyCaseNumber", "BANKRUPTCY_CASE"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: court_district
+    expression: |
+      c.PmBankruptcyDistrict.map({
+        "All": "CENTRAL",
+        "Middle": "MIDDLE",
+        "Northern": "NORTHERN",
+        "Southern": "SOUTHERN",
+        "Western": "WESTERN",
+        "Eastern": "EASTERN",
+        "Central": "CENTRAL"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: court_division
+    source: c.PmBankruptcyDivision
+    transform: identity
+    dtype: string
+
+  - target_column: court_state
+    source: c.PmFilingState
+    transform: identity
+    dtype: string
+
+  - target_column: case_number
+    source: dw.BankruptcyCaseNumber
+    transform: identity
+    dtype: string
+
+  - target_column: chapter
+    expression: "'CHAPTER_' + pd.to_numeric(li.BankruptcyCode, errors='coerce').astype('Int32').astype(str)"
+    transform: expression
+    dtype: string
+
+  - target_column: creditors_meeting_at
+    source: dw.BankruptcyCreditorMeetingDate
+    transform: identity
+    dtype: datetime
+
+  # - target_column: asset_case_type_last_changed_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: attorney_referral_date
+    expression: |
+      (lambda df, pd:
+        pd.concat([
+          pd.to_datetime(df.get(col, pd.Series(pd.NaT, index=df.index)), errors='coerce')
+          for col in [
+            'ActualCompletionDate_1K', 'ActualCompletionDate_214', 'ActualCompletionDate_239',
+            'ActualCompletionDate_B18', 'ActualCompletionDate_227', 'ActualCompletionDate_114',
+            'ActualCompletionDate_145', 'ActualCompletionDate_154'
+          ]
+        ], axis=1).min(axis=1)
+      )(df, pd)
+    transform: expression
+    dtype: date
+  
+  - target_column: chapter_conversion_date
+    source: ed.BankruptcyConversionDate
+    transform: identity
+    dtype: date
+
+  - target_column: confirmation_hearing_date
+    source: ed.BankruptcyConfirmationHearingDate
+    transform: identity
+    dtype: date
+
+  - target_column: dismissed_date
+    source: ed.BankruptcyDismissalDate
+    transform: identity
+    dtype: date
+
+  - target_column: proof_of_claim_deadline_date
+    source: ed.BankruptcyProofOfClaimFilingDate
+    transform: identity
+    dtype: date
+
+  - target_column: withdrawal_date
+    expression: |
+      ed.BankruptcyRemovalDate.where(
+        dw.BankruptcyRemovalCode.eq("13"), 
+        pd.NA
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: is_asset_case
+    expression: |
+      fi.BankruptcyAssetIndicator.map({
+        "Y": True,
+        "N": False
+      }).fillna(False)
+    transform: expression
+    dtype: boolean
+
+  - target_column: status
+    expression: |
+      np.select(
+        condlist=[
+          (dw.BankruptcyStatusCode == "C") & (dw.BankruptcyRemovalCode == "03"),
+          (dw.BankruptcyStatusCode == "C") & (dw.BankruptcyRemovalCode == "13"),
+          (dw.BankruptcyStatusCode == "C"),
+          (dw.BankruptcyStatusCode == "D"),
+          (dw.BankruptcyStatusCode == "A")
+        ],
+        choicelist=[
+          "DISMISSED_TERMINAL",
+          "WITHDRAWN_TERMINAL",
+          "COMPLETED_TERMINAL",
+          "DELETED",
+          "ACTIVE"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: trustee_email_address
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: trustee_name
+    source: dw.TrusteeName
+    transform: identity
+    dtype: string
+
+  - target_column: trustee_phone_number
+    source: dw.TrusteeTelephoneNumber
+    transform: identity
+    dtype: string
+
+  - target_column: was_closed_at_onboarding
+    expression: |
+      (
+        pd.to_datetime(ed.BankruptcyRemovalDate, errors="coerce").fillna(pd.to_datetime(ed.BankruptcyCompletionDate, errors="coerce"))
+        <
+        pd.to_datetime(ed.BankruptcySetupDate, errors="coerce")
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: filing_date
+    source: dw.BankruptcyFilingDate
+    transform: identity
+    dtype: date
+
+  - target_column: terminated_date
+    source: dw.BankruptcyRemovalDate
+    transform: identity
+    dtype: date
+
+  # - target_column: court_district_aacer_id
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  - target_column: court_division_aacer_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: servicer_attorney_id
+    source: sa.servicer_attorney_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "bankruptcy_case"
+  entity_id_col: "bankruptcy_case_id"
+  loan_id_col: "loan_id"  
+  loan_id_col_required: false

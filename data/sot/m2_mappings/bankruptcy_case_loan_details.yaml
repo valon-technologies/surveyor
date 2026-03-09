@@ -1,0 +1,341 @@
+table: bankruptcy_case_loan_details
+version: 1
+primary_key: [bankruptcy_case_loan_details_id]
+## need to revisit once stepcode B11 is added to the data
+sources:
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+    dtypes:
+      BankruptcyFilingDate: "date"
+      BankruptcyCompletionDate: "date"
+      BankruptcyEstimatedDischargeDate: "date"
+  - name: bankruptcy_case_staging
+    alias: bc
+    staging: {table: "bankruptcy_case"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: property_staging
+    alias: p
+    staging: {table: "property"}
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "LSMT"
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+  - name: debtor_attorney_staging
+    alias: da
+    staging: {table: "debtor_attorney"}
+  - name: escrow_analysis_staging
+    alias: ea
+    staging: {table: "escrow_analysis"}
+  - name: PayoffStatement
+    alias: ps
+    pipe_file: {table: "PayoffStatement"}
+    dtypes:
+      PifUpdatedDate: "date"
+  - name: servicer_attorney_staging
+    alias: sa
+    staging: {table: "servicer_attorney_bank"}
+
+joins:
+  - left: {source: bc}
+    right: {source: l}
+    "on": ["bc.loan_id == l.loan_id"]
+    how: left
+  - left: {source: bc}
+    right: {source: dw}
+    "on": ["l.loan_number == dw.LoanNumber"]
+    how: left
+  - left: {source: bc}
+    right: {source: ed}
+    "on": ["l.loan_number == ed.LoanNumber"]
+    how: left
+  - left: {source: bc}
+    right: {source: p}
+    "on": ["bc.loan_id == p.loan_id"]
+    how: left
+  - left: {source: bc}
+    right: {source: s}
+    "on": ["l.loan_number == s.LoanNumber"]
+    how: left
+  - left: {source: bc}
+    right: {source: da}
+    "on": ["bc.loan_id == da.loan_id"]
+    how: left
+  - left: {source: bc}
+    right: {source: ea}
+    "on": ["bc.loan_id == ea.loan_id"]
+    how: left
+  - left: {source: bc}
+    right: {source: ps}
+    "on": ["l.loan_number == ps.LoanNumber"]
+    how: left
+  - left: {source: bc}
+    right: {source: sa}
+    "on": ["l.loan_id == sa.loan_id"]
+    how: left
+
+columns:
+  - target_column: bankruptcy_case_loan_details_id
+    hash_columns: ["bc.bankruptcy_case_id", "l.loan_id", "dw.BankruptcyCaseNumber", "BANKRUPTCY_CASE_TO_LOAN"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: bankruptcy_case_id
+    source: bc.bankruptcy_case_id
+    transform: identity
+    dtype: string
+
+  - target_column: discharged_date
+    source: dw.BankruptcyDischargeDate
+    transform: identity
+    dtype: date
+
+  - target_column: active_plan_repayment_type
+    expression: |
+      np.where(
+        ((dw.BankruptcyStatusCode == "A") & (dw.BankruptcyChapterType.isin(["11","12","13"]))),
+        "CURE",
+        pd.NA 
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: active_plan_type
+    expression: |
+      np.select(
+        condlist=[
+        dw.BankruptcyPostPetitionIndicator == "Y",
+        dw.BankruptcyPostPetitionIndicator == "N"
+        ],
+        choicelist=[
+          "TRUSTEE_PAYALL",
+          "DIRECT_PAY"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  # - target_column: poc_filed_by_previous_servicer
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  # - target_column: needs_proof_of_claim
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  - target_column: property_intention
+    expression: |
+      (lambda get_col, np, pd: (
+        lambda dates_df: (
+          lambda has_valid, latest_step_code: np.select(
+            condlist=[
+              latest_step_code == '276',
+              latest_step_code.isin(['229', '230'])
+            ],
+            choicelist=[
+              "SURRENDER",
+              "REAFFIRM",
+            ],
+            default="RETAIN"
+          )
+        )(
+          dates_df.notna().any(axis=1),
+          dates_df.fillna(pd.Timestamp.min).idxmax(axis=1).where(dates_df.notna().any(axis=1))
+        )
+      )(
+        pd.DataFrame({
+          '276': pd.to_datetime(get_col('ActualCompletionDate_276'), errors='coerce'),
+          '229': pd.to_datetime(get_col('ActualCompletionDate_229'), errors='coerce'),
+          '230': pd.to_datetime(get_col('ActualCompletionDate_230'), errors='coerce'),
+        })
+      ))((lambda df, pd: lambda col: df.get(col, pd.Series(pd.NA, index=df.index)))(df, pd), np, pd)
+    transform: expression
+    dtype: string
+
+  - target_column: active_plan_confirmed_date
+    expression: df.get('ActualCompletionDate_B11', pd.Series(pd.NA, index=df.index))
+    transform: expression
+    dtype: date
+
+  - target_column: active_plan_duration_months
+    expression: |
+      (pd.to_datetime(dw.BankruptcyEstimatedDischargeDate) - pd.to_datetime(dw.BankruptcyFilingDate)).dt.days / 30
+    transform: expression
+    dtype: int
+
+  - target_column: active_plan_post_petition_payment_source
+    expression: |
+      np.select(
+        condlist=[
+          dw.BankruptcyPostPetitionIndicator == "Y",
+          dw.BankruptcyPostPetitionIndicator == "N"
+        ],
+        choicelist=[
+          "TRUSTEE",
+          "BORROWER"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: active_plan_pre_petition_arrearage_interest_rate_percent
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: active_plan_pre_petition_payment_source
+    expression: |
+      (lambda df, pd: np.where(
+        df.get('ActualCompletionDate_B11', pd.Series(pd.NA, index=df.index)).notna(), 
+        "TRUSTEE",
+        pd.NA
+      ))(df, pd)
+    transform: expression
+    dtype: string
+
+  # - target_column: active_plan_provisions_for_in_rem_relief
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  # - target_column: adr_reviewed_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: agreed_order_duration_months
+    source: []
+    transform: null
+    dtype: int
+
+  - target_column: agreed_order_term_type
+    source: []
+    transform: null
+    dtype: string
+
+  # - target_column: agreed_order_type
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  - target_column: consent_order_duration_months
+    source: []
+    transform: null
+    dtype: int
+
+  - target_column: consent_order_term_type
+    source: []
+    transform: null
+    dtype: string
+
+  # - target_column: consent_order_type
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  - target_column: debt_discharged
+    expression: |
+      (
+        dw.BankruptcyCh1112or13DischrgIndicator.isin(["11","12","13"])
+        |
+        dw.BankruptcyCh7DischargeIndicator.eq("Y")
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: debt_status
+    source: []
+    transform: null
+    dtype: string
+  # - target_column: debt_status
+  #   expression: |
+  #     np.where(
+  #       dw.BankruptcyDischargeDate.isnull(),
+  #       "NOT_DISCHARGED",
+  #       "DISCHARGED"
+  #     )
+  #   transform: expression
+  #   dtype: string
+
+  # - target_column: dra_reviewed_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: escrow_analysis_id
+    source: ea.escrow_analysis_id
+    transform: identity
+    dtype: string
+
+  - target_column: servicer_attorney_id
+    source: sa.servicer_attorney_id
+    transform: identity
+    dtype: string
+
+  - target_column: debtor_attorney_id
+    source: da.debtor_attorney_id
+    transform: identity
+    dtype: string
+
+  # - target_column: active_plan_objection_needed
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  - target_column: payoff_quote_good_through_date
+    expression: |
+      np.where(
+        (pd.to_datetime(ps.PifUpdatedDate) >= pd.to_datetime(ed.BankruptcyFilingDate)) &
+        (pd.to_datetime(ps.PifUpdatedDate) <= pd.to_datetime(ed.BankruptcyCompletionDate)),
+        ps.PifAsOfDate,
+        pd.NA
+      )
+    transform: expression
+    dtype: date
+
+  # - target_column: active_plan_objection_deadline_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: active_plan_objection_resolution
+  #   source: []
+  #   transform: identity
+  #   dtype: string
+
+  - target_column: stipulation_for_relief_duration_months
+    source: []
+    transform: null
+    dtype: int
+
+  - target_column: stipulation_for_relief_term_type
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: loan_id
+    source: bc.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "bankruptcy_case_loan_details"
+  entity_id_col: "bankruptcy_case_loan_details_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

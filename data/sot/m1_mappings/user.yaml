@@ -1,0 +1,48 @@
+table: user
+version: 1
+primary_key: [user_id]
+
+sources:
+  - name: user_call_staging
+    alias: uc
+    staging: {table: "user_call"}
+  - name: user_taskcontact_staging
+    alias: utc
+    staging: {table: "user_taskcontact"}
+  - name: user_taskresponsible_staging
+    alias: utr
+    staging: {table: "user_taskresponsible"}
+  - name: user_note_staging
+    alias: un
+    staging: {table: "user_note"}
+
+
+concat:
+  sources: [uc, utc, utr, un]
+
+columns:
+  - target_column: user_id
+    source: user_id
+    transform: identity
+    dtype: string
+
+  - target_column: first_name
+    source: first_name
+    transform: identity
+    dtype: string
+
+  - target_column: last_name
+    source: last_name
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "user"
+  entity_id_col: "user_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

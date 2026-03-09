@@ -1,0 +1,75 @@
+table: address_sc
+version: 1
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan1"}
+  - name: PriorServicer
+    alias: ps
+    pipe_file: {table: "PriorServicer"}
+    filters:
+      - column: "StreetAddress"
+        operator: "is_not_null"
+
+joins:
+  - left: {source: li}
+    right: {source: ps}
+    "on": ["li.AcquisitionOrSaleIdentifier == ps.AcquisitionOrSaleIdentifier"]
+    how: inner
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: address_id
+    expression: |
+      hash_address_id(
+        "ACDC",
+        ps.StreetAddress,
+        ps.StreetAddress2, 
+        ps.City, 
+        ps.State, 
+        ps.ZipCode
+      )
+    transform: expression
+    dtype: string
+    
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: city
+    source: ps.City
+    transform: identity
+    dtype: string
+
+  - target_column: county
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: state
+    source: ps.State
+    transform: identity
+    dtype: string
+
+  - target_column: street_address_1
+    source: ps.StreetAddress
+    transform: identity
+    dtype: string
+
+  - target_column: street_address_2
+    source: ps.StreetAddress2
+    transform: identity
+    dtype: string
+
+  - target_column: zip_code
+    source: ps.ZipCode
+    transform: identity
+    dtype: string

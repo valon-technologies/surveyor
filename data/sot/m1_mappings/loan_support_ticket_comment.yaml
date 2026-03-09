@@ -1,0 +1,57 @@
+table: loan_support_ticket_comment
+version: 1
+primary_key: [loan_support_ticket_comment_id]
+
+sources:
+  - name: loan_support_ticket_staging
+    alias: st
+    staging: {table: "loan_support_ticket_1"}
+
+columns:
+  - target_column: loan_support_ticket_comment_id
+    hash_columns: ["st.loan_support_ticket_id", "loan_support_ticket_comment"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: comment_submitted_at
+    expression: |
+      pd.to_datetime(st.CommentDateTime, format='mixed').dt.tz_localize('America/New_York', ambiguous=True, nonexistent='shift_forward').dt.tz_convert('UTC').dt.tz_localize(None)
+    transform: expression
+    dtype: string
+    
+  - target_column: comment_type
+    source: {literal: "INTERNAL_NOTE"}
+    transform: literal
+    dtype: string
+
+  - target_column: content
+    expression: st.comment.str.slice(0, 256)
+    transform: expression
+    dtype: string
+
+  - target_column: created_by_display_name
+    source: st.CommentUserName
+    transform: identity
+    dtype: string
+
+  - target_column: created_by_user_id
+    source: st.agent_user_id
+    transform: identity
+    dtype: string
+
+  - target_column: support_ticket_id
+    source: st.loan_support_ticket_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: st.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_support_ticket_comment"
+  entity_id_col: "loan_support_ticket_comment_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+

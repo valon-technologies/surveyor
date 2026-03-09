@@ -1,0 +1,47 @@
+table: servicer_attorney
+version: 1
+primary_key: [servicer_attorney_id]
+
+sources:
+  - name: servicer_attorney_bank
+    alias: sab
+    staging: {table: "servicer_attorney_bank"}
+  - name: servicer_attorney_fore
+    alias: saf
+    staging: {table: "servicer_attorney_fore"}
+
+concat:
+  sources: [sab, saf]
+
+columns:
+  - target_column: servicer_attorney_id
+    source: servicer_attorney_id
+    transform: identity
+    dtype: string
+
+  - target_column: email
+    source: email
+    transform: identity
+    dtype: string
+
+  - target_column: name
+    source: name
+    transform: identity
+    dtype: string
+
+  - target_column: servicer_law_firm_id
+    source: servicer_law_firm_id
+    transform: identity
+    dtype: string
+   
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "servicer_attorney"
+  entity_id_col: "servicer_attorney_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+

@@ -1,0 +1,65 @@
+table: loan_payment_deduction_schedule
+version: 1
+primary_key: [loan_payment_deduction_schedule_id]
+
+sources:
+  - name: loan_payment_deduction_schedule_1
+    alias: lps1
+    staging: {table: "loan_payment_deduction_schedule_1"}
+  - name: loan_payment_deduction_schedule_2
+    alias: lps2
+    staging: {table: "loan_payment_deduction_schedule_2"}
+  - name: loan_payment_deduction_schedule_3
+    alias: lps3
+    staging: {table: "loan_payment_deduction_schedule_3"}
+  - name: loan_payment_deduction_schedule_4
+    alias: lps4
+    staging: {table: "loan_payment_deduction_schedule_4"}
+  - name: loan_payment_deduction_schedule_5
+    alias: lps5
+    staging: {table: "loan_payment_deduction_schedule_5"}
+
+concat:
+  sources: [ lps1, lps2, lps3, lps4, lps5]
+
+columns:
+  - target_column: loan_payment_deduction_schedule_id
+    source: loan_payment_deduction_schedule_id
+    transform: identity
+    dtype: string
+
+  - target_column: deduction_amount
+    source: deduction_amount
+    transform: identity
+    dtype: float
+
+  - target_column: deduction_type
+    source: deduction_type
+    transform: identity
+    dtype: string
+
+  - target_column: first_due_date
+    source: first_due_date
+    transform: identity
+    dtype: date
+
+  - target_column: last_due_date
+    source: last_due_date
+    transform: identity
+    dtype: date
+
+  - target_column: payment_frequency
+    source: payment_frequency
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_payment_deduction_schedule"
+  entity_id_col: "loan_payment_deduction_schedule_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

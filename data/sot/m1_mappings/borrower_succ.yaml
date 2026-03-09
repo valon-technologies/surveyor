@@ -1,0 +1,115 @@
+table: borrower_succ
+version: 1
+primary_key: [borrower_id, loan_id]
+
+sources:
+  - name: Nonborrower
+    alias: nb
+    pipe_file: {table: "NonBorrower"}
+    filters:
+      - column: "NonborrowerType"
+        operator: "eq"
+        value: "PS"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: address_nb
+    alias: a
+    staging: {table: "address_nb"}
+
+joins:
+  - left: {source: nb}
+    right: {source: l}
+    "on": ["nb.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: nb}
+    right: {source: a}
+    "on": ["l.loan_id == a.loan_id"]
+    how: left
+
+columns:
+  - target_column: borrower_id
+    expression: |
+      hash_borrower_id(
+        "ACDC",
+        nb.NonborrowerSsnTinNumber,
+        nb.NbFirstName,
+        nb.NbLastName
+      )
+    transform: expression
+    dtype: string
+    
+  - target_column: mailing_address_id
+    source: a.address_id
+    transform: identity
+    dtype: string
+
+  - target_column: account_registration_completed_at
+    source: []
+    transform: null
+    dtype: datetime
+
+  - target_column: birth_date
+    source: nb.NonborrowerDateOfBirth
+    transform: identity
+    dtype: date
+
+  - target_column: deceased_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: email_address
+    expression: nb.NonborrowerEmail1Address.str.lower()
+    transform: expression
+    dtype: string
+
+  - target_column: ethnicity
+    source: {literal: "DECLINE_TO_STATE"}
+    transform: literal
+    dtype: string
+
+  - target_column: first_name
+    source: nb.NbFirstName
+    transform: identity
+    dtype: string
+
+  - target_column: gender
+    source: {literal: "DECLINE_TO_STATE"}
+    transform: literal
+    dtype: string
+
+  - target_column: last_name
+    source: nb.NbLastName
+    transform: identity
+    dtype: string
+
+  - target_column: middle_name
+    expression: nb.NbMiddleName.str.slice(0, 1).str.upper()
+    transform: expression
+    dtype: string
+
+  - target_column: preferred_language
+    source: {literal: "ENGLISH"}
+    transform: literal
+    dtype: string
+
+  - target_column: race
+    source: {literal: "DECLINED_TO_STATE"}
+    transform: literal
+    dtype: string
+
+  - target_column: suffix
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: tax_id_number
+    expression: nb.NonborrowerSsnTinNumber.fillna("123456789")
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

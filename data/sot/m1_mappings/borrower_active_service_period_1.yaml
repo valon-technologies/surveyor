@@ -1,0 +1,71 @@
+table: borrower_active_service_period_1
+version: 1
+primary_key: [borrower_active_service_period_id]
+
+sources:
+  - name: MilitaryReliefHistory
+    alias: mrh
+    pipe_file: {table: "MilitaryReliefHistory"}
+    filters:
+      - column: "MrhProtectionBeginDate"
+        operator: "is_not_null"
+    dtypes:
+      MrhActiveBeginDate: "date"
+      MrhActiveEndDate: "date"
+      MrhProtectionBeginDate: "date"
+      MrhProtectionEndDate: "date"
+    sorting:
+      - column: "MrhActiveBeginDate"
+        ascending: true
+    groupby:
+      by: ['LoanNumber', 'MrhActiveBeginDate']
+      agg:
+        MrhActiveEndDate: "max"
+        MrhProtectionBeginDate: "max"
+        MrhProtectionEndDate: "max"
+        MrhServiceBranchName: "first"
+
+columns:
+  - target_column: LoanNumber
+    source: mrh.LoanNumber
+    transform: identity
+    dtype: string
+
+  - target_column: MrhActiveBeginDate
+    source: mrh.MrhActiveBeginDate
+    transform: identity
+    dtype: date
+
+  - target_column: MrhActiveEndDate
+    source: mrh.MrhActiveEndDate
+    transform: identity
+    dtype: date
+
+  - target_column: MrhProtectionBeginDate
+    source: mrh.MrhProtectionBeginDate
+    transform: identity
+    dtype: date
+
+  - target_column: MrhProtectionEndDate
+    source: mrh.MrhProtectionEndDate
+    transform: identity
+    dtype: date
+
+  - target_column: MrhServiceBranchName
+    expression: |
+      mrh.MrhServiceBranchName.map({
+        "ARMY": "ARMY",
+        "NAVY": "NAVY",
+        "NATIONAL GUARD": "NATIONAL_GUARD",
+        "AIR FORCE": "AIR_FORCE",
+        "MARINE CORPS": "MARINE_CORPS",
+        "SPACE FORCE": "SPACE_FORCE",
+        "COAST GUARD": "COAST_GUARD"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: sequence_number
+    expression: row_number(df, partition_by=['LoanNumber'], order_by=['MrhActiveBeginDate'])
+    transform: expression
+    dtype: int

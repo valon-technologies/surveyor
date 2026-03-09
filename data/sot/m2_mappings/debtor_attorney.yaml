@@ -1,0 +1,60 @@
+table: debtor_attorney
+version: 1
+primary_key: [debtor_attorney_id]
+
+sources: 
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "BankruptcyStatusCode"
+        operator: "is_not_null"
+  - name: Party
+    alias: p
+    pipe_file: {table: "Party"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: dw}
+    right: {source: l}
+    "on": ["dw.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: dw}
+    right: {source: p}
+    "on": ["dw.BankruptcyDebtorAttorneyId == p.PartyId"]
+    how: left
+
+columns: 
+  - target_column: debtor_attorney_id
+    hash_columns: ["dw.BankruptcyMortgageeAttorneyId", "debtor_attorney"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: email_address
+    source: p.PartyNotes1Text
+    transform: identity
+    dtype: string
+
+  - target_column: name
+    source: p.PartyName1
+    transform: identity
+    dtype: string
+  
+  - target_column: phone_number
+    source: p.PartyTelephoneNumber
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "debtor_attorney"
+  entity_id_col: "debtor_attorney_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+

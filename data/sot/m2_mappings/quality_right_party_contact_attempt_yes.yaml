@@ -1,0 +1,177 @@
+table: quality_right_party_contact_attempt_yes
+version: 1
+primary_key: [quality_right_party_contact_attempt_id]
+
+sources: 
+  - name: QRPC
+    alias: qrpc
+    pipe_file: {table: "QualityRightPartyContact"}
+    filters:
+      - column: "CallId"
+        operator: "is_not_null"
+      - column: "CommentReasonCode"
+        operator: "is_not_null"
+    computed_columns:
+      - column: "CommentAddedDate"
+        expression: "pd.to_datetime(df.CommentAddedDate, errors='coerce').dt.strftime('%Y-%m-%d').astype('string')"
+    groupby:
+      by: ["LoanNumber", "CommentAddedDate", "CallId"]
+      agg:
+        CommentReasonCode: "concat"
+  - name: loan_support_call_staging
+    alias: lsc
+    staging: {table: "loan_support_call"}
+    computed_columns:
+      - column: "call_started_at"
+        expression: "pd.to_datetime(df.call_started_at, errors='coerce').dt.strftime('%Y-%m-%d').astype('string')"
+      - column: "call_disposition"
+        expression: |
+          np.where(
+            ((df['IsRPC'] == 'True') & ~(df['call_disposition'].isin(['Bi-Weekly', 'End of FB Call', 'Escrow', 'Escrow Analysis', 'FB-Task LMTSPOC', 'FB-Task LMTXFB', 'Funds in Suspense', 
+              'General Loan Information', 'Hazard or flood Insurance', 'IVR Payment', 'Loss Draft', 'Payment', 
+              'Payment Application', 'Payment Pending', 'Payoff or Release', 'PMI or MIP', 'Promise to pay', 'Recast', 'Unable to pay']))), 
+            df['call_disposition'] + ", " + "Spoke to Homeowner/A3P",
+            df['call_disposition']
+          )
+  - name: Notes
+    alias: n
+    pipe_file: {table: "Notes"}
+    read_options:
+      lineterminator: "\n"
+    filters:
+      - column: "CollectionsReasonCode"
+        operator: "is_not_null"
+    computed_columns:
+      - column: "CommentDate"
+        expression: "pd.to_datetime(df.CommentDate, errors='coerce').dt.strftime('%Y-%m-%d').astype('string')"
+    groupby:
+      by: ["LoanNumber", "CommentDate"]
+      agg:
+        CollectionsReasonCode: "concat"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: loan_payment_auto_pay_schedule_staging
+    alias: lpas
+    staging: {table: "loan_payment_auto_pay_schedule"}
+  - name: loss_mitigation_application_staging
+    alias: lma
+    staging: {table: "loss_mitigation_application"}
+
+joins:
+  - left: {source: qrpc}
+    right: {source: l}
+    "on": ["qrpc.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: qrpc}
+    right: {source: lsc}
+    "on": 
+      - "l.loan_id == lsc.loan_id"
+      - "qrpc.CallId == lsc.CallId"
+    how: left
+  - left: {source: qrpc}
+    right: {source: n}
+    "on": 
+      - "l.loan_number == n.LoanNumber"
+      - "qrpc.CommentAddedDate == n.CommentDate"
+      - "qrpc.CommentReasonCode == n.CollectionsReasonCode"
+    how: left
+  - left: {source: qrpc}
+    right: {source: lpas}
+    "on": ["l.loan_id == lpas.loan_id"]
+    how: left
+  - left: {source: qrpc}
+    right: {source: lma}
+    "on": ["l.loan_id == lma.loan_id"]
+    how: left
+
+columns: 
+  - target_column: quality_right_party_contact_attempt_id
+    hash_columns: ["lsc.loan_support_call_id", "quality_right_party_contact_attempt"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: ability_to_repay
+    expression: |  
+      np.select(
+        condlist=[
+          lsc.call_disposition.isin(['Payment', 'IVR Payment','Payment Application','Payment Pending','Payoff or Release', 'Promise to pay', 'Bi-Weekly']),
+          lsc.call_disposition.isin(['Unable to pay']),
+        ],
+        choicelist=[
+          "YES",
+          "NO"
+        ],
+        default="UNABLE_TO_GATHER_INFORMATION"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: loan_support_call_id
+    source: lsc.loan_support_call_id
+    transform: identity
+    dtype: string
+  
+  - target_column: is_qrpc_achieved
+    source: {literal: "YES"}
+    transform: literal
+    dtype: string
+
+  - target_column: property_occupancy_status
+    expression: |
+      np.select(
+        condlist=[
+          qrpc.CommentReasonCode.str.contains(r'\b400\b', na=False, regex=True),
+          qrpc.CommentReasonCode.str.contains(r'\b401\b', na=False, regex=True),
+          qrpc.CommentReasonCode.str.contains(r'\b402\b', na=False, regex=True),
+        ],
+        choicelist=[
+          "BORROWER_OCCUPIED",
+          "TENANT_OCCUPIED",
+          "VACANT"
+        ],
+        default="UNKNOWN"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: reason_for_delinquency_timeframe
+    expression: |
+      np.select(
+        condlist=[
+          qrpc.CommentReasonCode.str.contains(r'\b(1|5|8|9)\b', na=False, regex=True),
+          qrpc.CommentReasonCode.str.contains(r'\b(2|3|6|7|15|16|22|23|25|26|27|28|31|104|114|117|NBC|NBM)\b', na=False, regex=True),
+        ],
+        choicelist=[
+          "PERMANENT",
+          "TEMPORARY"
+        ],
+        default="TEMPORARY"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: resolution_commitment_type
+    expression: |  
+      np.select(
+        condlist=[
+          lsc.call_disposition.isin(['Promise to pay']),
+          lsc.call_disposition.isin(['Payment', 'IVR Payment','Payment Application','Payment Pending','Payoff or Release']),
+          ((pd.to_datetime(lsc.call_started_at) <= pd.to_datetime(lpas.enrollment_date)) & (pd.to_datetime(lsc.call_started_at) + pd.to_timedelta(7, unit='days') >= pd.to_datetime(lpas.enrollment_date))),
+          ((pd.to_datetime(lsc.call_started_at) <= pd.to_datetime(lma.received_date)) & (pd.to_datetime(lsc.call_started_at) + pd.to_timedelta(14, unit='days') >= pd.to_datetime(lma.received_date))),
+        ],
+        choicelist=[
+          "PROMISE_TO_PAY",
+          "PAYMENT_TAKEN",
+          "AUTOPAY_ENABLED",
+          "EVALUATE_FOR_MORTGAGE_ASSISTANCE"
+        ],
+        default="NO"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

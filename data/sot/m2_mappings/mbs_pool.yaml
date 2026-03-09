@@ -1,0 +1,146 @@
+table: mbs_pool
+version: 1
+primary_key: [mbs_pool_id]
+
+sources:
+  - name: Investor
+    alias: iv
+    pipe_file: {table: "Investor"}
+    filters:
+      - column: "InvestorName"
+        operator: "eq"
+        value: "FANNIE MAE"
+      - column: "ReconMethod"
+        operator: "in"
+        value: ["540", "817"]
+  - name: MBSPool
+    alias: mp
+    pipe_file: {table: "MBSPool"}
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+    filters:
+      - column: "FnmaPoolNumber"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan1"}
+  - name: mbs_report
+    alias: mr
+    pipe_file: {table: "FMNAMBSREPORT"}
+
+joins:
+  - left: {source: li}
+    right: {source: iv}
+    "on": 
+      - "li.InvestorId == iv.InvestorId"
+      - "li.CategoryCode == iv.CategoryCode"
+    how: inner
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: li}
+    right: {source: mp}
+    "on": 
+      - "iv.InvestorId == mp.InvestorId"
+      - "iv.CategoryCode == mp.CategoryCode"
+    how: left
+  - left: {source: li}
+    right: {source: mr}
+    "on": ["li.LoanNumber == mr.ServicerLoanID"]
+    how: left
+
+columns:
+  - target_column: mbs_pool_id
+    hash_columns: ["li.FnmaPoolNumber", "mp.MpPoolNumber", "mbs_pool"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: mbs_type
+    expression: |
+      iv.InvestorName.map({
+        "FANNIE MAE": "FNMA",
+        "FREDDIE MAC": "FHLMC",
+        "GINNIE MAE": "GNMA"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: pool_issue_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: pool_remittance_day
+    source: mr.RemittanceDay
+    transform: identity
+    dtype: string
+
+  - target_column: pool_remittance_day_type
+    source: {literal: "CD"}
+    transform: literal
+    dtype: string
+
+  - target_column: pool_type
+    source: {literal: "REGULAR"}
+    transform: literal
+    dtype: string
+
+  - target_column: remittance_cycle
+    expression: |
+      np.select(
+        condlist=[
+          mr.MBSExpressIndicator == "Y",
+          ((mr.MBSExpressIndicator == "N") & (li.FannieMaeRemitControlCode.str.startswith("R", na=False))),
+        ],
+        choicelist=[
+          "MBS_EXPRESS",
+          "RAPID_PAYMENT_METHOD"
+        ],
+        default="STANDARD"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: ginnie_issue_type
+    source: mp.MpIssueType
+    transform: identity
+    dtype: string
+
+  - target_column: pool_certificate_identifier
+    expression: |
+      li.FnmaPoolNumber.fillna(mp.MpPoolNumber)
+    transform: expression
+    dtype: string
+
+  - target_column: maturity_date
+    source: mp.MpMaturityDate
+    transform: identity
+    dtype: date
+
+  - target_column: original_amount
+    source: mp.MpOriginalPoolBalance
+    transform: identity
+    dtype: float
+
+  - target_column: original_security_rate
+    source: mp.MpSecurityInterestRate
+    transform: identity
+    dtype: float
+
+  - target_column: guarantee_fee_rate
+    source: mp.MpGuarantyFeeRate
+    transform: identity
+    dtype: float
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "mbs_pool"
+  entity_id_col: "mbs_pool_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

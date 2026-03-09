@@ -1,0 +1,102 @@
+table: property_insurance_installment
+version: 1
+primary_key: [property_insurance_installment_id]
+
+sources:
+  - name: HazardInsurance
+    alias: hi
+    pipe_file: {table: "HazardInsurance"}
+    filters:
+      - column: "HazardPolicyNumber"
+        operator: "is_not_null"
+      - column: "HazardInsCompanyCode"
+        operator: "not_in"
+        value: ["NOCOV", "GAPCN", "FLINH", "INMIS", "FLGAP", "RSTRT", "CYCLE", "7WAIV", "NRNWL", "66666", "77777", "CANCO", "CANIR", "CANNP", "CANUK", "TLOSS", 'UPV00']
+      - column: ["LoanNumber", "HazardDisbursementType", "HazardDisbursementDueDate"]
+        operator: "dedup"
+        keep: "last" 
+      - column: "HazardTypeOfPaymentCode"
+        operator: "in"
+        value: ["1", "2", "3", "4", "5", "6"]
+    computed_columns:
+      - column: "RecordStartDate_join"
+        expression: "pd.to_datetime(df.RecordStartDate, errors='coerce').dt.strftime('%Y-%m-%d')"
+      - column: "RecordEndDate_join"
+        expression: "pd.to_datetime(df.RecordEndDate, errors='coerce').dt.strftime('%Y-%m-%d').fillna('2099-12-31')"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: property_insurance_period_staging
+    alias: pip
+    staging: {table: "property_insurance_period_2"}
+  - name: escrow_loan_info_staging
+    alias: eli
+    staging: {table: "escrow_loan_info"}
+    
+joins:
+  - left: {source: hi}
+    right: {source: l}
+    "on": ["hi.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: hi}
+    right: {source: pip}
+    "on": 
+      - "l.loan_id == pip.loan_id"
+      - "hi.RecordStartDate_join == pip.RecordStartDate"
+      - "hi.RecordEndDate_join == pip.RecordEndDate"
+      - "hi.HazardDisbursementType == pip.HazardDisbursementType"
+      - "hi.HazardSequenceNumber == pip.HazardSequenceNumber"
+    how: inner
+  - left: {source: hi}
+    right: {source: eli}
+    "on": ["l.loan_id == eli.loan_id"]
+    how: left
+
+post_merge_filters:
+  - operator: "expression"
+    expression: "~((df['escrow_loan_info_id'].isnull()) & (df['HazardTypeOfPaymentCode'].isin(['1','2','3','4','5','6'])))"
+
+columns:
+  - target_column: property_insurance_installment_id
+    hash_columns: ["hi.LoanNumber", "hi.HazardDisbursementType", "hi.HazardSequenceNumber", "hi.RecordStartDate", "hi.RecordEndDate", "l.loan_id", "pip.property_insurance_period_id", "property_insurance_installment"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: amount_premium
+    source: hi.HazardDisbursementAmount
+    transform: identity
+    dtype: float
+
+  - target_column: due_date
+    source: hi.HazardDisbursementDueDate
+    transform: identity
+    dtype: date
+
+  - target_column: payment_status
+    expression: |
+      pd.Series(
+        np.where(
+          pd.to_datetime(hi.HazardDisbursementDueDate, errors='coerce') < pd.to_datetime(l.data_transfer_effective_date),
+          "PAID_BY_CURRENT_SERVICER",
+          "NOT_PAID"
+        ),
+        index=df.index
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: property_insurance_period_id
+    source: pip.property_insurance_period_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "property_insurance_installment"
+  entity_id_col: "property_insurance_installment_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

@@ -1,0 +1,163 @@
+table: loan_tax_installment_3_1
+version: 1
+primary_key: [loan_tax_installment_id]
+
+sources:
+  - name: loan_tax_installment_3
+    alias: t3
+    staging: {table: "loan_tax_installment_3"}
+    computed_columns:
+      - column: "tax_year"
+        expression: |
+          df.groupby(['loan_id', 'loan_tax_line_id']).apply(
+            lambda g: (
+              g.sort_values('installment_index').copy().pipe(
+                lambda h: h.assign(
+                  _duedate_mmdd=h['duedate'].astype('int'),
+                  _seq=h['installment_index'].astype('int'),
+                  _upcoming_mmdd=pd.to_datetime(h['upcoming_duedate']).dt.strftime('%m%d').astype('int').iloc[0] if h['upcoming_duedate'].notna().any() else -1,
+                  _next_year=pd.to_numeric(h['year'].iloc[0])
+                )
+              ).pipe(
+                lambda h: h.assign(
+                  _pivot_seq=(h.loc[h['_duedate_mmdd'].eq(h['_upcoming_mmdd']), '_seq'].iloc[0] if h['_duedate_mmdd'].eq(h['_upcoming_mmdd']).any() else -1)
+                )
+              ).pipe(
+                lambda h: h.assign(
+                  tax_year=np.where(
+                    h['_pivot_seq'] == -1,
+                    h['_next_year'],
+                    np.where(
+                      h['_pivot_seq'] == 1,
+                      h['_next_year'],
+                      np.where(h['_seq'] < h['_pivot_seq'], h['_next_year'], h['_next_year'] - 1)
+                    )
+                  )
+                )
+              )
+            )
+          ).reset_index(drop=True)['tax_year']
+      - column: "calendar_year"
+        expression: |
+          df.groupby(['loan_id', 'loan_tax_line_id']).apply(
+            lambda g: (
+              g.sort_values('installment_index').copy().pipe(
+                lambda h: h.assign(
+                  _duedate_mmdd=h['duedate'].astype('int'),
+                  _base_year=pd.to_numeric(h['year'].iloc[0])
+                )
+              ).pipe(
+                lambda h: h.assign(
+                  _year_rollover=(h['_duedate_mmdd'] < h['_duedate_mmdd'].shift(1)).fillna(False).astype('int').cumsum()
+                )
+              ).pipe(
+                lambda h: h.assign(
+                  calendar_year=h['_base_year'] + h['_year_rollover']
+                )
+              )
+            )
+          ).reset_index(drop=True)['calendar_year']
+      - column: "due_date_w_year"
+        expression: |
+          (lambda d: pd.to_datetime(
+            np.where(
+              d['duedate'].astype('int') == pd.to_datetime(d['upcoming_duedate']).dt.strftime('%m%d').astype('int'),
+              d['year'].astype('str'),
+              d['calendar_year'].astype('int').astype('str')
+            ) + d['duedate'],
+            format='%Y%m%d',
+            errors='coerce'
+          ))(df)
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: Transaction
+    alias: tr
+    pipe_file: {table: "Transaction"}
+    dtypes:
+      TotalAmountPaid: "float"
+      DueDate: "date"
+    filters:
+      - operator: "expression"
+        expression: "TransactionDescription.str.contains('Tax Disb|Utilities Dist Disb', regex=True, na=False)"
+      - column: ['LoanNumber', 'DueDate']
+        operator: "dedup"
+        keep: "last"
+
+joins:
+  - left: {source: t3}
+    right: {source: l}
+    "on": ["t3.loan_id == l.loan_id"]
+    how: left
+  - left: {source: t3}
+    right: {source: tr}
+    "on": 
+      - "l.loan_number == tr.LoanNumber"
+      - "t3.due_date_w_year == tr.DueDate"
+    how: left
+
+columns:
+  - target_column: loan_tax_installment_id
+    source: t3.loan_tax_installment_id
+    transform: identity
+    dtype: string
+
+  - target_column: amount_base
+    source: t3.amount_base
+    transform: identity
+    dtype: float
+
+  - target_column: amount_fee
+    source: t3.amount_fee
+    transform: identity
+    dtype: float
+
+  - target_column: economic_loss_date
+    expression: |
+      pd.to_datetime(
+        np.where(
+          t3.duedate.astype('int') == pd.to_datetime(t3.upcoming_duedate).dt.strftime('%m%d').astype('int'),
+          t3.year.astype('str'),
+          t3.calendar_year.astype('int').astype('str')
+        ) + t3.economic_loss_date,
+        format='%Y%m%d',
+        errors='coerce'
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: installment_index
+    source: t3.installment_index
+    transform: identity
+    dtype: string
+
+  - target_column: payment_status
+    expression: |
+      np.select(
+        condlist=[
+          (tr.TotalAmountPaid==0) & (pd.to_datetime(t3.due_date_w_year)<pd.to_datetime(l.data_transfer_effective_date)),
+          (tr.TotalAmountPaid.isnull()) & (pd.to_datetime(t3.due_date_w_year)>=pd.to_datetime(l.data_transfer_effective_date))
+        ],
+        choicelist=[
+          "DELINQUENT", 
+          "UNPAID"
+        ],
+        default="CONFIRMED"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: year
+    source: t3.tax_year
+    transform: identity
+    dtype: int
+
+  - target_column: loan_id
+    source: t3.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_tax_line_id
+    source: t3.loan_tax_line_id
+    transform: identity
+    dtype: string

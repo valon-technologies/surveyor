@@ -1,0 +1,116 @@
+table: arm_rate_period
+version: 1
+primary_key: [arm_rate_period_id]
+
+sources:
+- name: PaymentFactors
+  alias: pym
+  pipe_file: {table: "PaymentFactors"}
+  dtypes:
+    PfEffectiveDate: "date"
+    PfInterestRate: "float"
+  sorting:
+    - column: "PfEffectiveDate"
+      ascending: true
+  computed_columns:
+    # Replace zeros with NaN so shift() works on clean data
+    - column: "clean_rate"
+      expression: "df['PfInterestRate'].replace(0, np.nan)"
+    # Shift within non-zero rates only
+    - column: "prev_rate"
+      expression: "df.groupby('LoanNumber')['clean_rate'].shift()"
+    # Flag rate changes (where both current and previous are non-null and different)
+    - column: "rate_changed"
+      expression: "df['clean_rate'].notna() & df['prev_rate'].notna() & (df['clean_rate'] != df['prev_rate'])"
+  filters:
+    - operator: "expression"
+      expression: "clean_rate.notna()"
+    - operator: "expression"
+      expression: "rate_changed == True"
+  groupby:
+    by: ["LoanNumber"]
+    agg:
+      last_rate_change_date:
+        column: "PfEffectiveDate"
+        method: "last"
+- name: ARM
+  alias: arm
+  pipe_file: {table: "Arm"}
+  dtypes:
+    ArmNextInterestRateEffectiveDate: "date"
+    ArmTimingEffectiveDate: "date"
+    ArmIndexLeadDays1: "int"
+- name: loan_staging
+  alias: l
+  staging: {table: "loan"}
+- name: arm_loan_info_staging
+  alias: ali
+  staging: {table: "arm_loan_info"}
+- name: loan_payment_interest_schedule_staging
+  alias: lpis
+  staging: {table: "loan_payment_interest_schedule"}
+
+joins:
+- left: {source: pym}
+  right: {source: l}
+  'on': [pym.LoanNumber == l.loan_number]
+  how: left
+- left: {source: pym}
+  right: {source: arm}
+  'on': [pym.LoanNumber == arm.LoanNumber]
+  how: left
+- left: {source: pym}
+  right: {source: ali}
+  'on': [l.loan_id == ali.loan_id]
+  how: left
+- left: {source: pym}
+  right: {source: lpis}
+  'on': [l.loan_id == lpis.loan_id]
+  how: left
+
+columns:
+- target_column: arm_rate_period_id
+  hash_columns: [l.loan_id, "pym.last_rate_change_date", "ARM_RATE_PERIOD"]
+  transform: hash_id
+  dtype: string
+
+- target_column: accrual_start_date
+  expression: arm.ArmNextInterestRateEffectiveDate - pd.DateOffset(months=1)
+  transform: expression
+  dtype: date
+
+- target_column: arm_loan_info_id
+  source: ali.arm_loan_info_id
+  transform: identity
+  dtype: string
+
+- target_column: index_rate_id
+  source: []
+  transform: null
+  dtype: string
+
+- target_column: loan_payment_interest_schedule_id
+  source: lpis.loan_payment_interest_schedule_id
+  transform: identity
+  dtype: string
+
+- target_column: lookback_date
+  expression: arm.ArmTimingEffectiveDate - pd.to_timedelta(arm.ArmIndexLeadDays1, unit='D')
+  transform: expression
+  dtype: date
+
+- target_column: payment_cycle_start_date
+  source: pym.last_rate_change_date
+  transform: identity
+  dtype: date
+
+- target_column: loan_id
+  source: l.loan_id
+  transform: identity
+  dtype: string
+
+entity:
+  entity_type: "arm_rate_period"
+  entity_id_col: "arm_rate_period_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

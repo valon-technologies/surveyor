@@ -1,0 +1,30 @@
+table: notification
+version: 1
+primary_key: [notification_id]
+
+sources:
+  - name: notification_staging
+    alias: n
+    staging: {table: "notification_1"}
+
+columns:
+  - target_column: notification_id
+    source: n.notification_id
+    transform: identity
+    dtype: string
+
+  - target_column: notification_type
+    source: n.notification_type
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: n.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "notification"
+  entity_id_col: "notification_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

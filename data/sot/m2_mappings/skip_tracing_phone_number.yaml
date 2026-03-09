@@ -1,0 +1,50 @@
+table: skip_tracing_phone_number
+version: 1
+primary_key: [skip_tracing_phone_number_id]
+
+sources:
+  - name: Notes
+    alias: n
+    pipe_file: {table: "Notes"}
+    filters:
+      - column: "CommentCode"
+        operator: "in"
+        value: ["COSKTA", "COSKTS", "COSTIN", "COSTEN"]
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: borrower_to_loan_staging
+    alias: btl
+    staging: {table: "borrower_to_loan"}
+
+joins:
+  - left: {source: n}
+    right: {source: l}
+    "on": ["n.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: n}
+    right: {source: btl}
+    "on": ["l.loan_id == btl.loan_id"]
+    how: left
+
+columns:
+  - target_column: skip_tracing_phone_number_id
+    hash_columns: ["l.loan_id", "n.LoanNumber", "n.CommentCode", "n.CommentDate", "skip_tracing_phone_number"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: btl.borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "skip_tracing_phone_number"
+  entity_id_col: "skip_tracing_phone_number_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

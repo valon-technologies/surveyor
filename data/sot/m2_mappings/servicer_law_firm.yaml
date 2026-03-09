@@ -1,0 +1,36 @@
+table: servicer_law_firm
+version: 1
+primary_key: [servicer_law_firm_id]
+
+sources:
+  - name: servicer_law_firm_bank
+    alias: slfb
+    staging: {table: "servicer_law_firm_bank"}
+  - name: servicer_law_firm_fore
+    alias: slff
+    staging: {table: "servicer_law_firm_fore"}
+
+concat:
+  sources: [slfb, slff]
+
+columns:
+  - target_column: servicer_law_firm_id
+    source: servicer_law_firm_id
+    transform: identity
+    dtype: string
+
+  - target_column: name
+    source: name
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "servicer_law_firm"
+  entity_id_col: "servicer_law_firm_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

@@ -1,0 +1,36 @@
+table: foreclosure_payoff
+version: 1
+primary_key: [foreclosure_payoff_id]
+
+sources: 
+  - name: foreclosure_staging
+    alias: fs
+    staging: {table: "foreclosure"}
+
+columns: 
+- target_column: foreclosure_payoff_id
+  hash_columns: ["fs.foreclosure_id", "foreclosure_payoff_id"]
+  transform: hash_id
+  dtype: string
+
+- target_column: quote_request_id
+  source: []
+  transform: null
+  dtype: string
+
+- target_column: foreclosure_id
+  source: fs.foreclosure_id
+  transform: identity
+  dtype: string
+
+- target_column: loan_id
+  source: fs.loan_id
+  transform: identity
+  dtype: string
+
+entity:
+  entity_type: "foreclosure_payoff"
+  entity_id_col: "foreclosure_payoff_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+

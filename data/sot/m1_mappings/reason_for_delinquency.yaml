@@ -1,0 +1,78 @@
+table: reason_for_delinquency
+version: 1
+primary_key: [reason_for_delinquency_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+    dtypes:
+      DelinquentDayCount: "int"
+    filters:
+      - column: "DelinquentDayCount"
+        operator: "gt"
+        value: 0
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: reason_for_delinquency_id
+    hash_columns: ["li.LoanNumber", "l.loan_id", "reason_for_delinquency"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: reason_for_delinquency
+    expression: | 
+      li.DelinquencyReasonCode.map({
+      "001": "BORROWER_DEATH",
+      "002": "BORROWER_ILLNESS",
+      "003": "BORROWER_ILLNESS_FAMILY_MEMBER",
+      "004": "BORROWER_DEATH_FAMILY_MEMBER",
+      "005": "DIVORCE",
+      "006": "INCOME_REDUCTION",
+      "007": "EXCESSIVE_OBLIGATIONS",
+      "008": "PROPERTY_ABANDONMENT",
+      "009": "EMPLOYMENT_RELOCATION",
+      "011": "PROPERTY_REPAIRS",
+      "012": "INABILITY_TO_SELL",
+      "013": "INABILITY_TO_RENT",
+      "014": "MILITARY_SERVICE",
+      "015": "OTHER",
+      "016": "UNEMPLOYMENT",
+      "017": "BUSINESS_FAILURE",
+      "019": "CASUALTY_LOSS",
+      "022": "NATIONAL_EMERGENCY_DECLARATION",
+      "023": "SERVICING_PROBLEMS",
+      "026": "PAYMENT_ADJUSTMENT",
+      "027": "PAYMENT_DISPUTE",
+      "029": "PENDING_TRANSFER_OF_OWNERSHIP",
+      "030": "FRAUD",
+      "031": "UNABLE_TO_CONTACT_BORROWER",
+      "034": "ELIGIBLE_DISASTER_DECLARATION",
+      "INC": "INCARCERATION"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: source
+    source: []
+    transform: null
+    dtype: string
+
+entity:
+  entity_type: "reason_for_delinquency"
+  entity_id_col: "reason_for_delinquency_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

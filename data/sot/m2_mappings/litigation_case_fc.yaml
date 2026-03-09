@@ -1,0 +1,84 @@
+table: litigation_case_fc
+version: 1
+primary_key: [litigation_case_id]
+
+sources:
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "FORE"
+      - column: "StepCode"
+        operator: "in"
+        value: ["F82", "F85", "F64", "F65"]
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: foreclosure_staging
+    alias: fs
+    staging: {table: "foreclosure"}
+
+joins:
+  - left: {source: s}
+    right: {source: l}
+    "on": ["s.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: s}
+    right: {source: fs}
+    "on": ["l.loan_id == bc.loan_id"]
+    how: inner
+
+columns:
+  - target_column: litigation_case_id
+    hash_columns: ["li.LoanNumber", "l.loan_id", "bc.bankruptcy_case_id", "litigation_case"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: bankruptcy_case_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: foreclosure_id
+    source: fs.foreclosure_id
+    transform: identity
+    dtype: string
+
+  - target_column: case_type
+    expression: |
+      (lambda get_col, np, pd: np.select(
+        condlist=[
+          get_col('ActualCompletionDate_F82').notna() | get_col('ActualCompletionDate_F85').notna(),
+          get_col('ActualCompletionDate_F64').notna() | get_col('ActualCompletionDate_F65').notna()
+        ],
+        choicelist=[
+          "CONTESTED_FORECLOSURE",
+          "TITLE_CURATIVE"
+        ],
+        default=pd.NA
+      ))((lambda df, pd: lambda col: df.get(col, pd.Series(pd.NA, index=df.index)))(df, pd), np, pd)
+    transform: expression
+    dtype: string
+  
+  - target_column: file_date
+    expression: |
+      (lambda get_col, pd: get_col('ActualCompletionDate_F82').fillna(get_col('ActualCompletionDate_F64')))((lambda df, pd: lambda col: df.get(col, pd.Series(pd.NA, index=df.index)))(df, pd), pd)
+    transform: expression
+    dtype: date
+
+  - target_column: termination_date
+    expression: |
+      (lambda get_col, pd: get_col('ActualCompletionDate_F85').fillna(get_col('ActualCompletionDate_F65')))((lambda df, pd: lambda col: df.get(col, pd.Series(pd.NA, index=df.index)))(df, pd), pd)
+    transform: expression
+    dtype: date
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string 

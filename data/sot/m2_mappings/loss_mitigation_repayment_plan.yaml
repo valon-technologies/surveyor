@@ -1,0 +1,109 @@
+table: loss_mitigation_repayment_plan
+version: 1
+primary_key: [loss_mitigation_repayment_plan_id]
+
+sources:
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "LSMT"
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "LossMitTypeCode"
+        operator: "eq"
+        value: "REPA"
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+    filters:
+      - column: "FpFirstPaymentDueDate"
+        operator: "is_not_null"
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: loss_mitigation_plan
+    alias: lmp
+    staging: {table: "loss_mitigation_plan"}
+
+joins:
+  - left: {source: s}
+    right: {source: dw}
+    "on": ["s.LoanNumber == dw.LoanNumber"]
+    how: inner
+  - left: {source: s}
+    right: {source: ed}
+    "on": ["s.LoanNumber == ed.LoanNumber"]
+    how: inner
+  - left: {source: s}
+    right: {source: l}
+    "on": ["s.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: s}
+    right: {source: li}
+    "on": ["s.LoanNumber == li.LoanNumber"]
+    how: inner
+  - left: {source: s}
+    right: {source: lmp}
+    "on": ["l.loan_id == lmp.loan_id"]
+    how: left
+  
+columns:
+  - target_column: loss_mitigation_repayment_plan_id
+    hash_columns: ["l.loan_id", "s.LoanNumber", "loss_mitigation_repayment_plan"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: amount_monthly_payment
+    source: li.TotalMonthlyPayment
+    transform: identity
+    dtype: float
+
+  - target_column: amount_monthly_repayment
+    source: li.FpOriginalPaymentAmount
+    transform: identity
+    dtype: float
+
+  - target_column: duration_months
+    expression: |
+      (((pd.to_datetime(ed.FpLastPaymentDueDate) - pd.to_datetime(ed.FpFirstPaymentDueDate)).dt.days + 30) / 30).round().astype('int64')
+    transform: expression
+    dtype: int
+
+  - target_column: first_payment_due_date
+    source: ed.FpFirstPaymentDueDate
+    transform: identity
+    dtype: date
+
+  - target_column: last_payment_due_date
+    source: ed.FpLastPaymentDueDate
+    transform: identity
+    dtype: date
+
+  - target_column: loss_mitigation_plan_id
+    source: lmp.loss_mitigation_plan_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loss_mitigation_repayment_plan"
+  entity_id_col: "loss_mitigation_repayment_plan_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

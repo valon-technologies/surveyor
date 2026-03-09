@@ -1,0 +1,435 @@
+table: loss_mitigation_loan_modification
+version: 1
+primary_key: [loss_mitigation_loan_modification_id]
+
+sources:
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "LSMT"
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "LossMitTypeCode"
+        operator: "eq"
+        value: "TMOD"
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: LossMitigation
+    alias: lm
+    pipe_file: {table: "LossMitigation"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: property_valuation
+    alias: pv
+    staging: {table: "property_valuation"}
+    filters:
+      - column: "valuation_purpose"
+        operator: "eq"
+        value: "FLEX_MODIFICATION"
+  - name: loss_mitigation_plan
+    alias: lmp
+    staging: {table: "loss_mitigation_plan"}
+    filters:
+      - column: "plan_type"
+        operator: "eq"
+        value: "LOAN_MODIFICATION"
+
+joins:
+  - left: {source: s}
+    right: {source: l}
+    "on": ["s.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: s}
+    right: {source: dw}
+    "on": ["s.LoanNumber == dw.LoanNumber"]
+    how: inner
+  - left: {source: s}
+    right: {source: lm}
+    "on": ["s.LoanNumber == lm.LoanNumber"]
+    how: left
+  - left: {source: s}
+    right: {source: pv}
+    "on": ["l.loan_id == pv.loan_id"]
+    how: left
+  - left: {source: s}
+    right: {source: lmp}
+    "on": ["l.loan_id == lmp.loan_id"]
+    how: left
+  - left: {source: s}
+    right: {source: ed}
+    "on": ["s.LoanNumber == ed.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: loss_mitigation_loan_modification_id
+    hash_columns: ["l.loan_id", "s.LoanNumber", "loss_mitigation_loan_modification"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: actual_amount_capitalized_escrow_advance
+    source: dw.ModInfoCapEscrowAmount
+    transform: identity
+    dtype: float
+
+  - target_column: actual_amount_capitalized_interest
+    source: dw.ModInfoCapInterestAmount
+    transform: identity
+    dtype: float
+
+  - target_column: actual_amount_capitalized_servicing_advance
+    source: dw.ModInfoCapCorpAdvanceAmount
+    transform: identity
+    dtype: float
+
+  - target_column: actual_amount_deferred_principal
+    source: dw.ModDeferredPrincipalAmount
+    transform: identity
+    dtype: float
+
+  - target_column: actual_amount_escrow_shortage
+    source: dw.ModEscrowShortageAmount
+    transform: identity
+    dtype: float
+
+  - target_column: actual_modification_effective_date
+    source: ed.ModInfoEffectiveDate
+    transform: identity
+    dtype: date
+
+  - target_column: actual_modified_amount_pni_due
+    source: dw.ModInfoAfterPiPaymentAmount
+    transform: identity
+    dtype: float
+
+  - target_column: actual_modified_amount_tni_due
+    source: dw.ModPostMthlyEscrPaymentAmount
+    transform: identity
+    dtype: float
+
+  - target_column: actual_modified_date_maturity
+    source: dw.ModInfoAfterMatureDate
+    transform: identity
+    dtype: date
+
+  - target_column: actual_modified_interest_rate_percent
+    source: dw.ModInfoAfterInterestRate
+    transform: identity
+    dtype: float
+
+  - target_column: actual_modified_unpaid_principal_balance
+    source: dw.ModInfoAfterPrincipalBalance
+    transform: identity
+    dtype: float
+
+  - target_column: actual_num_escrow_shortage_repayment_months
+    source: {literal: 60}
+    transform: literal
+    dtype: int
+
+  - target_column: amount_escrow_shortage
+    source: dw.ModEscrowShortageAmount
+    transform: identity
+    dtype: float
+
+  - target_column: agreement_executed_date
+    source: s.ActualCompletionDate_N19
+    transform: identity
+    dtype: date
+
+  - target_column: agreement_received_from_homeowner_date
+    source: s.ActualCompletionDate_L87
+    transform: identity
+    dtype: date
+
+  - target_column: agreement_recorded_date
+    source: s.ActualCompletionDate_M09
+    transform: identity
+    dtype: date
+
+  - target_column: agreement_sent_to_homeowner_date
+    source: s.ActualCompletionDate_L96
+    transform: identity
+    dtype: date
+
+  - target_column: plan_booked_date
+    source: s.ActualCompletionDate_L66
+    transform: identity
+    dtype: date
+
+  - target_column: trial_period_date_first_payment_due
+    source: dw.ModTrialStartDate
+    transform: identity
+    dtype: date
+
+  - target_column: trial_period_date_last_payment_due
+    source: dw.ModTrialEndDate
+    transform: identity
+    dtype: date
+
+  - target_column: trial_period_payment_amount
+    source: dw.ModTrialPaymentAmount
+    transform: identity
+    dtype: float
+
+  - target_column: property_valuation_id
+    source: pv.property_valuation_id
+    transform: identity
+    dtype: string
+
+  - target_column: loss_mitigation_plan_id
+    source: lmp.loss_mitigation_plan_id
+    transform: identity
+    dtype: string
+
+  - target_column: actual_modified_maturity_date
+    source: dw.ModInfoAfterMatureDate
+    transform: identity
+    dtype: date
+
+  - target_column: actual_modified_principal_balance
+    source: dw.ModInfoAfterPrincipalBalance
+    transform: identity
+    dtype: float
+
+  - target_column: application_signed_date
+    source: s.ActualCompletionDate_L66
+    transform: identity
+    dtype: date
+
+  - target_column: lien_position
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: post_modification_date_maturity
+    source: dw.ModInfoAfterMatureDate
+    transform: identity
+    dtype: date
+
+  - target_column: post_modification_interest_rate_percent
+    source: dw.ModInfoAfterInterestRate
+    transform: identity
+    dtype: float
+
+  - target_column: post_modification_pni_payment_amount
+    source: dw.ModInfoAfterPiPaymentAmount
+    transform: identity
+    dtype: float
+
+  - target_column: property_value_amount
+    source: pv.value_amount
+    transform: identity
+    dtype: float
+
+  - target_column: agreement_certified_copy_sent_to_doc_custodian_date
+    source: lm.DocumentsToCustodianDate
+    transform: identity
+    dtype: date
+
+  - target_column: agreement_sent_to_doc_custodian_date
+    source: lm.DocumentsToCustodianDate
+    transform: identity
+    dtype: date
+
+  - target_column: agreement_signed_by_homeowner_date
+    source: lm.DocumentsSignedByMortgagorDate
+    transform: identity
+    dtype: date
+
+  - target_column: estimated_amount_capitalized_deferred_principal
+    expression: |
+      pd.to_numeric(dw.ModTotalCapitalizedAmount, errors="coerce") - (
+        pd.to_numeric(dw.ModInfoCapInterestAmount, errors="coerce").fillna(0) +
+        pd.to_numeric(dw.ModInfoCapEscrowAmount, errors="coerce").fillna(0) +
+        pd.to_numeric(dw.ModInfoCapFeesAmount, errors="coerce").fillna(0) +
+        pd.to_numeric(dw.ModInfoCapCorpAdvanceAmount, errors="coerce").fillna(0) +
+        pd.to_numeric(dw.ModInfoCapLateChgAmount, errors="coerce").fillna(0) +
+        pd.to_numeric(dw.ModInfoCapOtherAmount, errors="coerce").fillna(0)
+      )
+    transform: expression
+    dtype: float
+
+  - target_column: estimated_amount_capitalized_escrow_advance
+    source: dw.ModInfoCapEscrowAmount
+    transform: identity
+    dtype: float
+
+  - target_column: estimated_amount_capitalized_interest
+    source: dw.ModInfoCapInterestAmount
+    transform: identity
+    dtype: float
+
+  - target_column: estimated_modification_effective_date
+    source: dw.ModInfoEffectiveDate
+    transform: identity
+    dtype: date
+
+  - target_column: evaluated_final_modification_date
+    expression: pd.to_datetime(dw.ModApprovalDate).fillna(pd.to_datetime(dw.ModDenialDate))
+    transform: expression
+    dtype: date
+
+  - target_column: executed_agreement_sent_to_homeowner_date
+    source: lm.FinalDocumentsSentDate
+    transform: identity
+    dtype: date
+
+  - target_column: final_escrow_analysis_date
+    source: s.ActualCompletionDate_101
+    transform: identity
+    dtype: date
+
+  - target_column: initial_escrow_analysis_date
+    expression: pd.to_datetime(dw.ModApprovalDate).fillna(pd.to_datetime(dw.ModDenialDate))
+    transform: expression
+    dtype: date
+
+  - target_column: num_escrow_shortage_repayment_months
+    expression: |
+      np.where(
+        l.investor_type.isin(['FANNIE_MAE', 'FREDDIE_MAC']),
+        60,
+        np.nan
+      )
+    transform: expression
+    dtype: int
+
+  - target_column: pre_modification_date_maturity
+    source: ed.ModInfoBeforeMatureDate
+    transform: identity
+    dtype: date
+
+  - target_column: pre_modification_deferred_principal
+    source: dw.ModDeferredPrincipalAmount
+    transform: identity
+    dtype: float
+
+  - target_column: pre_modification_interest_bearing_unpaid_principal_balance
+    source: dw.ModInfoBeforePrincipalBalance
+    transform: identity
+    dtype: float
+
+  - target_column: pre_modification_interest_rate_percent
+    source: dw.ModInfoBeforeInterestRate
+    transform: identity
+    dtype: float
+
+  - target_column: pre_modification_pni_payment_amount
+    source: dw.ModInfoBeforePiPaymentAmount
+    transform: identity
+    dtype: float
+
+  - target_column: title_report_ordered_date
+    source: lm.TitleOrdered
+    transform: identity
+    dtype: date
+
+  - target_column: title_report_received_date
+    source: lm.TitleReceived
+    transform: identity
+    dtype: date
+
+  - target_column: estimated_amount_capitalized_escrow_shortage
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: estimated_amount_capitalized_servicing_advance
+    source: dw.ModInfoCapCorpAdvanceAmount
+    transform: identity
+    dtype: float
+
+  - target_column: estimated_num_escrow_shortage_repayment_months
+    expression: |
+      (pd.to_numeric(dw.ModEscrowShortageAmount, errors='coerce') / pd.to_numeric(dw.ModMthEscrowRepaymntAmount, errors='coerce').replace(0, np.nan)).round().astype('Int64')
+    transform: expression
+    dtype: int
+
+  - target_column: estimated_amount_deferred_principal
+    source: dw.ModDeferredPrincipalAmount
+    transform: identity
+    dtype: float
+
+  - target_column: estimated_amount_escrow_shortage
+    source: dw.ModEscrowShortageAmount
+    transform: identity
+    dtype: float
+
+  - target_column: estimated_modified_amount_pni_due
+    source: dw.ModInfoAfterPiPaymentAmount
+    transform: identity
+    dtype: float
+
+  - target_column: estimated_modified_amount_tni_due
+    expression: pd.to_numeric(dw.ModPostTotlMthlyPaymentAmount, errors="coerce") - pd.to_numeric(dw.ModInfoAfterPiPaymentAmount, errors="coerce")
+    transform: expression
+    dtype: float
+
+  - target_column: estimated_modified_date_maturity
+    source: dw.ModInfoAfterMatureDate
+    transform: identity
+    dtype: date
+
+  - target_column: estimated_modified_interest_rate_percent
+    source: dw.ModInfoAfterInterestRate
+    transform: identity
+    dtype: float
+
+  - target_column: estimated_modified_unpaid_principal_balance
+    source: dw.ModInfoAfterPrincipalBalance
+    transform: identity
+    dtype: float
+
+  - target_column: estimated_amount_interest_waived
+    source: {literal: 0}
+    transform: literal
+    dtype: float
+
+  - target_column: pre_modification_delinquent_principal
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: pre_modification_tni_payment_amount
+    expression: pd.to_numeric(dw.ModPreTotlMthlyPaymentAmount, errors="coerce") - pd.to_numeric(dw.ModInfoBeforePiPaymentAmount, errors="coerce")
+    transform: expression
+    dtype: float
+
+  - target_column: solicitation_type
+    expression: |
+      lm.WorkoutId.map({
+        30: "NON_SOLICITATION",
+        38: "NON_SOLICITATION",
+        31: "FLEX_MOD_SOLICITATION",
+        39: "FLEX_MOD_SOLICITATION"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: title_endorsement_obtained_date
+    source: s.ActualCompletionDate_M95
+    transform: identity
+    dtype: date
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loss_mitigation_loan_modification"
+  entity_id_col: "loss_mitigation_loan_modification_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

@@ -1,0 +1,85 @@
+table: address_taxauth
+version: 1
+
+sources:
+  - name: Payee
+    alias: p
+    pipe_file: {table: "Payee"}
+    filters:
+      - column: "PayeeType"
+        operator: "eq"
+        value: "TX"
+  - name: Tax
+    alias: t
+    pipe_file: {table: "Tax"}
+    filters:
+      - column: ["LoanNumber", "TaxPayeeCode"]
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: t}
+    right: {source: p}
+    "on": ["t.TaxPayeeCode == p.PayeeId"]
+    how: left 
+  - left: {source: t}
+    right: {source: l}
+    "on": ["t.LoanNumber == l.loan_number"]
+    how: left  
+  
+columns:
+  - target_column: address_id
+    expression: |
+      hash_address_id(
+        "ACDC",
+        p.PayeeAddressLine3.str.strip(),
+        p.PayeeAddressLine2.str.strip(), 
+        p.PayeeAddressLine4.str.rsplit(pat=" ", n=1).str[0].str.strip(), 
+        p.PayeeAddressLine4.str.rsplit(pat=" ", n=1).str[1].str.strip(), 
+        p.PayeeAddressZipCode.fillna('').astype(str).str.replace('nan', '').str.slice(0, 5).str.zfill(5).replace('00000', '').str.strip()
+      )
+    transform: expression
+    dtype: string
+    
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: city
+    expression: p.PayeeAddressLine4.str.rsplit(pat=" ", n=1).str[0].str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: county
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: state
+    expression: p.PayeeAddressLine4.str.rsplit(pat=" ", n=1).str[1].str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: street_address_1
+    expression: p.PayeeAddressLine3.str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: street_address_2
+    expression: p.PayeeAddressLine2.str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: zip_code
+    expression: p.PayeeAddressZipCode.fillna('').astype(str).str.replace('nan', '').str.slice(0, 5).str.zfill(5).replace('00000', '').str.strip()
+    transform: expression
+    dtype: string
+  
+  - target_column: payeeid
+    source: p.PayeeId
+    transform: identity
+    dtype: string

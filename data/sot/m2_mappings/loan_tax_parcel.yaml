@@ -1,0 +1,53 @@
+table: loan_tax_parcel
+version: 1
+primary_key: [loan_tax_parcel_id]
+
+sources:
+  - name: Tax
+    alias: t
+    pipe_file: {table: "Tax"}
+    filters:
+      - column: ["LoanNumber", "TaxId"]
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: t}
+    right: {source: l}
+    "on": ["t.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: loan_tax_parcel_id
+    hash_columns: ["t.LoanNumber", "l.loan_id", "t.TaxId", "loan_tax_parcel"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: legal_description
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: parcel_id
+    source: t.TaxId
+    transform: identity
+    dtype: string
+
+  - target_column: status
+    source: {literal: "ACTIVE"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_tax_parcel"
+  entity_id_col: "loan_tax_parcel_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

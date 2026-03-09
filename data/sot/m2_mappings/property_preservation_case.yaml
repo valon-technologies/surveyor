@@ -1,0 +1,118 @@
+table: property_preservation_case
+version: 1
+primary_key: [property_preservation_case_id]
+
+sources:
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "FcStatusCode"
+        operator: "is_not_null"
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+    filters:
+      - column: "PresStatusCode"
+        operator: "is_not_null"
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+    dtypes:
+      VacancyFirstKnownDate: "date"
+    sorting:
+      - column: "VacancyFirstKnownDate"
+        ascending: true
+    filters:
+      - column: "VacancyFirstKnownDate"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: PropertyPreservation
+    alias: pi
+    pipe_file: {table: "PropertyPreservation"}
+    dtypes:
+      PresSecuringCompletedDate: "date"
+    sorting:
+      - column: "PresSecuringCompletedDate"
+        ascending: true
+
+joins:
+  - left: {source: dw}
+    right: {source: l}
+    "on": ["dw.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: dw}
+    right: {source: fi}
+    "on": ["dw.LoanNumber == fi.LoanNumber"]
+    how: inner
+  - left: {source: dw}
+    right: {source: ed}
+    "on": ["dw.LoanNumber == ed.LoanNumber"]
+    how: left
+
+merge_asof:
+  - right:
+      source: pi
+    left_on: "VacancyFirstKnownDate"
+    right_on: "PresSecuringCompletedDate"
+    direction: "backward"
+    left_by: ["LoanNumber"]
+    right_by: ["LoanNumber"]
+
+columns:
+  - target_column: property_preservation_case_id
+    hash_columns: ["l.loan_id", "fi.LoanNumber", "property_preservation_case"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: status
+    expression: |
+      fi.PresStatusCode.map({
+        "C": "COMPLETED",
+        "A": "IN_PROGRESS",
+      }).fillna('NOT_STARTED')
+    transform: expression
+    dtype: string
+
+  - target_column: lockbox_code
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: closed_at
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: first_time_vacancy_date
+    source: ed.VacancyFirstKnownDate
+    transform: identity
+    dtype: date
+  
+  - target_column: initial_secure_date
+    source: pi.PresSecuringCompletedDate
+    transform: identity
+    dtype: date
+
+  - target_column: resolution_date
+    source: ed.PresConFinalCompletedDate
+    transform: identity
+    dtype: date
+
+  - target_column: resolution_reason
+    source: []
+    transform: null
+    dtype: string
+
+entity:
+  entity_type: "property_preservation_case"
+  entity_id_col: "property_preservation_case_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

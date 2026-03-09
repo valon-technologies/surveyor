@@ -1,0 +1,56 @@
+table: litigation_case
+version: 1
+primary_key: [litigation_case_id]
+
+sources:
+  - name: litigation_case_bk
+    alias: lk
+    staging: {table: "litigation_case_bk"}
+  - name: litigation_case_fc
+    alias: lf
+    staging: {table: "litigation_case_fc"}
+
+concat:
+  sources: [lk, lf]
+
+columns:
+  - target_column: litigation_case_id
+    source: litigation_case_id
+    transform: identity
+    dtype: string
+
+  - target_column: bankruptcy_case_id
+    source: bankruptcy_case_id
+    transform: identity
+    dtype: string
+
+  - target_column: foreclosure_id
+    source: foreclosure_id
+    transform: identity
+    dtype: string
+
+  - target_column: case_type
+    source: case_type
+    transform: identity
+    dtype: string
+  
+  - target_column: file_date
+    source: file_date
+    transform: identity
+    dtype: date
+
+  - target_column: termination_date
+    source: termination_date
+    transform: identity
+    dtype: date
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string 
+
+entity:
+  entity_type: "litigation_case"
+  entity_id_col: "litigation_case_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

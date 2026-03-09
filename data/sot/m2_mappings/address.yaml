@@ -1,0 +1,94 @@
+table: address
+version: 1
+
+sources:
+  - name: address_property
+    alias: prop
+    staging: {table: "address_property"}
+  - name: address_billing
+    alias: bill
+    staging: {table: "address_billing"}
+  - name: address_seasonal
+    alias: seasonal
+    staging: {table: "address_seasonal"}
+  - name: address_comrtgr
+    alias: comrtgr
+    staging: {table: "address_comrtgr"}
+  - name: address_investor
+    alias: investor
+    staging: {table: "address_investor"}
+  - name: address_lbro
+    alias: lbro
+    staging: {table: "address_lbro"}
+  - name: address_taxauth
+    alias: tax_auth
+    staging: {table: "address_taxauth"}
+  - name: address_mi
+    alias: mi
+    staging: {table: "address_mi"}
+  - name: address_pi
+    alias: pi
+    staging: {table: "address_pi"}
+  - name: address_nb
+    alias: nb
+    staging: {table: "address_nb"}
+  - name: address_nb_org
+    alias: nb_org
+    staging: {table: "address_nb_org"}
+  - name: address_sm
+    alias: sm
+    staging: {table: "address_sm"}
+  - name: address_sc
+    alias: sc
+    staging: {table: "address_sc"}
+
+concat:
+  sources: [bill, prop, seasonal, comrtgr, investor, lbro, tax_auth, mi, pi, nb, nb_org, sm, sc]
+
+columns:
+  - target_column: address_id
+    source: address_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: city
+    source: city
+    transform: identity
+    dtype: string
+
+  - target_column: county
+    source: county
+    transform: identity
+    dtype: string
+
+  - target_column: state
+    source: state
+    transform: identity
+    dtype: string
+
+  - target_column: street_address_1
+    source: street_address_1
+    transform: identity
+    dtype: string
+
+  - target_column: street_address_2
+    source: street_address_2
+    transform: identity
+    dtype: string
+
+  - target_column: zip_code
+    expression: |
+      zip_code.astype("string").str.strip().replace(["", "0", "nan"], pd.NA).str.replace(".0", "", regex=False).where(lambda s: s.str.isdigit() & (s.str.len() <= 5)).str.zfill(5).where(zip_code.notna(), pd.NA)
+    transform: expression
+    dtype: string
+
+entity:
+  entity_type: "address"
+  entity_id_col: "address_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

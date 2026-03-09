@@ -1,0 +1,159 @@
+table: borrower_active_service_period
+version: 1
+primary_key: [borrower_active_service_period_id]
+
+sources:
+  - name: borrower_active_service_period_1
+    alias: mrh
+    staging: {table: "borrower_active_service_period_1"}
+  - name: MilitaryReliefBorrower
+    alias: mrb
+    pipe_file: {table: "MilitaryReliefBorrower"}
+    dtypes:
+      PimSequenceNumber: "int"
+    computed_columns:
+      - column: "is_primary"
+        expression: |
+          df['PimIdentifierCode'] == "M"
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: borrower_to_loan_staging
+    alias: btl
+    staging: {table: "borrower_to_loan"}
+  - name: address_staging
+    alias: a
+    staging: {table: "address_property"}
+
+joins:
+  - left: {source: mrh}
+    right: {source: li}
+    "on": ["mrh.LoanNumber == li.LoanNumber"]
+    how: left
+  - left: {source: mrh}
+    right: {source: mrb}
+    "on": 
+      - "mrh.LoanNumber == mrb.LoanNumber"
+      - "mrh.sequence_number == mrb.PimSequenceNumber"
+    how: inner
+  - left: {source: mrh}
+    right: {source: fi}
+    "on": ["li.LoanNumber == fi.LoanNumber"]
+    how: left
+  - left: {source: mrh}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: mrh}
+    right: {source: btl}
+    "on": 
+      - "l.loan_id == btl.loan_id"
+      - "mrb.is_primary == btl.is_primary"
+    how: left
+  - left: {source: mrh}
+    right: {source: a}
+    "on": ["l.loan_id == a.loan_id"]
+    how: left
+
+columns:
+  - target_column: borrower_active_service_period_id
+    hash_columns: ["btl.borrower_id", "mrh.sequence_number", "mrh.MrhActiveBeginDate", "mrh.MrhActiveEndDate", "BORROWER_ACTIVE_SERVICE_PERIOD"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: btl.borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: end_date
+    source: mrh.MrhActiveEndDate
+    transform: identity
+    dtype: date
+
+  - target_column: has_scra_deferral_benefit
+    expression: |
+      (
+        a.state.isin(["CA", "NJ"])
+        &
+        (
+          mrh.MrhActiveEndDate.isna() |
+          (pd.to_datetime(mrh.MrhActiveEndDate) > pd.to_datetime(l.data_transfer_effective_date))
+        )
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: has_scra_fcl_protection_benefit
+    expression: |
+      (
+        mrh.MrhActiveEndDate.isna()
+        |
+        (pd.to_datetime(mrh.MrhActiveEndDate) > pd.to_datetime(l.data_transfer_effective_date))
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: has_scra_late_fee_protection_benefit
+    expression: |
+      (
+        (fi.LateChargeStopCode == "3")
+        &
+        (
+          mrh.MrhActiveEndDate.isna()
+          |
+          (pd.to_datetime(mrh.MrhActiveEndDate) > pd.to_datetime(l.data_transfer_effective_date))
+        )
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: has_scra_rate_cap_benefit
+    expression: |
+      (
+        mrh.MrhActiveEndDate.isna()
+        |
+        (pd.to_datetime(mrh.MrhActiveEndDate) > pd.to_datetime(l.data_transfer_effective_date))
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: military_branch
+    source: mrh.MrhServiceBranchName
+    transform: identity
+    dtype: string
+
+  - target_column: scra_protection_end_date
+    expression: |
+      mrh.MrhProtectionEndDate.fillna(
+        date_add(pd.to_datetime(mrh.MrhActiveEndDate), 365, "day")
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: scra_protection_start_date
+    expression: mrh.MrhProtectionBeginDate.fillna(mrh.MrhActiveBeginDate)
+    transform: expression
+    dtype: date
+
+  - target_column: start_date
+    source: mrh.MrhActiveBeginDate
+    transform: identity
+    dtype: date
+
+  - target_column: loan_id
+    source: b.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "borrower_active_service_period"
+  entity_id_col: "borrower_active_service_period_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

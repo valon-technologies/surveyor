@@ -1,0 +1,51 @@
+table: portfolio_pool
+version: 1
+primary_key: [portfolio_pool_id]
+
+sources:
+  - name: portfolio_staging
+    alias: p
+    staging: {table: "portfolio"}
+  - name: mbs_pool_staging
+    alias: mp
+    staging: {table: "mbs_pool"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: p}
+    right: {source: l}
+    "on": ["p.loan_id == l.loan_id"]
+    how: left
+  - left: {source: p}
+    right: {source: mp}
+    "on": ["p.loan_id == mp.loan_id"]
+    how: inner
+
+columns:
+  - target_column: portfolio_pool_id
+    hash_columns: ["p.portfolio_id", "mp.mbs_pool_id", "portfolio_pool"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: mbs_pool_id
+    source: mp.mbs_pool_id
+    transform: identity
+    dtype: string
+
+  - target_column: portfolio_id
+    source: p.portfolio_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "portfolio_pool"
+  entity_id_col: "portfolio_pool_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

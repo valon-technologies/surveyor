@@ -1,0 +1,74 @@
+table: address_lbro
+version: 1
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: Investor
+    alias: iv
+    pipe_file: {table: "Investor"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: iv}
+    right: {source: li}
+    "on": 
+      - "iv.InvestorId == li.InvestorId"
+      - "iv.CategoryCode == li.CategoryCode"
+    how: left
+  - left: {source: iv}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: address_id
+    expression: |
+      hash_address_id(
+        "ACDC",
+        iv.LbroDesignatedAddressLine1.str.strip(),
+        iv.LbroDesignatedAddressLine2.str.strip(), 
+        iv.LbroDesignatedCityName.str.strip(), 
+        iv.LbroDesignatedState.str.strip(), 
+        iv.LbroDesignatedPostalCode.fillna('').astype(str).str.replace('nan', '').str.slice(0, 5).str.zfill(5).replace('00000', '').str.strip()
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: city
+    expression: iv.LbroDesignatedCityName.str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: county
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: state
+    expression: iv.LbroDesignatedState.str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: street_address_1
+    expression: iv.LbroDesignatedAddressLine1.str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: street_address_2
+    expression: iv.LbroDesignatedAddressLine2.str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: zip_code
+    expression: iv.LbroDesignatedPostalCode.fillna('').astype(str).str.replace('nan', '').str.slice(0, 5).str.zfill(5).replace('00000', '').str.strip()
+    transform: expression
+    dtype: string

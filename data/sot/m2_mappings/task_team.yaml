@@ -1,0 +1,41 @@
+table: task_team
+version: 1
+primary_key: [task_team_id]
+
+sources:
+  - name: task_team_responsible_staging
+    alias: tr
+    staging: {table: "task_team_responsible"}
+  - name: task_team_contact_staging
+    alias: tc
+    staging: {table: "task_team_contact"}
+
+concat:
+  sources: [tr, tc]
+
+columns:
+  - target_column: task_team_id
+    source: task_team_id
+    transform: identity
+    dtype: string
+
+  - target_column: description
+    source: description
+    transform: identity
+    dtype: string
+
+  - target_column: name
+    source: name
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "task_team"
+  entity_id_col: "task_team_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

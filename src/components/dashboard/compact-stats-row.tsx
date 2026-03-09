@@ -2,12 +2,13 @@
 
 import type { DashboardStats } from "@/types/dashboard";
 
-export function CompactStatsRow({ stats }: { stats: DashboardStats }) {
+export function CompactStatsRow({ stats, milestone }: { stats: DashboardStats; milestone?: string }) {
+  const fieldLabel = milestone ? `${milestone} Fields` : "Fields";
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg bg-muted/50 px-4 py-2.5 text-sm">
       <Stat label="Entities" value={stats.totalEntities.toLocaleString()} />
       <Sep />
-      <Stat label="Fields" value={stats.totalFields.toLocaleString()} />
+      <Stat label={fieldLabel} value={stats.totalFields.toLocaleString()} />
       <Sep />
       <Stat
         label="Coverage"

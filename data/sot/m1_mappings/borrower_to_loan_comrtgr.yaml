@@ -1,0 +1,35 @@
+table: borrower_to_loan_comrtgr
+version: 1
+primary_key: [borrower_to_loan_id]
+
+sources:
+  - name: borrower_comortgr
+    alias: bc
+    staging: {table: "borrower_comortgr"}
+ 
+columns:
+  - target_column: borrower_to_loan_id
+    hash_columns: ["bc.loan_id", "bc.borrower_id", "BORROWER_TO_LOAN_COMRTGR"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: bc.borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: is_primary
+    source: {literal: "False"}
+    transform: literal
+    dtype: boolean
+
+  - target_column: loan_user_type
+    source: {literal: "BORROWER"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: bc.loan_id
+    transform: identity
+    dtype: string
+

@@ -1,0 +1,55 @@
+table: user_note
+version: 1
+primary_key: [user_id]
+
+sources:
+  - name: Notes
+    alias: n
+    pipe_file: {table: "Notes"}
+    read_options:
+      lineterminator: "\n"
+    filters:
+      - column: "CommentUserName"
+        operator: "is_not_null"
+      - column: ["LoanNumber", "CommentUserName"]
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: n}
+    right: {source: l}
+    "on": ["n.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: user_id
+    expression: |
+      hash_user_id(
+        "ACDC", 
+        n.CommentUserName
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: first_name
+    expression: n.CommentUserName.str.rsplit(pat=" ", n=1).str[0].str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: last_name
+    expression: n.CommentUserName.str.rsplit(pat=" ", n=1).str[-1].str.strip()
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: CommentUserName
+    source: n.CommentUserName
+    transform: identity
+    dtype: string

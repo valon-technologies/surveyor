@@ -1,0 +1,90 @@
+table: bankruptcy_case_debtor
+version: 1
+primary_key: [bankruptcy_case_debtor_id]
+
+sources: 
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "BankruptcyStatusCode"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: borrower_to_loan_staging
+    alias: btl
+    staging: {table: "borrower_to_loan"}
+  - name: bankruptcy_case_staging
+    alias: bc
+    staging: {table: "bankruptcy_case"}
+  - name: debtor_attorney_staging
+    alias: da
+    staging: {table: "debtor_attorney"}
+
+joins:
+  - left: {source: dw}
+    right: {source: l}
+    "on": ["dw.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: dw}
+    right: {source: bc}
+    "on": ["l.loan_id == bc.loan_id"]
+    how: left
+  - left: {source: dw}
+    right: {source: btl}
+    "on": ["l.loan_id == btl.loan_id"]
+    how: left
+  - left: {source: dw}
+    right: {source: da}
+    "on": ["l.loan_id == da.loan_id"]
+    how: left
+
+columns:
+  - target_column: bankruptcy_case_debtor_id
+    hash_columns: ["bc.bankruptcy_case_id", "l.loan_id", "btl.borrower_id", "BANKRUPTCY_CASE_DEBTOR"]
+    transform: hash_id
+    dtype: string
+
+  # - target_column: abusive_filer_action_description
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  # - target_column: potentially_abusive_filer
+  #   source: []
+  #   transform: null
+  #   dtype: boolean
+
+  - target_column: bankruptcy_case_id
+    source: bc.bankruptcy_case_id
+    transform: identity
+    dtype: string
+
+  - target_column: borrower_id
+    source: btl.borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: attorney_id
+    source: da.debtor_attorney_id
+    transform: identity
+    dtype: string
+
+  # - target_column: abusive_filer_action_advised
+  #   source: []
+  #   transform: null
+  #   dtype: boolean
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+
+entity:
+  entity_type: "bankruptcy_case_debtor"
+  entity_id_col: "bankruptcy_case_debtor_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+

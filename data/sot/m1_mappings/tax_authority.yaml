@@ -1,0 +1,136 @@
+table: tax_authority
+version: 1
+primary_key: [tax_authority_id]
+
+sources:
+  - name: Tax
+    alias: t
+    pipe_file: {table: "Tax"}
+    filters:
+      - column: ["LoanNumber", "TaxPayeeCode"]
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: Payee
+    alias: p
+    pipe_file: {table: "Payee"}
+    filters:
+      - column: "PayeeType"
+        operator: "eq"
+        value: "TX"
+  - name: address_taxauth_staging
+    alias: a
+    staging: {table: "address_taxauth"}
+    filters:
+      - column: ["loan_id", "payeeid"]
+        operator: "dedup"
+        keep: "last"
+
+joins:
+  - left: {source: t}
+    right: {source: l}
+    "on": ["t.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: t}
+    right: {source: p}
+    "on": ["t.TaxPayeeCode == p.PayeeId"]
+    how: left
+  - left: {source: t}
+    right: {source: a}
+    "on": 
+      - "l.loan_id == a.loan_id"
+      - "t.TaxPayeeCode == a.payeeid"
+    how: left   
+
+columns:
+  - target_column: tax_authority_id
+    hash_columns: ["t.TaxPayeeCode", "tax_authority"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: address_id
+    source: a.address_id
+    transform: identity
+    dtype: string
+
+  - target_column: accepts_postmarked_checks
+    source: {literal: "False"}
+    transform: literal
+    dtype: boolean
+
+  - target_column: economic_loss_1_date
+    source: p.PayeeTaxDelinquentDate1
+    transform: identity
+    dtype: string
+
+  - target_column: economic_loss_2_date
+    expression: p.PayeeTaxDelinquentDate2.fillna('0000')
+    transform: expression
+    dtype: string
+
+  - target_column: economic_loss_3_date
+    expression: p.PayeeTaxDelinquentDate3.fillna('0000')
+    transform: expression
+    dtype: string
+
+  - target_column: economic_loss_4_date
+    expression: p.PayeeTaxDelinquentDate4.fillna('0000')
+    transform: expression
+    dtype: string
+
+  - target_column: email
+    source: p.PayeeEmailAddress
+    transform: identity
+    dtype: string
+
+  - target_column: phone_number
+    source: p.PayeePhoneNumber
+    transform: identity
+    dtype: string
+
+  - target_column: vendor_tax_authority_id
+    source: t.TaxPayeeCode
+    transform: identity
+    dtype: string
+
+  - target_column: vendor_tax_authority_name
+    source: p.PayeeAddressLine1
+    transform: identity
+    dtype: string
+
+  - target_column: vendor_tax_authority_type
+    expression: | 
+      t.TaxDisbursementType.map({
+        "311": "COUNTY",
+        "312": "COUNTY",
+        "313": "CITY",
+        "314": "WASTE_FEE_DISTRICT",
+        "315": "MISCELLANEOUS_CHARGE_DISTRICT",
+        "316": "INCORPORATED_VILLAGE",
+        "317": "WATER_SEWER_RENTAL_DISTRICT",
+        "318": "SUBDIVISION_MAINTENANCE_CHARGE_DISTRICT_ESCROWED",
+        "319": "SCHOOL_DISTRICT",
+        "320": "SPECIAL_ASSESSMENT",
+        "321": "COUNTY",
+        "322": "COUNTY",
+        "325": "CENTRAL_APPRAISAL_TAXING_AUTHORITY",
+        "326": "LOCAL_IMPROVEMENT_DISTRICT",
+        "327": "SPECIAL_ASSESSMENT",
+        "328": "MISCELLANEOUS_CHARGE_DISTRICT",
+        "329": "COUNTY_COLLECTED_BY_OTHER_TAXING_AUTHORITY"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "tax_authority"
+  entity_id_col: "tax_authority_id"
+  loan_id_col: "loan_id"  
+  loan_id_col_required: false

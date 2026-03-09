@@ -9,16 +9,24 @@ function getGestaltKey(): string {
 async function gestaltInvoke<T = unknown>(
   integration: string,
   operation: string,
-  params: Record<string, string> = {}
+  params: Record<string, string> = {},
+  method: "GET" | "POST" = "POST"
 ): Promise<T> {
-  const res = await fetch(`${GESTALT_BASE}/${integration}/${operation}`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${getGestaltKey()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(params),
-  });
+  let url = `${GESTALT_BASE}/${integration}/${operation}`;
+  const headers: Record<string, string> = {
+    "Authorization": `Bearer ${getGestaltKey()}`,
+  };
+
+  let body: string | undefined;
+  if (method === "GET") {
+    const qs = new URLSearchParams(params).toString();
+    if (qs) url += `?${qs}`;
+  } else {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(params);
+  }
+
+  const res = await fetch(url, { method, headers, body });
 
   if (!res.ok) {
     const text = await res.text();
@@ -54,14 +62,14 @@ export interface BqTableSchema {
 
 export async function listDatasets(projectId: string): Promise<string[]> {
   const data = await gestaltInvoke<{ datasets: Array<{ datasetReference: { datasetId: string } }> }>(
-    "bigquery", "list_datasets", { project_id: projectId }
+    "bigquery", "list_datasets", { project_id: projectId }, "GET"
   );
   return data.datasets.map((d) => d.datasetReference.datasetId);
 }
 
 export async function listTables(projectId: string, datasetId: string): Promise<string[]> {
   const data = await gestaltInvoke<{ tables: Array<{ tableReference: BqTableRef }> }>(
-    "bigquery", "list_tables", { project_id: projectId, dataset_id: datasetId }
+    "bigquery", "list_tables", { project_id: projectId, dataset_id: datasetId }, "GET"
   );
   return (data.tables || []).map((t) => t.tableReference.tableId);
 }
@@ -73,7 +81,7 @@ export async function getTableSchema(
 ): Promise<BqTableSchema> {
   return gestaltInvoke<BqTableSchema>(
     "bigquery", "get_table_schema",
-    { project_id: projectId, dataset_id: datasetId, table_id: tableId }
+    { project_id: projectId, dataset_id: datasetId, table_id: tableId }, "GET"
   );
 }
 

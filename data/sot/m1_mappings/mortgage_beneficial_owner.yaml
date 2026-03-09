@@ -1,0 +1,47 @@
+table: mortgage_beneficial_owner
+version: 1
+primary_key: [mortgage_beneficial_owner_id]
+
+sources:
+  - name: Investor
+    alias: iv
+    pipe_file: {table: "Investor"}
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+joins:
+  - left: {source: iv}
+    right: {source: li}
+    "on": 
+      - "iv.InvestorId == li.InvestorId"
+      - "iv.CategoryCode == li.CategoryCode"
+    how: left
+  - left: {source: iv}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: mortgage_beneficial_owner_id
+    hash_columns: ["iv.InvestorName", "investor"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: name
+    source: iv.InvestorName
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "mortgage_beneficial_owner"
+  entity_id_col: "mortgage_beneficial_owner_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

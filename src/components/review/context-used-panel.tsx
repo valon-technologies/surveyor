@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMappingContexts } from "@/queries/mapping-queries";
 import { useContext as useContextDoc } from "@/queries/context-queries";
 import {
@@ -9,15 +9,19 @@ import {
   FileText,
   ExternalLink,
   BookOpen,
+  Quote,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { extractCitations } from "@/lib/generation/citation-parser";
 import type { MappingContextDetail } from "@/types/mapping";
 
 interface ContextUsedPanelProps {
   mappingId: string;
+  /** The mapping's reasoning text — used to identify which contexts were cited */
+  reasoning?: string | null;
 }
 
 /** Group labels for context types */
@@ -39,24 +43,53 @@ function groupByType(contexts: MappingContextDetail[]) {
   return groups;
 }
 
-export function ContextUsedPanel({ mappingId }: ContextUsedPanelProps) {
+export function ContextUsedPanel({ mappingId, reasoning }: ContextUsedPanelProps) {
   const { data: contexts, isLoading } = useMappingContexts(mappingId);
   const [isOpen, setIsOpen] = useState(false);
+  const [showOther, setShowOther] = useState(false);
+
+  // Extract cited context IDs from reasoning text
+  const citedIds = useMemo(
+    () => (reasoning ? extractCitations(reasoning) : new Set<string>()),
+    [reasoning]
+  );
+
+  // Deduplicate by contextId (a mapping may link to the same doc multiple times)
+  const uniqueContexts = useMemo(() => {
+    if (!contexts) return [];
+    const seen = new Set<string>();
+    return contexts.filter((c) => {
+      if (!c.contextId || seen.has(c.contextId)) return false;
+      seen.add(c.contextId);
+      return true;
+    });
+  }, [contexts]);
+
+  // Split into cited vs uncited groups
+  const { cited, uncited } = useMemo(() => {
+    if (citedIds.size === 0) {
+      // No citations in reasoning — treat all as cited (don't hide anything)
+      return { cited: uniqueContexts, uncited: [] as MappingContextDetail[] };
+    }
+    const c: MappingContextDetail[] = [];
+    const u: MappingContextDetail[] = [];
+    for (const ctx of uniqueContexts) {
+      if (ctx.contextId && citedIds.has(ctx.contextId)) {
+        c.push(ctx);
+      } else {
+        u.push(ctx);
+      }
+    }
+    return { cited: c, uncited: u };
+  }, [uniqueContexts, citedIds]);
 
   if (isLoading) return null;
   if (!contexts || contexts.length === 0) return null;
-
-  // Deduplicate by contextId (a mapping may link to the same doc multiple times)
-  const seen = new Set<string>();
-  const uniqueContexts = contexts.filter((c) => {
-    if (!c.contextId || seen.has(c.contextId)) return false;
-    seen.add(c.contextId);
-    return true;
-  });
-
   if (uniqueContexts.length === 0) return null;
 
-  const groups = groupByType(uniqueContexts);
+  const hasCitations = citedIds.size > 0;
+  const citedGroups = groupByType(cited);
+  const uncitedGroups = groupByType(uncited);
 
   return (
     <div className="border-b bg-muted/10">
@@ -74,31 +107,73 @@ export function ContextUsedPanel({ mappingId }: ContextUsedPanelProps) {
           Context Used
         </span>
         <span className="text-[10px] text-muted-foreground">
-          ({uniqueContexts.length} doc{uniqueContexts.length !== 1 ? "s" : ""})
+          {hasCitations
+            ? `(${cited.length} cited, ${uncited.length} other)`
+            : `(${uniqueContexts.length} doc${uniqueContexts.length !== 1 ? "s" : ""})`}
         </span>
       </button>
 
       {isOpen && (
         <div className="px-4 pb-3 space-y-3 max-h-48 overflow-y-auto">
-          {Array.from(groups.entries()).map(([type, items]) => (
+          {/* Cited contexts — always shown when panel is open */}
+          {Array.from(citedGroups.entries()).map(([type, items]) => (
             <div key={type}>
               <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 {TYPE_LABELS[type] || type}
               </span>
               <div className="mt-1 space-y-1">
                 {items.map((item) => (
-                  <ContextDocRow key={item.id} item={item} />
+                  <ContextDocRow
+                    key={item.id}
+                    item={item}
+                    isCited={hasCitations}
+                  />
                 ))}
               </div>
             </div>
           ))}
+
+          {/* Uncited contexts — collapsed by default */}
+          {uncited.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowOther(!showOther)}
+                className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showOther ? (
+                  <ChevronDown className="h-2.5 w-2.5 shrink-0" />
+                ) : (
+                  <ChevronRight className="h-2.5 w-2.5 shrink-0" />
+                )}
+                <span>
+                  Show {uncited.length} more reference document{uncited.length !== 1 ? "s" : ""}
+                </span>
+              </button>
+              {showOther && (
+                <div className="mt-2 space-y-3">
+                  {Array.from(uncitedGroups.entries()).map(([type, items]) => (
+                    <div key={type}>
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        {TYPE_LABELS[type] || type}
+                      </span>
+                      <div className="mt-1 space-y-1">
+                        {items.map((item) => (
+                          <ContextDocRow key={item.id} item={item} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function ContextDocRow({ item }: { item: MappingContextDetail }) {
+function ContextDocRow({ item, isCited }: { item: MappingContextDetail; isCited?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const { data: fullContext, isError } = useContextDoc(
     expanded ? (item.contextId ?? undefined) : undefined
@@ -119,6 +194,12 @@ function ContextDocRow({ item }: { item: MappingContextDetail }) {
         <span className="text-xs font-medium truncate flex-1">
           {item.contextName || "Unknown document"}
         </span>
+        {isCited && (
+          <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-blue-600 dark:text-blue-400 px-1 py-0.5 bg-blue-50 dark:bg-blue-950/50 rounded shrink-0">
+            <Quote className="h-2 w-2" />
+            Cited
+          </span>
+        )}
         {item.contextCategory && (
           <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 bg-muted/50 rounded">
             {item.contextCategory}

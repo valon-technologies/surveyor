@@ -1,0 +1,54 @@
+table: escrow_loan_info
+version: 1
+primary_key: [escrow_loan_info_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+    dtypes:
+      TAndIMonthlyAmount: "float"
+      MiMonthlyAmount: "float"
+      PendingTAndIMonthlyAmount: "float"
+    filters:
+      - operator: "expression"
+        expression: "((df['TAndIMonthlyAmount'].fillna(0) != 0) | (df['MiMonthlyAmount'].fillna(0) != 0) | ((df['PendingTAndIMonthlyAmount'].fillna(0) != 0) & (df['TAndIMonthlyAmount'].fillna(0) == 0)))"
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: li}
+    right: {source: ed}
+    "on": ["li.LoanNumber == ed.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: escrow_loan_info_id
+    hash_columns: ["ed.LoanNumber", "l.loan_id", "escrow_loan_info"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: datetime_last_escrow_analysis
+    expression: pd.to_datetime(ed.LastAnalysisDate, errors='coerce').fillna(pd.to_datetime('2025-04-16'))
+    transform: expression
+    dtype: datetime
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "escrow_loan_info"
+  entity_id_col: "escrow_loan_info_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

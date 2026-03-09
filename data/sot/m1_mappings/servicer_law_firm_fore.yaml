@@ -1,0 +1,52 @@
+table: servicer_law_firm_fore
+version: 1
+primary_key: [servicer_law_firm_id]
+
+sources:
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "FcStatusCode"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: Payee
+    alias: p
+    pipe_file: {table: "Payee"}
+
+joins:
+  - left: {source: dw}
+    right: {source: l}
+    "on": ["dw.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: dw}
+    right: {source: p}
+    "on": ["dw.FcAttorneyPayeeId == p.PayeeId"]
+    how: left
+
+columns:
+  - target_column: servicer_law_firm_id
+    expression: | 
+      hash_servicer_law_firm_id(
+        "ACDC",
+        p.PayeeAddressLine1
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: name
+    source: p.PayeeAddressLine1
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: FcAttorneyPayeeId
+    source: dw.FcAttorneyPayeeId
+    transform: identity
+    dtype: string

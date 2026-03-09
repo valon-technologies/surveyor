@@ -1,0 +1,65 @@
+table: non_borrower_loan_participant_role
+version: 1
+primary_key: [non_borrower_loan_participant_role_id]
+
+sources:
+  - name: NonBorrower
+    alias: nb
+    pipe_file: {table: "NonBorrower"}
+    filters:
+      - column: "NonborrowerType"
+        operator: "in"
+        value: ["PA", "RO"]
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: non_borrower_loan_participant_staging
+    alias: nblp
+    staging: {table: "non_borrower_loan_participant"}
+
+joins:
+  - left: {source: nb}
+    right: {source: l}
+    "on": ["nb.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: nb}
+    right: {source: nblp}
+    "on": ["l.loan_id == nblp.loan_id"]
+    how: left
+
+columns:
+  - target_column: non_borrower_loan_participant_role_id
+    hash_columns: ["nblp.loan_id", "nblp.non_borrower_loan_participant_id", "non_borrower_loan_participant_role"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: non_borrower_loan_organization_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: non_borrower_loan_participant_id
+    source: nblp.non_borrower_loan_participant_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_participant_type
+    expression: |
+      np.where(
+        nb.NonborrowerType.eq("RO"),
+        "NON_OBLIGOR",
+        "POWER_OF_ATTORNEY"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "non_borrower_loan_participant_role"
+  entity_id_col: "non_borrower_loan_participant_role_id"
+  loan_id_col: "loan_id"  
+  loan_id_col_required: false

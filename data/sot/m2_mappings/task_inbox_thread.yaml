@@ -1,0 +1,36 @@
+table: task_inbox_thread
+version: 1
+primary_key: [task_inbox_thread_id]
+
+sources:
+  - name: task_staging
+    alias: t
+    staging: {table: "task"}
+
+columns:
+  - target_column: task_inbox_thread_id
+    hash_columns: ["t.task_id", "t.loan_id", "t.due_at", "task_inbox_thread"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: external_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: task_id
+    source: t.task_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: t.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "task_inbox_thread"
+  entity_id_col: "task_inbox_thread_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+

@@ -1,0 +1,127 @@
+table: loss_mitigation_forbearance
+version: 1
+primary_key: [loss_mitigation_forbearance_id]
+
+sources:
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "LSMT"
+      - operator: "expression"
+        expression: |
+          df["LoanNumber"].map(
+            df.groupby("LoanNumber").apply(
+              lambda g: ((g["StepCode"] == "L89") & (g["ActualCompletionDate"].notna())).any()
+            )
+          ).fillna(False).astype('bool')
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDate
+    alias: ed
+    pipe_file: {table: "EventDate"}
+  - name: loss_mitigation_plan
+    alias: lmp
+    staging: {table: "loss_mitigation_plan"}
+    filters:
+      - column: "plan_type"
+        operator: "eq"
+        value: "FORBEARANCE"
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "LossMitTypeCode"
+        operator: "eq"
+        value: "FORB"
+
+joins:
+  - left: {source: s}
+    right: {source: l}
+    "on": ["s.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: s}
+    right: {source: dw}
+    "on": ["s.LoanNumber == dw.LoanNumber"]
+    how: inner
+  - left: {source: s}
+    right: {source: ed}
+    "on": ["s.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: s}
+    right: {source: li}
+    "on": ["s.LoanNumber == li.LoanNumber"]
+    how: left
+  - left: {source: s}
+    right: {source: lmp}
+    "on": ["l.loan_id == lmp.loan_id"]
+    how: left
+
+columns:
+  - target_column: loss_mitigation_forbearance_id
+    hash_columns: ["l.loan_id", "s.LoanNumber", "loss_mitigation_forbearance"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: amount_reduced_payment_due
+    source: li.FpInitialPaymentAmount
+    transform: identity
+    dtype: float
+
+  - target_column: duration_months
+    expression: |
+      (((pd.to_datetime(ed.FpLastPaymentDueDate) - pd.to_datetime(ed.FpFirstPaymentDueDate)).dt.days + 30) / 30).round().astype('int64')
+    transform: expression
+    dtype: int
+
+  - target_column: first_payment_due_date
+    source: ed.FpFirstPaymentDueDate
+    transform: identity
+    dtype: date
+
+  - target_column: last_payment_due_date
+    source: ed.FpLastPaymentDueDate
+    transform: identity
+    dtype: date
+
+  - target_column: forbearance_type
+    expression: |
+      np.where(
+        pd.to_numeric(li.FpInitialPaymentAmount, errors="coerce") == 0.0,
+        "SUSPENDED",
+        "REDUCED"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: payment_reduction_percent
+    source: li.FpOriginalPaymentPercent
+    transform: identity
+    dtype: float
+
+  - target_column: loss_mitigation_plan_id
+    source: lmp.loss_mitigation_plan_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loss_mitigation_forbearance"
+  entity_id_col: "loss_mitigation_forbearance_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

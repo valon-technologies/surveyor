@@ -1,0 +1,64 @@
+table: servicer_attorney_bank
+version: 1
+primary_key: [servicer_attorney_id]
+
+sources:
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "BankruptcyCaseNumber"
+        operator: "is_not_null"
+  - name: Payee
+    alias: p
+    pipe_file: {table: "Payee"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: servicer_law_firm_bank
+    alias: slfb
+    staging: {table: "servicer_law_firm_bank"}
+
+joins:
+  - left: {source: dw}
+    right: {source: l}
+    "on": ["dw.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: dw}
+    right: {source: p}
+    "on": ["dw.BankruptcyMortgageeAttorneyId == p.PayeeId"]
+    how: left
+  - left: {source: dw}
+    right: {source: slfb}
+    "on": 
+      - "dw.BankruptcyMortgageeAttorneyId == slfb.BankruptcyMortgageeAttorneyId"
+      - "l.loan_id == slfb.loan_id"
+    how: left
+
+columns:
+  - target_column: servicer_attorney_id
+    hash_columns: ["dw.BankruptcyMortgageeAttorneyId", "dw.LoanNumber", "servicer_attorney_bank"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: email
+    expression: |
+      p.PayeeEmailAddress.fillna('servicer_attorney_bank@valon.com')
+    transform: expression
+    dtype: string
+
+  - target_column: name
+    expression: |
+      p.PayeeAddressLine1 + " " + "Attorney"
+    transform: expression
+    dtype: string
+
+  - target_column: servicer_law_firm_id
+    source: slfb.servicer_law_firm_id
+    transform: identity
+    dtype: string
+   
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

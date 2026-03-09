@@ -1,0 +1,73 @@
+table: litigation_case_bk
+version: 1
+primary_key: [litigation_case_id]
+
+sources:
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "BANK"
+      - column: "StepCode"
+        operator: "in"
+        value: ["002", "003"]
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: bankruptcy_case_staging
+    alias: bc
+    staging: {table: "bankruptcy_case"}
+
+joins:
+  - left: {source: s}
+    right: {source: l}
+    "on": ["s.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: s}
+    right: {source: bc}
+    "on": ["l.loan_id == bc.loan_id"]
+    how: inner
+
+columns:
+  - target_column: litigation_case_id
+    hash_columns: ["li.LoanNumber", "l.loan_id", "bc.bankruptcy_case_id", "litigation_case"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: bankruptcy_case_id
+    source: bc.bankruptcy_case_id
+    transform: identity
+    dtype: string
+
+  - target_column: foreclosure_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: case_type
+    source: {literal: "PROBATE"}
+    transform: literal
+    dtype: string
+  
+  - target_column: file_date
+    expression: |
+      (lambda get_col, pd: get_col('ActualCompletionDate_002'))((lambda df, pd: lambda col: df.get(col, pd.Series(pd.NA, index=df.index)))(df, pd), pd)
+    transform: expression
+    dtype: date
+
+  - target_column: termination_date
+    expression: |
+      (lambda get_col, pd: get_col('ActualCompletionDate_003'))((lambda df, pd: lambda col: df.get(col, pd.Series(pd.NA, index=df.index)))(df, pd), pd)
+    transform: expression
+    dtype: date
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string 

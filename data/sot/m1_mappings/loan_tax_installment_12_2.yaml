@@ -1,0 +1,109 @@
+table: loan_tax_installment_12_2
+version: 1
+primary_key: [loan_tax_installment_id]
+
+sources:
+  - name: loan_tax_installment_12
+    alias: t12
+    staging: {table: "loan_tax_installment_12"}
+    dtypes:
+      upcoming_duedate: "date"
+      amount_base: "float"
+    computed_columns:
+      - column: "due_date_w_year"
+        expression: "pd.to_datetime((pd.to_numeric(df['year'])-1).astype('str') + df['duedate'], format='%Y%m%d', errors='coerce')"
+      - column: "year"
+        expression: "(pd.to_numeric(df['year']) - 1)"
+    filters:
+      - column: "year"
+        operator: "gte"
+        value: 2025
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: Transaction
+    alias: tr
+    pipe_file: {table: "Transaction"}
+    dtypes:
+      TotalAmountPaid: "float"
+      DueDate: "date"
+    filters:
+      - operator: "expression"
+        expression: "TransactionDescription.str.contains('Tax Disb|Utilities Dist Disb', regex=True, na=False)"
+      - column: ['LoanNumber', 'DueDate']
+        operator: "dedup"
+        keep: "last"
+        
+joins:
+  - left: {source: t12}
+    right: {source: l}
+    "on": ["t12.loan_id == l.loan_id"]
+    how: left
+  - left: {source: t12}
+    right: {source: tr}
+    "on": 
+      - "l.loan_number == tr.LoanNumber"
+      - "t12.due_date_w_year == tr.DueDate"
+    how: left
+  
+columns:
+  - target_column: loan_tax_installment_id
+    hash_columns: ["t12.loan_tax_installment_id", "loan_tax_installment_12_2025"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: amount_base
+    source: t12.amount_base
+    transform: identity
+    dtype: float
+
+  - target_column: amount_fee
+    source: t12.amount_fee
+    transform: identity
+    dtype: float
+
+  - target_column: economic_loss_date
+    expression: |
+      np.where(
+        pd.to_numeric(t12.duedate)<pd.to_numeric(t12.economic_loss_date),
+        pd.to_datetime(t12.year.astype(str) + t12.economic_loss_date, format='%Y%m%d', errors='coerce'),
+        pd.to_datetime((pd.to_numeric(t12.year) + 1).astype(str) + t12.economic_loss_date, format='%Y%m%d', errors='coerce')
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: installment_index
+    source: t12.installment_index
+    transform: identity
+    dtype: string
+
+  - target_column: payment_status
+    expression: |
+      np.select(
+        condlist=[
+          (tr.TotalAmountPaid==0) & (pd.to_datetime(t12.due_date_w_year)<pd.to_datetime(l.data_transfer_effective_date)),
+          (tr.TotalAmountPaid.isnull()) & (pd.to_datetime(t12.due_date_w_year)>=pd.to_datetime(l.data_transfer_effective_date))
+        ],
+        choicelist=[
+          "DELINQUENT", 
+          "UNPAID"
+        ],
+        default="CONFIRMED"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: year
+    source: t12.year
+    transform: identity
+    dtype: int
+
+  - target_column: loan_id
+    source: t12.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_tax_line_id
+    source: t12.loan_tax_line_id
+    transform: identity
+    dtype: string

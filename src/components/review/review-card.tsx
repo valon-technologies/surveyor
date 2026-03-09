@@ -230,7 +230,7 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple }: Revi
 
         {/* Actions */}
         <div className="flex items-center gap-0.5 shrink-0">
-          {showUndo ? (
+          {showUndo && (
             <Button
               size="icon"
               variant="ghost"
@@ -241,32 +241,6 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple }: Revi
             >
               <Undo2 className="h-3.5 w-3.5" />
             </Button>
-          ) : (
-            <>
-              {!isUnmapped && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
-                  onClick={() =>
-                    acceptMutation.mutateAsync(card.id).then(() => onAcceptWithRipple?.(card))
-                  }
-                  disabled={acceptMutation.isPending}
-                  title="Accept"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                onClick={() => onExclude(card)}
-                title="Exclude"
-              >
-                <Ban className="h-3.5 w-3.5" />
-              </Button>
-            </>
           )}
           <Button
             size="icon"

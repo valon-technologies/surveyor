@@ -10,12 +10,18 @@ import { MilestoneProgress } from "@/components/dashboard/milestone-progress";
 import { StatusDistribution } from "@/components/dashboard/status-distribution";
 import { MyWorkTab } from "@/components/dashboard/my-work-tab";
 import { cn } from "@/lib/utils";
+import { MILESTONES } from "@/lib/constants";
 
 type Tab = "overview" | "my-work";
 
+const MILESTONE_OPTIONS = ["All", ...MILESTONES] as const;
+
 export default function DashboardPage() {
   const [tab, setTab] = useState<Tab>("overview");
-  const { data: stats, isLoading } = useDashboardStats();
+  const [milestone, setMilestone] = useState<string>("M2.5");
+  const { data: stats, isLoading } = useDashboardStats(
+    milestone === "All" ? undefined : milestone
+  );
 
   if (isLoading) {
     return (
@@ -48,6 +54,17 @@ export default function DashboardPage() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Progress Summary</h1>
+        <select
+          value={milestone}
+          onChange={(e) => setMilestone(e.target.value)}
+          className="rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          {MILESTONE_OPTIONS.map((m) => (
+            <option key={m} value={m}>
+              {m === "All" ? "All Milestones" : m}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Tab Bar */}
@@ -69,7 +86,7 @@ export default function DashboardPage() {
       {/* Tab Content */}
       {tab === "overview" && (
         <div className="space-y-6">
-          <CompactStatsRow stats={stats} />
+          <CompactStatsRow stats={stats} milestone={milestone === "All" ? undefined : milestone} />
           <Leaderboard
             data={
               stats.leaderboard ?? {

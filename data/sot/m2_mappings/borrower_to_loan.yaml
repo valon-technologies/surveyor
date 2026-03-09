@@ -1,0 +1,50 @@
+table: borrower_to_loan
+version: 1
+primary_key: [borrower_to_loan_id]
+
+sources:
+  - name: borrower_to_loan_primary
+    alias: btlp
+    staging: {table: "borrower_to_loan_primary"}
+  - name: borrower_to_loan_comrtgr
+    alias: btlc
+    staging: {table: "borrower_to_loan_comrtgr"}
+  # - name: borrower_to_loan_succ
+  #   alias: btls
+  #   staging: {table: "borrower_to_loan_succ"}
+    
+concat:
+  # sources: [btlp, btlc, btls]
+  sources: [btlp, btlc]
+
+columns:
+  - target_column: borrower_to_loan_id
+    source: borrower_to_loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: borrower_id
+    source: borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: is_primary
+    source: is_primary
+    transform: identity
+    dtype: boolean
+
+  - target_column: loan_user_type
+    source: loan_user_type
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "borrower_to_loan"
+  entity_id_col: "borrower_to_loan_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

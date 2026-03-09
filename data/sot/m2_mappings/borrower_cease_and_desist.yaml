@@ -1,0 +1,67 @@
+table: borrower_cease_and_desist
+version: 1
+primary_key: [borrower_cease_and_desist_id]
+
+sources:
+  - name: CeaseAndDesistHistory
+    alias: cadh
+    pipe_file: {table: "CeaseAndDesistHistory"}
+    dtypes:
+      RecordStartDate: "date"
+    sorting:
+      - column: "RecordStartDate"
+        ascending: true
+    filters:
+      - column: "CeaseAndDesistStopCode"
+        operator: "is_not_null"
+      - column: ["LoanNumber"]
+        operator: "dedup"
+        keep: "last"
+  - name: borrower_to_loan_staging
+    alias: btl
+    staging: {table: "borrower_to_loan"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: cadh}
+    right: {source: l}
+    "on": ["cadh.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: cadh}
+    right: {source: btl}
+    "on": ["l.loan_id == btl.loan_id"]
+    how: left
+
+columns:
+  - target_column: borrower_cease_and_desist_id
+    hash_columns: ["btl.borrower_id", "l.loan_id", "cadh.CeaseAndDesistStopCode", "cadh.CeaseAndDesistChangedDate", "cadh.CeaseAndDesistExpireDate", "CEASE_AND_DESIST"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: btl.borrower_id
+    transform: identity
+    dtype: string
+    
+  - target_column: started_at
+    source: cadh.CeaseAndDesistChangedDate
+    transform: identity
+    dtype: datetime
+
+  - target_column: ended_at
+    source: cadh.CeaseAndDesistExpireDate
+    transform: identity
+    dtype: datetime
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "borrower"
+  entity_id_col: "borrower_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

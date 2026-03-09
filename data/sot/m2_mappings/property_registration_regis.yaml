@@ -1,0 +1,85 @@
+table: property_registration_regis
+version: 1
+primary_key: [property_registration_id]
+
+sources: 
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+    filters:
+      - column: "PresVprDate"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: ed}
+    right: {source: l}
+    "on": ["ed.LoanNumber == l.loan_number"]
+    how: left
+
+columns: 
+  - target_column: property_registration_id
+    hash_columns: ["ed.LoanNumber", "l.loan_id", "ed.PresVprDate", "property_registration_regis"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: action_type
+    source: {literal: "REGISTRATION"}
+    transform: literal
+    dtype: string
+
+  - target_column: ordinance_type
+    source: {literal: "VACANT_ONLY"}
+    transform: literal
+    dtype: string
+
+  - target_column: completed_date
+    source: ed.PresVprDate
+    transform: identity
+    dtype: date
+
+  - target_column: comments
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: municipality
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: registration_frequency
+    expression: |
+      np.select(
+        condlist=[
+          ed.PresVprDate.isna(),
+          ed.PresVprRenewalDate.isna(),
+          pd.to_datetime(ed.PresVprRenewalDate) < pd.to_datetime(ed.PresVprDate),
+          ((pd.to_datetime(ed.PresVprRenewalDate) - pd.to_datetime(ed.PresVprDate)).dt.days / 30.44).round() == 3,
+          ((pd.to_datetime(ed.PresVprRenewalDate) - pd.to_datetime(ed.PresVprDate)).dt.days / 30.44).round() == 6,
+          ((pd.to_datetime(ed.PresVprRenewalDate) - pd.to_datetime(ed.PresVprDate)).dt.days / 30.44).round() == 12
+        ],
+        choicelist=[
+          pd.NA,
+          "ONE_TIME",
+          "ONE_TIME",
+          "QUARTERLY",
+          "SEMI_ANNUALLY",
+          "ANNUALLY"
+        ],
+        default="ONE_TIME"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: status
+    source: {literal: "COMPLETED"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

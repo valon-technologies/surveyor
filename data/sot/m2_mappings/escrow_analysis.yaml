@@ -1,0 +1,231 @@
+table: escrow_analysis
+version: 1
+primary_key: [escrow_analysis_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+    dtypes:
+      TAndIMonthlyAmount: "float"
+      MiMonthlyAmount: "float"
+      PendingTAndIMonthlyAmount: "float"
+    filters:
+      - operator: "expression"
+        expression: "((df['TAndIMonthlyAmount'].fillna(0) != 0) | (df['MiMonthlyAmount'].fillna(0) != 0) | ((df['PendingTAndIMonthlyAmount'].fillna(0) != 0) & (df['TAndIMonthlyAmount'].fillna(0) == 0)))"
+  - name: PaymentFactors
+    alias: pf
+    pipe_file: {table: "PaymentFactors"}
+    dtypes:
+      PfEffectiveDate: "date"
+      PfOverOrShortAmount: "float"
+      PfMiscAmount: "float"
+      PfCountyTaxAmount: "float"
+      PfCityTaxAmount: "float"
+      PfHazardPremiumAmount: "float"
+      PfMipAmount: "float"
+      PfLienAmount: "float"
+    filters:
+      - operator: "expression"
+        expression: "(PfOverOrShortAmount != 0) | (PfMiscAmount != 0) | (PfCountyTaxAmount != 0) | (PfCityTaxAmount != 0) | (PfHazardPremiumAmount != 0) | (PfMipAmount != 0) | (PfLienAmount != 0)"
+    lag_columns:
+      columns: ["PfOverOrShortAmount", "PfMiscAmount", "PfCountyTaxAmount", "PfCityTaxAmount", "PfHazardPremiumAmount", "PfMipAmount", "PfLienAmount"]
+      group_by: ["LoanNumber"] 
+      order_by: ["PfEffectiveDate"]  
+      fillna: 0
+      dtype: "float"
+      order_ascending: True 
+      suffix: "_lag1"
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+    dtypes:
+      LastAnalysisDate: "date"
+      LastAnalysisEffectiveDate: "date"
+  - name: Transaction
+    alias: ts
+    pipe_file: {table: "Transaction"}
+    dtypes:
+      TransactionDate: "date"
+      TransactionRowNumber: "int"
+      EscrowBalance: "float"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: li}
+    right: {source: ed}
+    "on": ["li.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: pf}
+    "on": 
+      - "li.LoanNumber == pf.LoanNumber"
+      - "ed.LastAnalysisEffectiveDate == pf.PfEffectiveDate"
+    how: left
+
+merge_as_of:
+  - right:
+      source: ts
+    left_on: "LastAnalysisDate"
+    right_on: "TransactionDate"
+    direction: "backward"  
+    left_by: ["LoanNumber"]
+    right_by: ["LoanNumber"]
+    right_sort_by: ["TransactionRowNumber"]  # Additional sort column
+    right_sort_ascending: false
+
+columns:
+  - target_column: escrow_analysis_id
+    hash_columns: ["li.LoanNumber", "l.loan_id", "ed.LastAnalysisDate", "pf.PfEffectiveDate", "escrow_analysis"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: analysis_date_as_of
+    source: ed.LastAnalysisDate
+    transform: identity
+    dtype: date
+
+  - target_column: analysis_effective_date
+    source: pf.PfEffectiveDate
+    transform: identity
+    dtype: date
+
+  - target_column: analysis_window_date_end
+    expression: |
+      date_add(
+        date_add(
+          pf.PfEffectiveDate, 
+          12, 
+          "month"
+        ), 
+        -1, 
+        "day"
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: analysis_window_date_start
+    source: pf.PfEffectiveDate
+    transform: identity
+    dtype: date
+
+  - target_column: current_escrow_balance
+    expression: ts.EscrowBalance.fillna(0.0)
+    transform: expression
+    dtype: float
+
+  - target_column: impact_to_payment
+    expression: |
+      np.select(
+        condlist=[
+          (
+          pf.PfOverOrShortAmount.fillna(0) 
+          + pf.PfMiscAmount.fillna(0) 
+          + pf.PfCountyTaxAmount.fillna(0) 
+          + pf.PfCityTaxAmount.fillna(0) 
+          + pf.PfHazardPremiumAmount.fillna(0) 
+          + pf.PfMipAmount.fillna(0) 
+          + pf.PfLienAmount.fillna(0)
+          ).round(2) - (
+            pf.PfOverOrShortAmount_lag1.fillna(0) 
+            + pf.PfMiscAmount_lag1.fillna(0) 
+            + pf.PfCountyTaxAmount_lag1.fillna(0) 
+            + pf.PfCityTaxAmount_lag1.fillna(0)
+            + pf.PfHazardPremiumAmount_lag1.fillna(0) 
+            + pf.PfMipAmount_lag1.fillna(0) 
+            + pf.PfLienAmount_lag1.fillna(0)
+            ).round(2) > 0.0,
+          (
+          pf.PfOverOrShortAmount.fillna(0) 
+          + pf.PfMiscAmount.fillna(0) 
+          + pf.PfCountyTaxAmount.fillna(0) 
+          + pf.PfCityTaxAmount.fillna(0) 
+          + pf.PfHazardPremiumAmount.fillna(0) 
+          + pf.PfMipAmount.fillna(0) 
+          + pf.PfLienAmount.fillna(0)
+          ).round(2) - (
+            pf.PfOverOrShortAmount_lag1.fillna(0) 
+            + pf.PfMiscAmount_lag1.fillna(0) 
+            + pf.PfCountyTaxAmount_lag1.fillna(0) 
+            + pf.PfCityTaxAmount_lag1.fillna(0)
+            + pf.PfHazardPremiumAmount_lag1.fillna(0) 
+            + pf.PfMipAmount_lag1.fillna(0) 
+            + pf.PfLienAmount_lag1.fillna(0)
+            ).round(2) < 0.0,
+        ],
+        choicelist=[
+          "SHORTAGE_INCREASE_MONTHLY_PAYMENT",
+          "OVERAGE_REDUCE_NEXT_PAYMENT"
+        ],
+        default="NO_FURTHER_ACTION"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: impact_to_payment_amount
+    expression: |
+      ((
+      pf.PfOverOrShortAmount.fillna(0) 
+      + pf.PfMiscAmount.fillna(0) 
+      + pf.PfCountyTaxAmount.fillna(0) 
+      + pf.PfCityTaxAmount.fillna(0) 
+      + pf.PfHazardPremiumAmount.fillna(0) 
+      + pf.PfMipAmount.fillna(0) 
+      + pf.PfLienAmount.fillna(0)
+      ) - (
+        pf.PfOverOrShortAmount_lag1.fillna(0) 
+        + pf.PfMiscAmount_lag1.fillna(0) 
+        + pf.PfCountyTaxAmount_lag1.fillna(0) 
+        + pf.PfCityTaxAmount_lag1.fillna(0)
+        + pf.PfHazardPremiumAmount_lag1.fillna(0) 
+        + pf.PfMipAmount_lag1.fillna(0) 
+        + pf.PfLienAmount_lag1.fillna(0)
+        )
+      ).round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: total_projected_mi_amount
+    source: pf.PfMipAmount
+    transform: identity
+    dtype: float
+
+  - target_column: total_projected_pi_amount
+    source: pf.PfHazardPremiumAmount
+    transform: identity
+    dtype: float
+
+  - target_column: total_projected_tax_amount
+    expression: |
+      (pf.PfCountyTaxAmount.fillna(0) + pf.PfCityTaxAmount.fillna(0) + pf.PfLienAmount.fillna(0) + pf.PfMiscAmount.fillna(0)).round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: amount_new_monthly_payment
+    expression: |
+      (pf.PfOverOrShortAmount.fillna(0) + pf.PfMiscAmount.fillna(0) + pf.PfCountyTaxAmount.fillna(0) + pf.PfCityTaxAmount.fillna(0) + pf.PfHazardPremiumAmount.fillna(0) + pf.PfMipAmount.fillna(0) + pf.PfLienAmount.fillna(0)).round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: amount_previous_monthly_payment
+    expression: |
+      (pf.PfOverOrShortAmount_lag1.fillna(0) + pf.PfMiscAmount_lag1.fillna(0) + pf.PfCountyTaxAmount_lag1.fillna(0) + pf.PfCityTaxAmount_lag1.fillna(0) + pf.PfHazardPremiumAmount_lag1.fillna(0) + pf.PfMipAmount_lag1.fillna(0) + pf.PfLienAmount_lag1.fillna(0)).round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "escrow_analysis"
+  entity_id_col: "escrow_analysis_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

@@ -1,0 +1,128 @@
+table: foreclosure_hold
+version: 1
+primary_key: [foreclosure_hold_id]
+
+sources: 
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "FcStatusCode"
+        operator: "is_not_null"
+      - column: "FcSuspendDate"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: foreclosure_staging
+    alias: fs
+    staging: {table: "foreclosure"}
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "FORE"
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+
+joins:
+  - left: {source: dw}
+    right: {source: l}
+    "on": ["dw.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: dw}
+    right: {source: fs}
+    "on": ["l.loan_id == fs.loan_id"]
+    how: left
+  - left: {source: dw}
+    right: {source: s}
+    "on": ["dw.LoanNumber == s.LoanNumber"]
+    how: left
+
+columns: 
+  - target_column: foreclosure_hold_id
+    hash_columns: ["dw.LoanNumber", "fs.foreclosure_id", "foreclosure_hold"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: foreclosure_id
+    source: fs.foreclosure_id
+    transform: identity
+    dtype: string
+
+  - target_column: actual_end_date
+    source: dw.FcSuspenseRemovalDate
+    transform: identity
+    dtype: date
+
+  - target_column: projected_end_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: reason
+    expression: |
+      (lambda get_col, np, pd: (
+        lambda latest_step_code: np.select(
+          condlist=[
+            latest_step_code.isin(['289','291','293','295']),
+            latest_step_code.isin(['310','312','314','316']),
+            latest_step_code == '272',
+            latest_step_code == '285',
+            latest_step_code == 'F82',
+            latest_step_code == '406'
+          ],
+          choicelist=[
+            "BANKRUPTCY",
+            "LOSS_MITIGATION",
+            "FEMA_DISASTER",
+            "INVESTOR_REGULATION_DELAY",
+            "LITIGATION",
+            "OTHER"
+          ],
+          default="OTHER"
+        )
+      )(
+        pd.DataFrame({
+          '289': pd.to_datetime(get_col('ActualCompletionDate_289'), errors='coerce'),
+          '291': pd.to_datetime(get_col('ActualCompletionDate_291'), errors='coerce'),
+          '293': pd.to_datetime(get_col('ActualCompletionDate_293'), errors='coerce'),
+          '295': pd.to_datetime(get_col('ActualCompletionDate_295'), errors='coerce'),
+          '310': pd.to_datetime(get_col('ActualCompletionDate_310'), errors='coerce'),
+          '312': pd.to_datetime(get_col('ActualCompletionDate_312'), errors='coerce'),
+          '314': pd.to_datetime(get_col('ActualCompletionDate_314'), errors='coerce'),
+          '316': pd.to_datetime(get_col('ActualCompletionDate_316'), errors='coerce'),
+          '272': pd.to_datetime(get_col('ActualCompletionDate_272'), errors='coerce'),
+          '285': pd.to_datetime(get_col('ActualCompletionDate_285'), errors='coerce'),
+          'F82': pd.to_datetime(get_col('ActualCompletionDate_F82'), errors='coerce'),
+          '406': pd.to_datetime(get_col('ActualCompletionDate_406'), errors='coerce'),
+        }).idxmax(axis=1)
+      ))((lambda df, pd: lambda col: df.get(col, pd.Series(pd.NA, index=df.index)))(df, pd), np, pd)
+    transform: expression
+    dtype: string
+    
+  - target_column: request_sent_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: start_date
+    source: dw.FcSuspendDate
+    transform: identity
+    dtype: date
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "foreclosure_hold"
+  entity_id_col: "foreclosure_hold_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+

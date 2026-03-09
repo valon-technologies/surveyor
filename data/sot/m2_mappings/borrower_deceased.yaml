@@ -1,0 +1,109 @@
+table: borrower_deceased
+version: 1
+primary_key: [borrower_id, loan_id]
+
+sources:
+  - name: Deceased
+    alias: d
+    pipe_file: {table: "DeceasedBorrower"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: d}
+    right: {source: l}
+    "on": ["d.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: borrower_id
+    expression: |
+      hash_borrower_id(
+        "ACDC",
+        d.DbName,
+        d.DbFirstName,
+        d.DbLastName
+      )
+    transform: expression
+    dtype: string
+    
+  - target_column: mailing_address_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: account_registration_completed_at
+    source: []
+    transform: null
+    dtype: datetime
+
+  - target_column: birth_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: deceased_date
+    source: d.DbDateOfDeath
+    transform: identity
+    dtype: date
+
+  - target_column: email_address
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: ethnicity
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: first_name
+    source: d.DbFirstName
+    transform: identity
+    dtype: string
+
+  - target_column: gender
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: last_name
+    source: d.DbLastName
+    transform: identity
+    dtype: string
+
+  - target_column: middle_name
+    source: d.DbMiddleName
+    transform: identity
+    dtype: string
+
+  - target_column: preferred_language
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: race
+    source: []
+    transform: null
+    dtype: string
+
+  # - target_column: social_security_number
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  - target_column: suffix
+    source: []
+    transform: null
+    dtype: string
+  
+  - target_column: tax_id_number
+    source: []
+    transform: null
+    dtype: string
+  
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

@@ -1,0 +1,75 @@
+table: escrow_schedule
+version: 1
+primary_key: [escrow_schedule_id]
+
+sources:
+  - name: PaymentFactors
+    alias: pf
+    pipe_file: {table: "PaymentFactors"}
+    dtypes:
+      PfEffectiveDate: "date"
+      PfEndDate: "date"
+      PfOverOrShortAmount: "float"
+      PfMiscAmount: "float"
+      PfCountyTaxAmount: "float"
+      PfCityTaxAmount: "float"
+      PfHazardPremiumAmount: "float"
+      PfMipAmount: "float"
+      PfLienAmount: "float"
+    filters:
+      - operator: "expression"
+        expression: "(PfOverOrShortAmount != 0) | (PfMiscAmount != 0) | (PfCountyTaxAmount != 0) | (PfCityTaxAmount != 0) | (PfHazardPremiumAmount != 0) | (PfMipAmount != 0) | (PfLienAmount != 0)"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: escrow_loan_info
+    alias: eli
+    staging: {table: "escrow_loan_info"}
+
+joins:
+  - left: {source: pf}
+    right: {source: l}
+    "on": ["pf.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: pf}
+    right: {source: eli}
+    "on": ["l.loan_id == eli.loan_id"]
+    how: inner
+
+columns:
+  - target_column: escrow_schedule_id
+    hash_columns: ["pf.LoanNumber", "pf.PfEffectiveDate", "pf.PfEndDate", "l.loan_id", "escrow_schedule"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: amount_due_per_period
+    expression: |
+      (np.maximum(pf.PfOverOrShortAmount.fillna(0), 0) + pf.PfMiscAmount.fillna(0) + pf.PfCountyTaxAmount.fillna(0) + pf.PfCityTaxAmount.fillna(0) + pf.PfHazardPremiumAmount.fillna(0) + pf.PfMipAmount.fillna(0) + pf.PfLienAmount.fillna(0)).round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: initial_payment_due_date
+    source: pf.PfEffectiveDate
+    transform: identity
+    dtype: date
+
+  - target_column: payment_frequency
+    source: {literal: "MONTHLY"}
+    transform: literal
+    dtype: string
+
+  - target_column: version
+    source: {literal: "1"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "escrow_schedule"
+  entity_id_col: "escrow_schedule_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

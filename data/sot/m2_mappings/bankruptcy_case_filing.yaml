@@ -1,0 +1,243 @@
+table: bankruptcy_case_filing
+version: 1
+primary_key: [bankruptcy_case_filing_id]
+
+sources: 
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "BankruptcyCaseNumber"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: bankruptcy_case_staging
+    alias: bc
+    staging: {table: "bankruptcy_case"}
+  - name: debtor_attorney_staging
+    alias: da
+    staging: {table: "debtor_attorney"}
+  - name: Step 
+    alias: s
+    pipe_file: {table: "Step"}
+    dtypes:
+      ActualCompletionDate: "datetime"
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "BANK"
+      - column: "StepCode"
+        operator: "in"
+        value: ["30", "43", "220", "150", "075", "072", "105", "106", "207", "210", "228", "233", "B08", "242", "241", "145"]
+      - column: "ActualCompletionDate"
+        operator: "is_not_null"
+    sorting:
+      - column: "LoanNumber"
+        ascending: true
+      - column: "ActualCompletionDate"
+        ascending: false
+    computed_columns:
+      - column: "_is_242_241"
+        expression: "StepCode.isin(['242', '241'])"
+      - column: "_rank_242_241"
+        expression: "np.where(_is_242_241, df.groupby('LoanNumber')['_is_242_241'].cumsum(), 0)"
+    post_groupby_filters:
+      - column: "_rank_242_241"
+        operator: "expression"
+        expression: "(~_is_242_241) | (_rank_242_241 == 1)"
+  - name: servicer_attorney_staging
+    alias: sa
+    staging: {table: "servicer_attorney_bank"}
+
+joins:
+  - left: {source: dw}
+    right: {source: l}
+    "on": ["dw.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: dw}
+    right: {source: bc}
+    "on": ["l.loan_id == bc.loan_id"]
+    how: left
+  - left: {source: dw}
+    right: {source: da}
+    "on": ["l.loan_id == da.loan_id"]
+    how: left
+  - left: {source: dw}
+    right: {source: s}
+    "on": ["dw.LoanNumber == s.LoanNumber"]
+    how: inner
+  - left: {source: dw}
+    right: {source: sa}
+    "on": ["l.loan_id == sa.loan_id"]
+    how: left
+
+columns: 
+  - target_column: bankruptcy_case_filing_id
+    hash_columns: ["bc.bankruptcy_case_id", "l.loan_id", "s.ActualCompletionDate", "BANKRUPTCY_CASE_FILING"]
+    transform: hash_id
+    dtype: string
+
+  # - target_column: approved_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: bankruptcy_case_id
+    source: bc.bankruptcy_case_id
+    transform: identity
+    dtype: string
+
+  # - target_column: completed_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: court_hearing_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: denied_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: draft_approved_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: draft_provided_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: effective_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: servicer_attorney_id
+    source: sa.servicer_attorney_id
+    transform: identity
+    dtype: string
+
+  - target_column: debtor_attorney_id
+    source: da.debtor_attorney_id
+    transform: identity
+    dtype: string
+
+  # - target_column: entered_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: executed_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: filed_date
+    source: s.ActualCompletionDate
+    transform: identity
+    dtype: date
+
+  - target_column: filing_reviewed_date
+    source: []
+    transform: null
+    dtype: date
+
+  # - target_column: granted_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: hearing_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: objection_filed_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: referred_date
+    expression: np.where(s.StepCode == "145", s.ActualCompletionDate, pd.NA)
+    transform: expression
+    dtype: datetime
+
+  # - target_column: rescinded_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: sent_to_debtor_attorney_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  # - target_column: submitted_for_revision_date
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: type
+    expression: |
+      np.select(
+        condlist=[
+          s.StepCode == "30",
+          s.StepCode == "43",
+          s.StepCode == "220",
+          s.StepCode == "150",
+          s.StepCode == "075",
+          s.StepCode == "072",
+          s.StepCode == "105",
+          s.StepCode == "106",
+          s.StepCode == "207",
+          s.StepCode == "210",
+          s.StepCode == "228",
+          s.StepCode == "233",
+          s.StepCode == "B08",
+          s.StepCode.isin(["242", "241"]),
+          s.StepCode == "145",
+        ],
+        choicelist=[
+          "AGREED_ORDER",
+          "AMENDED_PROOF_OF_CLAIM",
+          "PROOF_OF_CLAIM",
+          "MOTION_FOR_RELIEF",
+          "MOTION_TO_DEEM_CURRENT", 
+          "MOTION_TO_DEEM_CURRENT_RESPONSE",
+          "NOTICE_OF_FINAL_CURE", 
+          "NOTICE_OF_FINAL_CURE_RESPONSE",
+          "PAYMENT_CHANGE_NOTICE",
+          "PLAN_OBJECTION",
+          "POST_PETITION_FEES_NOTICE",
+          "REAFFIRMATION",
+          "BANKRUPTCY_PLAN",
+          "TRANSFER_OF_CLAIM",
+          "MOTION_FOR_REFERRAL"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  # - target_column: withdrawn_date
+  #   source: []  
+  #   transform: null
+  #   dtype: date
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "bankruptcy_case_filing"
+  entity_id_col: "bankruptcy_case_filing_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

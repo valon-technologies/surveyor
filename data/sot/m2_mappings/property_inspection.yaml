@@ -1,0 +1,258 @@
+table: property_inspection
+version: 1
+primary_key: [property_inspection_id]
+
+sources:
+  - name: PropertyInspection
+    alias: pi
+    pipe_file: {table: "PropertyInspection"}
+    dtypes:
+      PropertyInspectionNumber: "int"
+      RecordStartDate: "date"
+    sorting:
+      - column: "RecordStartDate"
+        ascending: True
+    filters:
+      - column: ["LoanNumber", "PropertyInspectionNumber"]
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: property_staging
+    alias: p
+    staging: {table: "property"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+
+joins:
+  - left: {source: pi}
+    right: {source: l}
+    "on": ["pi.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: pi}
+    right: {source: p}
+    "on": ["l.loan_id == p.loan_id"]
+    how: left
+  - left: {source: pi}
+    right: {source: fi}
+    "on": ["pi.LoanNumber == fi.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: property_inspection_id
+    hash_columns: ["l.loan_id", "p.property_id", "pi.PropertyInspectionNumber", "pi.RecordStartDate", "pi.RecordEndDate", "property_inspection"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: amount_invoice
+    source: pi.Fee
+    transform: identity
+    dtype: float
+
+  - target_column: cancellation_reason
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: date_cancelled
+    expression: |
+      np.where(
+        ((pi.InspectionCompletedDate.notnull()) & ((pi.PiOccupancyCode.isnull()) | (pi.PiOccupancyCode == 'U'))),
+        pi.InspectionCompletedDate,
+        pd.NA
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: date_completed
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: date_initiated
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: date_inspected
+    expression: |
+      np.where(
+        ((pi.PiOccupancyCode.isnull()) | (pi.PiOccupancyCode == 'U')),
+        pd.NA,
+        pi.InspectionCompletedDate
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: date_ordered
+    source: pi.InspectionOrderedDate
+    transform: identity
+    dtype: date
+
+  - target_column: has_property_damage
+    expression: |
+      np.where(
+        pi.PropertyDamageDate.notnull(),
+        True,
+        np.where(
+          pi.InspectionCompletedDate.notnull(),
+          False,
+          pd.NA
+        )
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: insured_loss_repair_inspection_type
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: is_post_disaster
+    source: []
+    transform: null
+    dtype: boolean
+
+  - target_column: percentage_repair_completion_requested
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: percentage_repair_completion_verified
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: property_access_contact
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: property_access_instructions
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: property_access_lock_box_combination
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: property_access_phone_number
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: property_condition
+    source: pi.PropertyCondition
+    transform: identity
+    dtype: string
+
+  - target_column: inspection_type
+    expression: |
+      np.select(
+        condlist=[
+          pi.InspectionType == "BANKRUPTCY",
+          pi.PiOccupancyCode.isin(["O", "U"]),
+          pi.PiOccupancyCode.isin(["V"]),
+        ],
+        choicelist=[
+          "NO_CONTACT",
+          "EXTERIOR",
+          "INTERIOR"
+        ],
+        default="EXTERIOR"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: property_occupancy_status_after_result
+    expression: |
+      np.where(
+        pi.InspectionCompletedDate.notnull(),
+        pi.PiOccupancyCode.map({
+          "O": "UNKNOWN_OCCUPIED",       
+          "U": "UNKNOWN",
+          "V": "VACANT"       
+        }).fillna("UNKNOWN"),
+        pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: property_occupancy_status_before_result
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: reason_for_incomplete_inspection
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: review_outcome
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: reviewed_at
+    source: []
+    transform: null
+    dtype: datetime
+
+  - target_column: source_type
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: status
+    expression: |
+      np.select(
+        condlist=[
+          pi.InspectionCompletedDate.notnull(),
+          ((pi.InspectionOrderedDate.notnull()) & (pi.PiOccupancyCode == 'U') & (pi.InspectionCompletedDate.isnull())),
+          ((pi.InspectionOrderedDate.notnull()) & (pi.InspectionCompletedDate.isnull())),
+        ],
+        choicelist=[
+          'COMPLETED',
+          'CANCELLED',
+          'ORDERED'
+        ],
+        default='INITIATED'
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: vendor_type
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: was_inspection_able_to_be_completed
+    source: []
+    transform: null
+    dtype: boolean
+
+  - target_column: work_order_number
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: property_id
+    source: p.property_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "property_inspection"
+  entity_id_col: "property_inspection_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

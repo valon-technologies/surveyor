@@ -3,12 +3,14 @@ import { api, workspacePath } from "@/lib/api-client";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import type { DashboardStats, MyWorkData } from "@/types/dashboard";
 
-export function useDashboardStats() {
+export function useDashboardStats(milestone?: string) {
   const { workspaceId } = useWorkspace();
   return useQuery({
-    queryKey: ["dashboard", workspaceId],
+    queryKey: ["dashboard", workspaceId, milestone],
     queryFn: () =>
-      api.get<DashboardStats>(workspacePath(workspaceId, "dashboard")),
+      api.get<DashboardStats>(workspacePath(workspaceId, "dashboard"), {
+        milestone,
+      }),
   });
 }
 

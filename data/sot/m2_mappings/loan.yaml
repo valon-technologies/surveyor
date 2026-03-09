@@ -1,0 +1,377 @@
+table: loan
+version: 1
+primary_key: [loan_id]
+
+sources:
+  - name: loan_1
+    alias: l1
+    staging: {table: "loan1"}
+  - name: mbs_pool_staging
+    alias: mp
+    staging: {table: "mbs_pool"}
+  - name: servicer_company_staging
+    alias: sc
+    staging: {table: "servicer_company"}
+
+  - name: ExcessServiceFee
+    alias: esf
+    pipe_file: {table: "ExcessServiceFee"}
+
+joins:
+  - left: {source: l1}
+    right: {source: mp}
+    "on":
+      - "l1.loan_id == mp.loan_id"
+    how: left
+  - left: {source: l1}
+    right: {source: sc}
+    "on": ["l1.loan_id == sc.loan_id"]
+    how: left
+
+columns:
+  - target_column: loan_id
+    source: l1.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: amortization_term
+    source: l1.amortization_term
+    transform: identity
+    dtype: int
+
+  - target_column: balloon_date
+    source: l1.balloon_date
+    transform: identity
+    dtype: date
+
+  - target_column: data_transfer_activated_at
+    source: l1.data_transfer_activated_at
+    transform: identity
+    dtype: datetime
+
+  - target_column: data_transfer_effective_date
+    source: l1.data_transfer_effective_date
+    transform: identity
+    dtype: date
+
+  - target_column: effective_transfer_date
+    source: l1.effective_transfer_date
+    transform: identity
+    dtype: date
+
+  - target_column: fannie_holding_type
+    source: l1.fannie_holding_type
+    transform: identity
+    dtype: string
+
+  - target_column: fannie_loan_number
+    source: l1.fannie_loan_number
+    transform: identity
+    dtype: string
+
+  - target_column: fannie_servicer_number
+    source: l1.fannie_servicer_number
+    transform: identity
+    dtype: string
+
+  - target_column: freddie_loan_number
+    source: l1.freddie_loan_number
+    transform: identity
+    dtype: string
+
+  - target_column: freddie_seller_id
+    source: l1.freddie_seller_id
+    transform: identity
+    dtype: string
+
+  - target_column: freddie_servicer_number
+    source: l1.freddie_servicer_number
+    transform: identity
+    dtype: string
+
+  - target_column: government_insuring_agency
+    source: l1.government_insuring_agency
+    transform: identity
+    dtype: string
+
+  - target_column: government_insuring_agency_case_number
+    source: l1.government_insuring_agency_case_number
+    transform: identity
+    dtype: string
+
+  - target_column: guaranty_fee_rate
+    source: l1.guaranty_fee_rate
+    transform: identity
+    dtype: float
+
+  - target_column: hamp_step_rate
+    source: l1.hamp_step_rate
+    transform: identity
+    dtype: boolean
+
+  - target_column: has_additional_collateral
+    source: l1.has_additional_collateral
+    transform: identity
+    dtype: boolean
+  
+  - target_column: inactive_date
+    source: l1.inactive_date
+    transform: identity
+    dtype: date
+
+  - target_column: interest_only_end_date
+    source: l1.interest_only_end_date
+    transform: identity
+    dtype: date
+
+  - target_column: interest_only_remaining_term
+    source: l1.interest_only_remaining_term
+    transform: identity
+    dtype: int
+
+  - target_column: interest_only_term_months
+    source: l1.interest_only_term_months
+    transform: identity
+    dtype: int
+
+  - target_column: investor_loan_number
+    source: l1.investor_loan_number
+    transform: identity
+    dtype: string
+
+  - target_column: investor_type
+    source: l1.investor_type
+    transform: identity
+    dtype: string
+
+  - target_column: iregistration_indicator
+    source: l1.iregistration_indicator
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_actively_serviced
+    source: l1.is_actively_serviced
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_arm
+    source: l1.is_arm
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_assumable
+    source: l1.is_assumable
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_balloon
+    source: l1.is_balloon
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_cdfi
+    source: l1.is_cdfi
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_charged_off
+    source: l1.is_charged_off
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_electronic_mortgage
+    source: l1.is_electronic_mortgage
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_high_priced_mortgage_loan
+    source: l1.is_high_priced_mortgage_loan
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_interest_only
+    source: l1.is_interest_only
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_mers_originated_mortgage
+    source: l1.is_mers_originated_mortgage
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_negative_amort
+    source: l1.is_negative_amort
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_option_arm
+    source: l1.is_option_arm
+    transform: identity
+    dtype: boolean
+
+  # - target_column: is_second_home
+  #   source: []
+  #   transform: null
+  #   dtype: boolean
+
+  - target_column: loan_number
+    source: l1.loan_number
+    transform: identity
+    dtype: string
+
+  - target_column: loan_purpose
+    source: l1.loan_purpose
+    transform: identity
+    dtype: string
+
+  - target_column: master_servicing_fee_percent
+    source: l1.master_servicing_fee_percent
+    transform: identity
+    dtype: float
+
+  - target_column: maturity_date
+    source: l1.maturity_date
+    transform: identity
+    dtype: date
+
+  - target_column: mers_deactivated_date
+    source: l1.mers_deactivated_date
+    transform: identity
+    dtype: date
+
+  - target_column: mers_deactivated_reason
+    source: l1.mers_deactivated_reason
+    transform: identity
+    dtype: string
+
+  - target_column: mers_id_number
+    source: l1.mers_id_number
+    transform: identity
+    dtype: string
+
+  - target_column: mers_originating_org_id
+    source: l1.mers_originating_org_id
+    transform: identity
+    dtype: string
+
+  - target_column: mers_status
+    source: l1.mers_status
+    transform: identity
+    dtype: string
+
+  - target_column: mers_subservicer_org_id
+    source: l1.mers_subservicer_org_id
+    transform: identity
+    dtype: string
+
+  - target_column: mortgage_classification
+    source: l1.mortgage_classification
+    transform: identity
+    dtype: string
+
+  - target_column: negative_amortization_limit
+    source: l1.negative_amortization_limit
+    transform: identity
+    dtype: float
+
+  # - target_column: non_conforming_agency_type
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  # - target_column: note_has_endorsement
+  #   source: []
+  #   transform: null
+  #   dtype: boolean
+
+  - target_column: note_holder_current
+    source: l1.note_holder_current
+    transform: identity
+    dtype: string
+
+  - target_column: offboarding_transfer_date
+    source: l1.offboarding_transfer_date
+    transform: identity
+    dtype: date
+
+  - target_column: offboarding_transferee_name
+    source: l1.offboarding_transferee_name
+    transform: identity
+    dtype: string
+
+  - target_column: other_agency_type
+    source: l1.other_agency_type
+    transform: identity
+    dtype: string
+
+  - target_column: payment_application_priority
+    source: l1.payment_application_priority
+    transform: identity
+    dtype: string
+
+  - target_column: product_type
+    source: l1.product_type
+    transform: identity
+    dtype: string
+  
+  - target_column: prior_servicer_id
+    source: sc.servicer_company_id
+    transform: identity
+    dtype: string
+
+  - target_column: prior_servicer_name
+    source: sc.name
+    transform: identity
+    dtype: string
+
+  - target_column: prior_servicer_loan_number
+    source: l1.prior_servicer_loan_number
+    transform: identity
+    dtype: string
+
+  - target_column: remittance_schedule
+    source: l1.remittance_schedule
+    transform: identity
+    dtype: string
+
+  - target_column: seller_loan_id
+    source: l1.seller_loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: servicing_strip_rate
+    source: esf.IesflExcessServiceRat
+    transform: identity
+    dtype: float
+
+  - target_column: servicing_strip_rate_required
+    source: l1.servicing_strip_rate_required
+    transform: identity
+    dtype: boolean
+
+  # - target_column: servicing_transfer_activated_at
+  #   source: []
+  #   transform: null
+
+  # - target_column: subsequent_negative_amortization_recast_period
+  #   source: []
+  #   transform: null
+  #   dtype: date
+
+  - target_column: vesting_name
+    source: l1.vesting_name
+    transform: identity
+    dtype: string
+  
+  - target_column: mbs_pool_id
+    source: mp.mbs_pool_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan"
+  entity_id_col: "loan_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+
+  

@@ -1,0 +1,578 @@
+table: loan1
+version: 1
+primary_key: [loan_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: Investor
+    alias: iv
+    pipe_file: {table: "Investor"}
+  - name: StopFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: Arm
+    alias: a
+    pipe_file: {table: "Arm"}
+  - name: Heloc
+    alias: h
+    pipe_file: {table: "HELOC"}
+
+joins:
+  - left: {source: li}
+    right: {source: ed}
+    "on": ["li.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: iv}
+    "on": 
+      - "li.InvestorId == iv.InvestorId"
+      - "li.CategoryCode == iv.CategoryCode"
+    how: left
+  - left: {source: li}
+    right: {source: fi}
+    "on": ["li.LoanNumber == fi.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: a}
+    "on": ["li.LoanNumber == a.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: h}
+    "on": ["li.LoanNumber == h.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: loan_id
+    transform: hash_id
+    hash_columns: ["li.LoanNumber", "loan"]
+    dtype: string
+
+  - target_column: amortization_term
+    source: li.LoanTerm
+    transform: identity
+    dtype: int
+
+  - target_column: balloon_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: data_transfer_activated_at
+    source: []
+    transform: null
+    dtype: datetime
+
+  - target_column: data_transfer_effective_date
+    source: {literal: "02/01/2026"}
+    transform: literal
+    dtype: date
+
+  - target_column: effective_transfer_date
+    source: ed.AcquisitionDate
+    transform: identity
+    dtype: date
+
+  - target_column: fannie_holding_type
+    expression: |
+      np.select(
+        condlist=[
+          (iv.ReconMethod=="253") & (iv.CategoryCode != '990'),
+          (iv.ReconMethod=="253") & (iv.CategoryCode == '990'),
+          (iv.ReconMethod=="817") & (iv.CategoryCode != '990'),
+          (iv.ReconMethod=="817") & (iv.CategoryCode == '990')
+        ],
+        choicelist=[
+          "PORTFOLIO_MORTGAGE_LOAN",
+          "POOLED_FROM_PORTFOLIO",
+          "MBS_MORTGAGE_LOAN", 
+          "POOLED_FROM_PORTFOLIO"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: fannie_loan_number
+    expression: li.InvestorLoanNumber.where(fi.GseCode == "F", pd.NA)
+    transform: expression
+    dtype: string
+
+  - target_column: fannie_servicer_number
+    expression: iv.InvestorServicerNumber.where(fi.GseCode == "F", pd.NA)
+    transform: expression
+    dtype: string
+
+  - target_column: freddie_loan_number
+    expression: |
+      np.where(
+        fi.GseCode == "H",
+        li.InvestorLoanNumber.str.replace(r"^0", "", regex=True),
+        pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: freddie_seller_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: freddie_servicer_number
+    expression: iv.InvestorServicerNumber.where(fi.GseCode == "H", pd.NA)
+    transform: expression
+    dtype: string
+
+  - target_column: government_insuring_agency
+    expression: |
+      np.select(
+        condlist=[
+          (fi.LoType=='1') | (fi.LoType=='5'),
+          fi.LoType=='2',
+          fi.LoType=='7',
+          fi.LoType=='9'
+        ],
+        choicelist=[
+          "FHA",
+          "VA",
+          "PIH",
+          "RHS",
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: government_insuring_agency_case_number
+    source: li.FhaVaRhsNumber
+    transform: identity
+    dtype: string
+
+  - target_column: guaranty_fee_rate
+    source: li.GuarFeeAfterBuyupDownFc
+    transform: identity
+    dtype: float
+
+  - target_column: hamp_step_rate
+    expression: |
+      li.LoanModProgramType.isin([
+      'CHM1','HMD1','HMP1','HMP2','HPC1','HPM1'
+      ])
+    transform: expression
+    dtype: boolean
+
+  - target_column: has_additional_collateral
+    source: []
+    transform: null
+    dtype: boolean
+  
+  - target_column: inactive_date
+    expression: |
+      np.where(
+        fi.PaymentInFullStopCode != '0',
+        pd.to_datetime(ed.PaymentInFullDate, errors="coerce"),
+        pd.NA
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: interest_only_end_date
+    source: ed.InterestOnlyEndDate
+    transform: identity
+    dtype: date
+
+  - target_column: interest_only_remaining_term
+    expression: |
+      date_diff(
+      ed.InterestOnlyExpireDate.fillna(ed.InterestOnlyEndDate),
+      pd.Timestamp('2026-02-01'),
+      "month").where(ed.InterestOnlyExpireDate.notna() | ed.InterestOnlyEndDate.notna(),pd.NA).clip(lower=0)
+    transform: expression
+    dtype: int
+
+  - target_column: interest_only_term_months
+    expression: |
+      date_diff(
+      ed.InterestOnlyExpireDate.fillna(ed.InterestOnlyEndDate),
+      ed.FirstDueDate,
+      "month"
+      ) + 1
+    transform: expression
+    dtype: int
+
+  - target_column: investor_loan_number
+    expression: |
+      np.where(
+        li.InvestorId.eq("HN1"),
+        li.InvestorLoanNumber.str.replace(r"^0", "", regex=True),
+        li.InvestorLoanNumber
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: investor_type
+    expression: |
+      fi.GseCode.map({
+        "F": "FANNIE",
+        "H": "FREDDIE",
+        "G": "GINNIE",
+        "O": "PRIVATE_ASSET"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: iregistration_indicator
+    expression: |
+      fi.MersRegistrationStatusCode.isin(["Y", "U", "T", "R"])
+    transform: expression
+    dtype: boolean
+
+  - target_column: is_actively_serviced
+    expression: |
+      np.where(
+        fi.ActiveLoan=='1',
+        True,
+        False
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: is_arm
+    expression: fi.ArmIndicator.eq("Y")
+    transform: expression
+    dtype: boolean
+
+  - target_column: is_assumable
+    expression: | 
+      fi.AssumptionCode.map({
+        "0": True,
+        "1": False,
+        "C": True,
+        "Q": True,
+        "U": True
+      }).fillna(True)
+    transform: expression
+    dtype: boolean
+
+  - target_column: is_balloon
+    expression: fi.BalloonStatusCode.isin(["A","H"])
+    transform: expression
+    dtype: boolean
+
+  - target_column: is_cdfi
+    source: []
+    transform: null
+    dtype: boolean
+
+  - target_column: is_charged_off
+    expression: fi.PaymentInFullStopCode.eq("6")
+    transform: expression
+    dtype: boolean
+
+  - target_column: is_electronic_mortgage
+    expression: fi.MersNoteType.eq("E")
+    transform: expression
+    dtype: boolean
+
+  - target_column: is_high_priced_mortgage_loan
+    expression: fi.HigherPricedIndicator.eq("Y")
+    transform: expression
+    dtype: boolean
+
+  - target_column: is_interest_only
+    expression: |
+      (
+      fi.InterestOnlyLoanIndicator.eq("Y")
+      | ed.InterestOnlyEndDate.notna()
+      | ed.InterestOnlyExpireDate.notna()
+      | a.ArmPiCalcMethodCode.eq("I")
+      | a.ArmPbCalcMethodCode.eq("I")
+      | (pd.to_numeric(a.ArmInterestOnlyPiAmount, errors="coerce").fillna(0) > 0)
+      | fi.PaymentOptionIndicatorCode.eq("2")
+      | li.ArmPlanId.isin(["FR01","FR02","FR03","FR04","FR05","FR06","FR07","FR10","FR15","FRFD"])
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: is_mers_originated_mortgage
+    expression: fi.MersOriginalMortgageeIndicator.eq("Y")
+    transform: expression
+    dtype: boolean
+
+  - target_column: is_negative_amort
+    # expression: |
+    #   (
+    #   (pd.to_numeric(li.ActualDeferredBalance, errors="coerce").fillna(0) > 0)
+    #   | (pd.to_numeric(li.ScheduledDeferredBalance, errors="coerce").fillna(0) > 0)
+    #   | (pd.to_numeric(li.DefInterestBalance, errors="coerce").fillna(0) > 0)
+    #   )
+    # transform: expression
+    source: []
+    transform: null
+    dtype: boolean
+
+  - target_column: is_option_arm
+    expression: fi.PaymentOptionIndicatorCode.isin(["1","2","3","4"])
+    transform: expression
+    dtype: boolean
+
+  # - target_column: is_second_home
+  #   source: []
+  #   transform: null
+  #   dtype: boolean
+
+  - target_column: loan_number
+    source: li.LoanNumber
+    transform: identity
+    dtype: string
+
+  - target_column: loan_purpose
+    expression: |
+      np.select(
+        condlist = 
+        [
+          fi.LoanPurposeCode.isin(["1","3","4","7","A"]),
+          fi.LoanPurposeCode.eq("6"),
+          fi.LoanPurposeCode.isin(["5","8"]),
+          (fi.GnmaRfsLoanPurposeCode.eq("2") & fi.GnmaRfsRefinanceType.eq("2")),
+          fi.GnmaRfsLoanPurposeCode.eq("2")
+        ],
+        choicelist = 
+        [
+          "NEW_ORIGINATION",
+          "CASH_OUT",
+          "REFINANCE",
+          "CASH_OUT",
+          "REFINANCE"
+        ],
+        default="NEW_ORIGINATION"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: master_servicing_fee_percent
+    expression: ((pd.to_numeric(li.FirstServiceFeeRate, errors="coerce") - pd.to_numeric(li.GuarFeeAfterBuyupDownFc, errors="coerce")) * 100.0).round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: maturity_date
+    source: ed.LoanMaturesDate
+    transform: identity
+    dtype: date
+
+  - target_column: mers_deactivated_date
+    expression: |
+      np.where(
+        fi.MersRegistrationStatusCode.astype("string").str.upper().eq("D"),
+        ed.MersRegistrationDate,
+        pd.NA
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: mers_deactivated_reason
+    expression: |
+      li.MersIdNumberStatusCode.map({
+        "00": pd.NA,
+        "02": "FORECLOSURE",
+        "03": "LOAN_COMPLETION",
+        "06": pd.NA,
+        "12": pd.NA,
+        "18": "DEFAULT_BANKRUPTCY"
+      }).where(fi.MersRegistrationStatusCode.eq("D"), pd.NA)
+    transform: expression
+    dtype: string
+
+  - target_column: mers_id_number
+    source: li.MersId
+    transform: identity
+    dtype: string
+
+  - target_column: mers_originating_org_id
+    source: li.MersOriginatingOrganizatnId
+    transform: identity
+    dtype: string
+
+  - target_column: mers_status
+    expression: | 
+      li.MersIdNumberStatusCode.map({
+        "00": "ACTIVE", 
+        "02": "INACTIVE", 
+        "03": "DEACTIVATED", 
+        "06": "DEACTIVATED", 
+        "12": "INACTIVE",
+        "18": "DEACTIVATED"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: mers_subservicer_org_id
+    source: {"literal": "1014821"}
+    transform: literal
+    dtype: string
+
+  - target_column: mortgage_classification
+    expression: | 
+      np.select(
+        [
+          (fi.LoType.isin(["3","6"])) & (fi.LoanSubprimeCode == "P"),
+          (fi.LoanSubprimeCode == "0")
+        ],
+        [
+          "PRIME_CONFORMING",
+          "SUBPRIME"
+        ],
+        default="PRIME_CONFORMING"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: negative_amortization_limit
+    source: []
+    transform: null
+    dtype: float
+
+  # - target_column: non_conforming_agency_type
+  #   source: []
+  #   transform: null
+  #   dtype: string
+
+  # - target_column: note_has_endorsement
+  #   source: []
+  #   transform: null
+  #   dtype: boolean
+
+  - target_column: note_holder_current
+    source: li.MersOriginalNoteHolderName
+    transform: identity
+    dtype: string
+
+  - target_column: offboarding_transfer_date
+    source: ed.ServicingSoldDate
+    transform: identity
+    dtype: date
+
+  - target_column: offboarding_transferee_name
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: other_agency_type
+    expression: |
+      np.select(
+        condlist = [
+          (h.LoanNumber.notna() | fi.ElocBillType.notna() | (fi.PaymentOptionIndicatorCode.isin(["1","2","3","4"]) & li.ProductLineCode.eq("HELOC"))),
+            ed.ReverseMortgageMaxMaturityDate.notna(),
+            (li.SecondPrincipalBalance.notna() | li.SecondInvestorId.notna() | li.SecondLienholderName.notna()),
+            li.CsAccountType.eq("0F")
+        ],
+        
+        choicelist = [
+          "HELOC",
+          "REVERSE",
+          "CLOSED_END_SECOND",
+          "CONSTRUCTION_AND_DEVELOPMENT"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: payment_application_priority
+    source: []
+    transform: null
+    dtype: string
+
+  # - target_column: prior_servicer_name
+  #   source: li.OldServicerId
+  #   transform: identity
+  #   dtype: string
+
+  - target_column: prior_servicer_loan_number
+    source: li.OldLoanNumber
+    transform: identity
+    dtype: string
+
+  - target_column: product_type
+    expression: |
+      np.select(
+        condlist=[
+          fi.ElocIndicator.astype("string").str.strip().str.upper().eq("Y"),
+          (li.ArmPlanId.notna() & ed.InterestOnlyEndDate.fillna(ed.InterestOnlyExpireDate).notna()),
+          li.ArmPlanId.notna(),
+          ed.InterestOnlyEndDate.fillna(ed.InterestOnlyExpireDate).notna(),
+          (li.ArmPlanId.isna() & ed.InterestOnlyEndDate.fillna(ed.InterestOnlyExpireDate).isna())
+        ],
+        choicelist=[
+          "HELOC",
+          "IOARM",
+          "ARM",
+          "IOFRM",
+          "FRM"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: remittance_schedule
+    expression: | 
+      np.select(
+        condlist=[
+          iv.ReconMethod.eq("139"),
+          iv.ReconMethod.eq("253"),
+          iv.ReconMethod.eq("540"),
+          iv.ReconMethod.eq("660"),
+          iv.ReconMethod.eq("759"),
+          iv.ReconMethod.eq("817")
+        ],
+        choicelist=[
+          "ACTUAL_ACTUAL",
+          "ACTUAL_ACTUAL",
+          "SCHEDULED_SCHEDULED",
+          "ACTUAL_ACTUAL",
+          "SCHEDULED_ACTUAL",
+          "SCHEDULED_SCHEDULED"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: seller_loan_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: servicing_strip_rate
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: servicing_strip_rate_required
+    source: []
+    transform: null
+    dtype: boolean
+
+  # - target_column: servicing_transfer_activated_at
+  #   source: []
+  #   transform: null
+
+  - target_column: subsequent_negative_amortization_recast_period
+    expression: |
+      np.where(
+        a.ArmPiChangeReasonCode.eq("RC"),
+        a.ArmPiPaymentPeriod,
+        pd.NA
+      )
+    transform: expression
+    dtype: int
+
+  - target_column: vesting_name
+    source: iv.Vitno1
+    transform: identity
+    dtype: string

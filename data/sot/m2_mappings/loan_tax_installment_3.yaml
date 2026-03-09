@@ -1,0 +1,150 @@
+table: loan_tax_installment_3
+version: 1
+primary_key: [loan_tax_installment_id]
+
+sources:
+  - name: Tax
+    alias: t
+    pipe_file: {table: "Tax"}
+    dtypes:
+      TaxKeySequenceNumber: "int"
+      TaxDisbursementDueDate: "date"
+    filters:
+      - column: "TaxTerm"
+        operator: "eq"
+        value: "3"
+    pivot:
+      repeat_rows: 4
+      repeat_rows_group_by: ["LoanNumber", "TaxId", "TaxPayeeCode"]
+      year_column: "TaxDisbursementDueDate"
+      year_output_column: "TaxYear"
+      sort_by: "TaxKeySequenceNumber"
+      sort_ascending: true
+      group_by: ["LoanNumber", "TaxId", "TaxPayeeCode"]
+      sequence_column: "TaxKeySequenceNumberPerYear"
+      sequence_dtype: "Int32"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: loan_tax_parcel_staging
+    alias: ltp
+    staging: {table: "loan_tax_parcel"}
+  - name: loan_tax_line_staging
+    alias: ltl
+    staging: {table: "loan_tax_line_3"}
+  - name: tax_authority_staging
+    alias: ta
+    staging: {table: "tax_authority"}
+  - name: Payee
+    alias: p
+    pipe_file: {table: "Payee"}
+
+joins:
+  - left: {source: t}
+    right: {source: l}
+    "on": ["t.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: t}
+    right: {source: ta}
+    "on": 
+      - "l.loan_id == ta.loan_id"
+      - "t.TaxPayeeCode == ta.vendor_tax_authority_id"
+    how: left
+  - left: {source: t}
+    right: {source: ltp}
+    "on": 
+      - "l.loan_id == ltp.loan_id"
+      - "t.TaxId == ltp.parcel_id"
+    how: left
+  - left: {source: t}
+    right: {source: ltl}
+    "on": 
+      - "l.loan_id == ltl.loan_id"
+      - "ltp.loan_tax_parcel_id == ltl.loan_tax_parcel_id"
+      - "ta.tax_authority_id == ltl.tax_authority_id"
+    how: left
+  - left: {source: t}
+    right: {source: p}
+    "on": ["t.TaxPayeeCode == p.PayeeId"]
+    how: left
+
+columns:
+  - target_column: loan_tax_installment_id
+    hash_columns: ["t.LoanNumber", "l.loan_id", "ltl.loan_tax_line_id", "t.TaxDisbursementType", "t.TaxYear", "t.TaxKeySequenceNumberPerYear", "t.TaxPayeeCode", "loan_tax_installment_3"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: amount_base
+    source: t.TaxDisbursementAmount
+    transform: identity
+    dtype: float
+
+  - target_column: amount_fee
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: upcoming_duedate
+    source: t.TaxDisbursementDueDate
+    transform: identity
+    dtype: date
+
+  - target_column: duedate
+    expression: |
+      np.select(
+        condlist=[
+          t.TaxKeySequenceNumberPerYear == 1,
+          t.TaxKeySequenceNumberPerYear == 2,
+          t.TaxKeySequenceNumberPerYear == 3,
+          t.TaxKeySequenceNumberPerYear == 4
+          ],
+        choicelist=[
+          p.PayeeTaxDueDate1,
+          p.PayeeTaxDueDate2,
+          p.PayeeTaxDueDate3,
+          p.PayeeTaxDueDate4
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: economic_loss_date
+    expression: |
+      np.select(
+        condlist=[
+          t.TaxKeySequenceNumberPerYear == 1,
+          t.TaxKeySequenceNumberPerYear == 2,
+          t.TaxKeySequenceNumberPerYear == 3,
+          t.TaxKeySequenceNumberPerYear == 4
+          ],
+        choicelist=[
+          p.PayeeTaxDelinquentDate1,
+          p.PayeeTaxDelinquentDate2,
+          p.PayeeTaxDelinquentDate3,
+          p.PayeeTaxDelinquentDate4
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: installment_index
+    source: t.TaxKeySequenceNumberPerYear
+    transform: identity
+    dtype: string
+
+  - target_column: year
+    source: t.TaxYear
+    transform: identity
+    dtype: int
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_tax_line_id
+    source: ltl.loan_tax_line_id
+    transform: identity
+    dtype: string

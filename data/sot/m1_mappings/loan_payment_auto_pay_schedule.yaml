@@ -1,0 +1,201 @@
+table: loan_payment_auto_pay_schedule
+version: 1
+primary_key: [loan_payment_auto_pay_schedule_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: bank_account_staging
+    alias: ba
+    staging: {table: "bank_account"}
+  - name: p1ld
+    alias: p1ld
+    pipe_file: {table: "P1LD"}
+
+joins:
+  - left: {source: p1ld}
+    right: {source: l}
+    "on": ["p1ld.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: p1ld}
+    right: {source: li}
+    "on": ["p1ld.LoanNumber == li.LoanNumber"]
+    how: left
+  - left: {source: p1ld}
+    right: {source: ed}
+    "on": ["p1ld.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: p1ld}
+    right: {source: fi}
+    "on": ["p1ld.LoanNumber == fi.LoanNumber"]
+    how: left
+  - left: {source: p1ld}
+    right: {source: ba}
+    "on": ["l.loan_id == ba.loan_id"]
+    how: left
+
+columns:
+  - target_column: loan_payment_auto_pay_schedule_id
+    hash_columns: ["li.LoanNumber", "l.loan_id", "ba.bank_account_id", "ed.DraftAddedDate", "loan_payment_auto_pay_schedule"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: bank_account_id
+    source: ba.bank_account_id
+    transform: identity
+    dtype: string
+
+  - target_column: additional_escrow_amount
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: additional_principal_amount
+    source: li.DraftAdditionalPrinAmount
+    transform: identity
+    dtype: float
+
+  - target_column: cancellation_reason
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: cancelled_at
+    source: []
+    transform: null
+    dtype: datetime
+
+  - target_column: enrollment_date
+    source: ed.DraftAddedDate
+    transform: identity
+    dtype: date
+
+  - target_column: for_payment_date
+    source: ed.NextPaymentDueDate
+    transform: identity
+    dtype: date
+
+  - target_column: next_actual_draft_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: next_payment_date
+    expression: |
+      np.select(
+        condlist=[
+          fi.FlexDraftFrequencyCode == "S",
+          (fi.DraftOptionCode.isna() | (fi.DraftOptionCode == "0")),
+          fi.DraftOptionCode=="A"
+        ],
+        choicelist=[
+          np.where(
+            pd.to_datetime(p1ld.LastDraftDate, errors='coerce').dt.day == pd.to_datetime(ed.FlexDraftDate1, errors='coerce').dt.day,
+            date_add(
+              pd.to_datetime(p1ld.LastDraftDate, errors='coerce').dt.to_period('M').dt.to_timestamp(),
+              pd.to_datetime(ed.FlexDraftDate2, errors='coerce').dt.day - 1,
+              "day"
+            ),
+            date_add(
+              date_add(pd.to_datetime(p1ld.LastDraftDate, errors='coerce').dt.to_period('M').dt.to_timestamp(), 1, "month"),
+              pd.to_datetime(ed.FlexDraftDate1, errors='coerce').dt.day - 1,
+              "day"
+            )
+          ),
+          date_add(pd.to_datetime(p1ld.LastDraftDate, errors="coerce"), 1, "month"),
+          np.where(
+            pd.to_datetime(ed.DraftLastScheduledDate, errors="coerce") >= pd.to_datetime(l.data_transfer_effective_date, errors="coerce"),
+            pd.to_datetime(ed.DraftLastScheduledDate, errors="coerce"),
+            date_add(pd.to_datetime(ed.DraftLastScheduledDate, errors="coerce"), 14, "day")
+          )
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: payment_frequency
+    expression: |
+      np.select(
+        condlist=[
+          fi.FlexDraftFrequencyCode == "S",
+          (fi.DraftOptionCode.isna() | (fi.DraftOptionCode == "0")),
+          fi.DraftOptionCode=="A"
+        ],
+        choicelist=[
+          "SEMI_MONTHLY",
+          "MONTHLY",
+          "BI_WEEKLY"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: requested_draft_day_first
+    expression: |
+      np.select(
+        condlist=[
+          fi.FlexDraftFrequencyCode == "S",
+          (fi.DraftOptionCode.isna() | (fi.DraftOptionCode == "0")),
+          fi.DraftOptionCode=="A"
+        ],
+        choicelist=[
+          pd.to_datetime(ed.FlexDraftDate1, errors='coerce').dt.day,
+          pd.to_numeric(li.DraftDelayDaysQuantity) + 1,
+          np.where(
+            pd.to_datetime(ed.DraftLastScheduledDate, errors="coerce") >= pd.to_datetime(l.data_transfer_effective_date, errors="coerce"),
+            pd.to_datetime(ed.DraftLastScheduledDate, errors="coerce").dt.day,
+            date_add(pd.to_datetime(ed.DraftLastScheduledDate, errors="coerce"), 14, "day").dt.day
+          )
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: int
+
+  - target_column: requested_draft_day_second
+    expression: |
+      np.where(
+        fi.FlexDraftFrequencyCode == "S",
+        pd.to_datetime(ed.FlexDraftDate2, errors='coerce').dt.day,
+        pd.NA
+      )
+    transform: expression
+    dtype: int
+
+  - target_column: schedule_status
+    expression: |
+      np.where(
+        (fi.DraftingIndicator == "Y") | (fi.FlexDraftIndicator == "Y"),
+        "ACTIVE",
+        "CANCELLED"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: schedule_source
+    source: {literal: "SYSTEM_TRANSFER"}
+    transform: literal
+    dtype: string
+    
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_payment_auto_pay_schedule"
+  entity_id_col: "loan_payment_auto_pay_schedule_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

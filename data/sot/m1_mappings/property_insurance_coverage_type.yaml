@@ -1,0 +1,45 @@
+table: property_insurance_coverage_type
+version: 1
+primary_key: [property_insurance_coverage_type_id]
+
+sources:
+  - name: property_insurance_coverage_type
+    alias: pci
+    staging: {table: "property_insurance_coverage_type_1"}
+
+columns:
+  - target_column: property_insurance_coverage_type_id
+    source: pci.property_insurance_coverage_type_id
+    transform: identity
+    dtype: string
+
+  - target_column: insurance_stream
+    source: pci.insurance_stream
+    transform: identity
+    dtype: string
+
+  - target_column: is_escrowed
+    source: pci.is_escrowed
+    transform: identity
+    dtype: boolean
+
+  - target_column: is_required
+    source: pci.is_required
+    transform: identity
+    dtype: boolean
+
+  - target_column: structure_id
+    source: pci.structure_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: pci.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "property_insurance_coverage_type"
+  entity_id_col: "property_insurance_coverage_type_id"
+  loan_id_col: "loan_id"  
+  loan_id_col_required: true

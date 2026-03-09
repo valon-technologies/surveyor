@@ -1,0 +1,68 @@
+table: loan_expense_recov
+version: 1
+primary_key: [loan_expense_id]
+
+sources:
+  - name: Transaction
+    alias: ts
+    pipe_file: {table: "Transaction"}
+    dtypes:
+      TransactionRowNumber: "int"
+      RecoverableAdvBalance: "float"
+      NonRecoverableAdvBalance: "float"
+      ThirdPartyAdvBalance: "float"
+    sorting:
+      - column: "TransactionRowNumber"
+        ascending: False
+    filters:
+      - column: "LoanNumber"
+        operator: "dedup"
+        keep: "last"
+      - column: "RecoverableAdvBalance"
+        operator: "gt"
+        value: 0.0
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: ts}
+    right: {source: l}
+    "on": ["ts.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: loan_expense_id
+    hash_columns: ["ts.LoanNumber", "l.loan_id", "loan_expense_recov"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: amount
+    source: ts.RecoverableAdvBalance
+    transform: identity
+    dtype: float
+
+  - target_column: expense_type
+    source: {literal: "SERVICING_EXPENSE"}
+    transform: literal
+    dtype: string
+
+  - target_column: is_onboarded
+    source: {literal: "True"}
+    transform: literal
+    dtype: string
+
+  - target_column: recoverability_type
+    source: {literal: "HOMEOWNER_RECOVERABLE"}
+    transform: literal
+    dtype: string
+
+  - target_column: servicing_expense_type
+    source: {literal: "ONBOARDING_EXPENSE"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

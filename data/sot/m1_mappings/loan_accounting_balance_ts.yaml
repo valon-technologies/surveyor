@@ -1,0 +1,394 @@
+table: loan_accounting_balance_ts
+version: 1
+primary_key: [loan_accounting_balance_id]
+
+sources:
+  - name: Transaction
+    alias: ts 
+    pipe_file: {table: "Transaction"}
+    dtypes:
+      EffectiveDate: "date"
+      DueDate: "date"
+      InterestPaidAmount: "float:2"
+      PrincipalAmount: "float:2"
+      TransactionRowNumber: "int"
+      FirstPrincipalBalance: "float:2"
+      NonRecoverableAdvBalance: "float:2"
+      ThirdPartyAdvBalance: "float:2"
+      RecoverableAdvBalance: "float:2"
+      EscrowBalance: "float:2"
+    filters:
+      - column: "TransactionType"
+        operator: "neq"
+        value: "Prior Servicer"
+    computed_columns:
+      - column: "effective_date"
+        expression: "pd.to_datetime(df.TransactionDate)"
+    lag_columns:
+      columns: ["FirstPrincipalBalance", "NonRecoverableAdvBalance", "ThirdPartyAdvBalance", "RecoverableAdvBalance"]
+      group_by: ["LoanNumber"] 
+      order_by: ["TransactionRowNumber"]  
+      fillna: 0.0
+      dtype: "float:2"
+      order_ascending: False 
+      suffix: "_lag1"
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDates 
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: ts}
+    right: {source: li}
+    "on": ["ts.LoanNumber == li.LoanNumber"]
+    how: left
+  - left: {source: ts}
+    right: {source: l}
+    "on": ["ts.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: ts}
+    right: {source: ed}
+    "on": ["ts.LoanNumber == ed.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: loan_accounting_balance_id
+    hash_columns: ["ts.LoanNumber", "ts.TransactionDate", "ts.TransactionRowNumber", "l.loan_id", "loan_accounting_balance"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: action_datetime
+    source: ts.TransactionDate  
+    transform: identity
+    dtype: datetime
+
+  - target_column: event_type
+    source: ts.TransactionCode
+    transform: identity
+    dtype: string
+
+  - target_column: event_subtype
+    source: ts.TransactionType
+    transform: identity
+    dtype: string
+
+  - target_column: modification_type
+    source: ts.TransactionDescription
+    transform: identity
+    dtype: string
+
+  - target_column: date_effective
+    source: ts.effective_date
+    transform: identity
+    dtype: date
+
+  - target_column: date_paid_through
+    expression: | 
+      (
+        lambda ts:
+          ts.assign(
+            date_paid_through=pd.NaT
+          )
+          .assign(
+            date_paid_through=lambda x: np.where(
+              # 1) qualifying payment → DueDate + 1 month
+              (x.TransactionType == "Payment")
+              & (x.InterestPaidAmount > 0)
+              & (x.PrincipalAmount > 0),
+              x.DueDate + pd.DateOffset(months=1),
+              x.date_paid_through
+            )
+          )
+          .assign(
+            date_paid_through=lambda x: np.where(
+              # 2) misapp rev → DueDate (only if not already set)
+              (x.TransactionDescription == "Misapp Rev")
+              & (x.InterestPaidAmount < 0)
+              & (x.PrincipalAmount < 0)
+              & pd.isna(x.date_paid_through),
+              x.DueDate,
+              x.date_paid_through
+            )
+          )
+          .groupby("LoanNumber", group_keys=False)
+          .apply(
+            lambda g:
+              g.assign(
+                date_paid_through=(
+                  lambda s:
+                    (
+                      s.ffill()
+                      .pipe(
+                        lambda t:
+                          t.fillna(
+                            t.dropna().iloc[0] - pd.DateOffset(months=1)
+                          )
+                          if t.notna().any()
+                          else t
+                      )
+                    )
+                )(g.date_paid_through)
+              )
+          )["date_paid_through"]
+          .apply(lambda x: x - pd.DateOffset(months=1) if pd.notna(x) else x)
+      )(ts)
+    transform: expression
+    dtype: date
+
+  - target_column: deferred_principal_balance
+    expression: |
+      (-1 * pd.to_numeric(ts.PrincipalAmount, errors="coerce") - (pd.to_numeric(ts.FirstPrincipalBalance, errors="coerce") - pd.to_numeric(ts.FirstPrincipalBalance_lag1, errors="coerce")).round(2)).groupby(ts.LoanNumber).cumsum().round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: deferred_principal_balance_delta
+    expression: |
+      -1 * pd.to_numeric(ts.PrincipalAmount, errors="coerce") - (pd.to_numeric(ts.FirstPrincipalBalance, errors="coerce") - pd.to_numeric(ts.FirstPrincipalBalance_lag1, errors="coerce")).round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: escrow_client_advance_balance
+    expression: |
+      (pd.Series(
+        np.where(
+          ts.TransactionDescription == "Escrow Advance",
+          pd.to_numeric(ts.TotalAmountPaid, errors="coerce"),
+          0.0
+        )
+      ) + pd.Series(
+            np.where(
+              (ts.TransactionDescription == "Escr Advance Repay"),
+              pd.to_numeric(ts.EscrowPaidAmount, errors="coerce"),
+              0.0
+            )
+          )
+        ).groupby(ts.LoanNumber).cumsum().round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: escrow_client_advance_balance_delta
+    expression: |
+      pd.Series(
+        np.where(
+          ts.TransactionDescription == "Escrow Advance",
+          pd.to_numeric(ts.TotalAmountPaid, errors="coerce"),
+          0.0
+        )
+      ) + pd.Series(
+            np.where(
+              (ts.TransactionDescription == "Escr Advance Repay"),
+              pd.to_numeric(ts.EscrowPaidAmount, errors="coerce"),
+              0.0
+            )
+          )
+    transform: expression
+    dtype: float
+
+  - target_column: escrow_holding_balance
+    source: ts.EscrowBalance
+    transform: identity
+    dtype: float
+
+  - target_column: escrow_holding_balance_delta
+    expression: |
+      np.where(
+        ts.TransactionDescription == "Escr Advance Repay",
+        0.0,
+        pd.to_numeric(ts.EscrowPaidAmount, errors="coerce") + pd.to_numeric(ts.InsurancePaidAmount, errors="coerce")
+      )
+    transform: expression
+    dtype: float
+
+  - target_column: escrow_interest_accrued_balance
+    expression: | 
+      pd.Series(np.where(
+        ts.TransactionCode == '160',
+          pd.to_numeric(ts.EscrowPaidAmount, errors="coerce").round(2),
+          0.0
+        )
+      ).groupby(ts.LoanNumber).cumsum().round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: escrow_interest_accrued_balance_delta
+    expression: |
+      np.where(
+        ts.TransactionCode == '160',
+        pd.to_numeric(ts.EscrowPaidAmount, errors="coerce").round(2),
+        0.0
+      )
+    transform: expression
+    dtype: float
+
+  - target_column: fee_late_balance
+    expression: (-1 * pd.to_numeric(ts.LateFeesPaidAmount, errors="coerce")).groupby(ts.LoanNumber).cumsum()
+    transform: expression
+    dtype: float
+
+  - target_column: fee_late_balance_delta
+    expression: -1 * pd.to_numeric(ts.LateFeesPaidAmount, errors="coerce")
+    transform: expression
+    dtype: float
+
+  - target_column: fee_nsf_balance
+    expression: |
+      pd.Series(np.where(
+        ts.TransactionDescription.astype(str).str.contains("Fee: RETURNED PAYMENT", na=False),
+        -1 *pd.to_numeric(ts.OtherPaidAmount, errors="coerce"),
+        0
+      )).groupby(ts.LoanNumber).cumsum().round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: fee_nsf_balance_delta
+    expression: |
+      np.where(
+        ts.TransactionDescription.astype(str).str.contains("Fee: RETURNED PAYMENT", na=False),
+        -1 * pd.to_numeric(ts.OtherPaidAmount, errors="coerce").round(2),
+        0
+      )
+    transform: expression
+    dtype: float
+
+  - target_column: fee_other_balance
+    expression: |
+      pd.Series(np.where(
+        ts.TransactionDescription.astype(str).str.contains("Fee: RETURNED PAYMENT", na=False),
+        0,
+        -1 * pd.to_numeric(ts.OtherPaidAmount, errors="coerce")
+      )).groupby(ts.LoanNumber).cumsum().round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: fee_other_balance_delta
+    expression: |
+      np.where(
+        ts.TransactionDescription.astype(str).str.contains("Fee: RETURNED PAYMENT", na=False),
+        0,
+        -1 * pd.to_numeric(ts.OtherPaidAmount, errors="coerce").round(2)
+      )
+    transform: expression
+    dtype: float
+
+  - target_column: gse_servicing_strip_fee_expense_balance_delta
+    source: {literal: 0.0}
+    transform: literal
+    dtype: float
+  
+  - target_column: interest_bearing_principal_balance
+    expression: pd.to_numeric(ts.FirstPrincipalBalance, errors="coerce").round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: interest_bearing_principal_balance_delta
+    expression: (pd.to_numeric(ts.FirstPrincipalBalance, errors="coerce") - pd.to_numeric(ts.FirstPrincipalBalance_lag1, errors="coerce")).round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: interest_holding_balance_delta
+    expression: pd.to_numeric(ts.InterestPaidAmount, errors="coerce").round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: interest_expense_paid
+    expression: pd.to_numeric(ts.InterestPaidAmount, errors="coerce").groupby(ts.LoanNumber).cumsum()
+    transform: expression
+    dtype: float
+
+  - target_column: interest_expense_paid_delta
+    expression: pd.to_numeric(ts.InterestPaidAmount, errors="coerce").round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: interest_rate_buydown_holding_balance
+    source: {literal: 0.0}
+    transform: literal
+    dtype: float
+
+  - target_column: loss_draft_holding_balance
+    source: {literal: 0.0}
+    transform: literal
+    dtype: float
+
+  - target_column: loss_draft_interest_accrued_balance
+    source: {literal: 0.0}
+    transform: literal
+    dtype: float
+
+  - target_column: loss_mitigation_modified_date_paid_through
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: non_recoverable_advance_balance
+    expression: pd.to_numeric(ts.NonRecoverableAdvBalance, errors="coerce").round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: non_recoverable_advance_balance_delta
+    expression: pd.to_numeric(ts.NonRecoverableAdvBalance, errors="coerce").round(2) - pd.to_numeric(ts.NonRecoverableAdvBalance_lag1, errors="coerce").round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: recoverable_servicing_advance_balance
+    expression: pd.to_numeric(ts.RecoverableAdvBalance, errors="coerce").round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: recoverable_servicing_advance_balance_delta
+    expression: pd.to_numeric(ts.RecoverableAdvBalance, errors="coerce").round(2) - pd.to_numeric(ts.RecoverableAdvBalance_lag1, errors="coerce").round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: suspense_holding_balance
+    expression: |
+      pd.to_numeric(ts.SuspenseAmount, errors="coerce").groupby(ts.LoanNumber).cumsum().round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: suspense_holding_balance_delta
+    expression: pd.to_numeric(ts.SuspenseAmount, errors="coerce").round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: third_party_advance_balance
+    expression: pd.to_numeric(ts.ThirdPartyAdvBalance, errors="coerce").round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: third_party_advance_balance_delta
+    expression: pd.to_numeric(ts.ThirdPartyAdvBalance, errors="coerce").round(2) - pd.to_numeric(ts.ThirdPartyAdvBalance_lag1, errors="coerce").round(2)
+    transform: expression
+    dtype: float
+
+  - target_column: unpaid_principal_balance
+    expression: |
+     -1 * (pd.to_numeric(ts.PrincipalAmount, errors="coerce").groupby(ts.LoanNumber).cumsum().round(2))
+    transform: expression
+    dtype: float
+
+  - target_column: unpaid_principal_balance_delta
+    expression: |
+      -1 * pd.to_numeric(ts.PrincipalAmount, errors="coerce")
+    transform: expression
+    dtype: float
+
+  - target_column: sequence_num
+    expression: row_number(df, partition_by=['loan_id'], order_by=['effective_date'])
+    transform: expression
+    dtype: int
+
+  - target_column: servicing_activity_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

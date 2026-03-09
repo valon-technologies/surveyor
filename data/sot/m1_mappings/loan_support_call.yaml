@@ -1,0 +1,118 @@
+table: loan_support_call
+version: 1
+primary_key: [loan_support_call_id]
+
+sources:
+  - name: CallLog
+    alias: cl
+    pipe_file: {table: "CallLog"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: user_call_staging
+    alias: uc
+    staging: {table: "user_call"}
+    filters:
+      - column: ["AgentName", "loan_id"]
+        operator: "dedup"
+        keep: "last"
+
+joins:
+  - left: {source: cl}
+    right: {source: l}
+    "on": ["cl.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: cl}
+    right: {source: uc}
+    "on": 
+      - "cl.AgentName == uc.AgentName"
+      - "l.loan_id == uc.loan_id"
+    how: left
+
+columns:
+  - target_column: loan_support_call_id
+    hash_columns: ["cl.CallId", "loan_support_call"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: call_summary
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: call_direction
+    expression: |
+      np.select(
+        condlist=[
+          cl.BaseCallType.eq("Inbound"),
+          cl.BaseCallType.isin(["Manual", "Outbound", "Preview"])
+        ],
+        choicelist=[
+          "INBOUND",
+          "OUTBOUND"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: call_started_at
+    expression: pd.to_datetime(cl.TimeStamp, format='%m/%d/%Y %I:%M:%S %p').dt.strftime('%Y-%m-%d %H:%M:%S')
+    transform: expression
+    dtype: string
+
+  - target_column: call_disposition
+    source: cl.Disposition
+    transform: identity
+    dtype: string
+
+  - target_column: is_abandoned
+    expression: |
+      np.where(
+        cl.IsAbandoned == "True",
+        True,
+        False
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: queue_time_in_seconds
+    source: cl.SpeedOfAnswer
+    transform: identity
+    dtype: int
+
+  - target_column: skill_name
+    source: cl.SkillDepartment
+    transform: identity
+    dtype: string
+
+  - target_column: talk_time_in_seconds
+    expression: |
+      pd.to_timedelta(np.where(cl.TalkTime.str.count(':')==1, '00:' + cl.TalkTime.astype(str), cl.TalkTime.astype(str))).total_seconds().fillna(0).astype('int')
+    transform: expression
+    dtype: int
+
+  - target_column: agent_user_id
+    source: uc.user_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: btl.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: IsRPC
+    source: cl.IsRPC
+    transform: identity
+    dtype: string
+
+  - target_column: CallId
+    source: cl.CallId
+    transform: identity
+    dtype: string

@@ -1,0 +1,105 @@
+table: property_insurance_period_2
+version: 1
+primary_key: [property_insurance_period_id]
+
+sources:
+  - name: property_insurance_period
+    alias: pip
+    staging: {table: "property_insurance_period_1"}
+    dtypes:
+      policy_cancelled_date: "date"
+      policy_start_date: "date"
+    filters:
+      - operator: "expression"
+        expression: "~(df['policy_cancelled_date'] < df['policy_start_date'])"
+  
+columns:
+  - target_column: property_insurance_period_id
+    source: pip.property_insurance_period_id
+    transform: identity
+    dtype: string
+
+  - target_column: amount_coverage
+    source: pip.amount_coverage
+    transform: identity
+    dtype: float
+
+  - target_column: amount_deductible
+    source: pip.amount_deductible
+    transform: identity
+    dtype: float
+
+  - target_column: amount_premium
+    source: pip.amount_premium
+    transform: identity
+    dtype: float
+
+  - target_column: archived_at
+    source: pip.archived_at
+    transform: identity
+    dtype: datetime
+
+  - target_column: is_force_placed
+    source: pip.is_force_placed
+    transform: identity
+    dtype: boolean
+
+  - target_column: policy_cancelled_date
+    source: pip.policy_cancelled_date
+    transform: identity
+    dtype: date
+
+  - target_column: policy_end_date
+    source: pip.policy_end_date
+    transform: identity
+    dtype: date
+
+  - target_column: policy_number
+    source: pip.policy_number
+    transform: identity
+    dtype: string
+
+  - target_column: policy_start_date
+    source: pip.policy_start_date
+    transform: identity
+    dtype: date
+
+  - target_column: property_insurance_company_id
+    source: pip.property_insurance_company_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: pip.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: RecordStartDate
+    source: pip.RecordStartDate
+    transform: identity
+    dtype: string
+
+  - target_column: RecordEndDate
+    source: pip.RecordEndDate
+    transform: identity
+    dtype: string
+
+  - target_column: HazardTypeOfPaymentCode
+    source: pip.HazardTypeOfPaymentCode
+    transform: identity
+    dtype: string
+
+  - target_column: HazardCoverageType
+    source: pip.HazardCoverageType
+    transform: identity
+    dtype: string
+
+  - target_column: HazardDisbursementType
+    source: pip.HazardDisbursementType
+    transform: identity
+    dtype: string
+
+  - target_column: HazardSequenceNumber
+    source: pip.HazardSequenceNumber
+    transform: identity
+    dtype: string

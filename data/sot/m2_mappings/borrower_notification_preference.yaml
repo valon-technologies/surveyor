@@ -1,0 +1,159 @@
+table: borrower_notification_preference
+version: 1
+primary_key: [borrower_notification_preference_id]
+
+sources:
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: Econsent
+    alias: ec
+    pipe_file: {table: "Econsent"}
+    dtypes:
+      EconsentDate: "date"
+    filters:
+      - column: ["LoanNumber", "EconsentType", "EconsentDate", "EconsentCode"]
+        operator: "dedup"
+        keep: "first"
+    pivot: 
+      pivot_index: ["LoanNumber", "EconsentDate"]
+      pivot_columns: ["EconsentType"]
+      pivot_values: ["EconsentCode"]
+  - name: borrower_to_loan_staging
+    alias: btl
+    staging: {table: "borrower_to_loan"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: btl}
+    right: {source: l}
+    "on": ["btl.loan_id == l.loan_id"]
+    how: left
+  - left: {source: btl}
+    right: {source: fi}
+    "on": ["l.loan_number == fi.LoanNumber"]
+    how: left
+  - left: {source: btl}
+    right: {source: ec}
+    "on": ["fi.LoanNumber == ec.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: borrower_notification_preference_id
+    hash_columns: ["btl.borrower_id", "btl.loan_id", "fi.LoanNumber", "ec.EconsentDate", "BORROWER_NOTIFICATION_PREFERENCE"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: btl.borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: creation_reason
+    expression: |
+      np.select(
+        condlist=[
+          (btl.is_primary == "True") & fi.MortgagorEmailConsentRevokedIndicator.isin(["1", "2", "3", "4", "5", "6", "7", "8", "B", "C", "N"]),
+          (btl.is_primary == "False") & fi.CoMortgagorEmailConsentRevokedIndicator.isin(["1", "2", "3", "4", "5", "6", "7", "8", "B", "C", "N"])
+        ], 
+        choicelist=[
+          fi.MortgagorEmailConsentRevokedSourceIndicator.map({
+            "1": "ORIGINATION",
+            "2": "SKIP TRACE",
+            "3": "CUSTOMER CALL",
+            "4": "ACQUISITION",
+            "5": "INTERNET (CCN)",
+            "6": "BANK/BRANCH"
+          }),
+          fi.CoMortgagorEmailConsentRevokedSourceIndicator.map({
+            "1": "ORIGINATION",
+            "2": "SKIP TRACE",
+            "3": "CUSTOMER CALL",
+            "4": "ACQUISITION",
+            "5": "INTERNET (CCN)",
+            "6": "BANK/BRANCH"
+          })
+        ],
+      default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: email
+    expression: |
+      (
+        fi.MortgagorEmailConsentRevokedIndicator.where(
+          btl.is_primary == "True",
+          fi.CoMortgagorEmailConsentRevokedIndicator).map({     
+          "7": True,  # EMAIL CONSENT
+          "8": False, # EMAIL REVOKED
+          "C": False  # CEASE & DESIST
+          }).astype("boolean")
+          | (ec.EconsentCode_BL.eq("E") | ec.EconsentCode_BL.isna())
+          | (ec.EconsentCode_EA.eq("E") | ec.EconsentCode_EA.isna())
+          | (ec.EconsentCode_RC.eq("E") | ec.EconsentCode_RC.isna())
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: mail
+    expression: |
+      np.where(
+          ((ec.EconsentCode_BL.eq("E")) & (ec.EconsentCode_EA.eq("E")) & (ec.EconsentCode_RC.eq("E"))),
+          False,
+          True
+        )
+    transform: expression
+    dtype: boolean
+
+  - target_column: phone_call
+    expression: |
+      (
+        fi.MortgagorEmailConsentRevokedIndicator.where(
+          btl.is_primary == "True",
+          fi.CoMortgagorEmailConsentRevokedIndicator).map({
+          "1": True,  # CELL PHONE CONSENT
+          "3": True,  # CELL PHONE AND TEXT CONSENT
+          "4": False, # REVOKED CELL PHONE
+          "6": False, # REVOKED CELL PHONE AND TEXT
+          "B": True,  # REVOKE WORK PH
+          "C": False, # CEASE & DESIST
+          "N": True   # NO CALL AT WORK
+          }).astype("boolean")  
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: sms
+    expression: |
+      (
+      fi.MortgagorEmailConsentRevokedIndicator.where(
+        btl.is_primary == "True",
+        fi.CoMortgagorEmailConsentRevokedIndicator).map({
+          "2": True,  # TEXT CONSENT
+          "3": True,  # CELL PHONE AND TEXT CONSENT
+          "5": False, # REVOKED TEXT
+          "6": False, # REVOKED CELL PHONE AND TEXT
+          "C": False  # CEASE & DESIST
+        }).astype("boolean")
+      )
+    transform: expression
+    dtype: boolean
+
+  - target_column: creator_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: loan_id
+    source: btl.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "borrower_notification_preference"
+  entity_id_col: "borrower_notification_preference_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

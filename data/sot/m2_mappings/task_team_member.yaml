@@ -1,0 +1,51 @@
+table: task_team_member
+version: 1
+primary_key: [task_team_member_id]
+
+sources:
+  - name: task_team_member_contact_staging
+    alias: tmc
+    staging: {table: "task_team_member_contact"}
+  - name: task_team_member_responsible_staging
+    alias: tmr
+    staging: {table: "task_team_member_responsible"}
+
+concat:
+  sources: [tmc, tmr]
+  
+columns:
+  - target_column: task_team_member_id
+    source: task_team_member_id
+    transform: identity
+    dtype: string
+
+  - target_column: member_status
+    source: member_status
+    transform: identity
+    dtype: string
+
+  - target_column: member_type
+    source: member_type
+    transform: identity
+    dtype: string
+
+  - target_column: task_team_id
+    source: task_team_id
+    transform: identity
+    dtype: string
+
+  - target_column: user_id
+    source: user_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "task_team_member"
+  entity_id_col: "task_team_member_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

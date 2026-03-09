@@ -1,0 +1,63 @@
+table: borrower_to_loan_assumption
+version: 1
+primary_key: [borrower_to_loan_assumption_id]
+
+sources:
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: borrower_to_loan_staging
+    alias: btl  
+    staging: {table: "borrower_to_loan"}
+  - name: loan_assumption_staging
+    alias: la
+    staging: {table: "loan_assumption"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins: 
+  - left: {source: btl}
+    right: {source: la}
+    "on": ["btl.loan_id == la.loan_id"]
+    how: inner
+  - left: {source: btl}
+    right: {source: l}
+    "on": ["btl.loan_id == l.loan_id"]
+    how: left
+  - left: {source: btl}
+    right: {source: ed}
+    "on": ["l.loan_number == ed.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: borrower_to_loan_assumption_id
+    hash_columns: ["btl.borrower_id", "btl.loan_id", "ed.LoanNumber", "la.loan_assumption_id", "BORROWER_TO_LOAN_ASSUMPTION"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: btl.borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: role
+    source: {literal: "ASSUMING_BORROWER"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_assumption_id
+    source: la.loan_assumption_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: btl.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "borrower_to_loan_assumption"
+  entity_id_col: "borrower_to_loan_assumption_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false  

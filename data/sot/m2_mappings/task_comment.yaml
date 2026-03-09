@@ -1,0 +1,111 @@
+table: task_comment
+version: 1
+primary_key: [task_comment_id]
+
+sources:
+  - name: Notes
+    alias: n
+    pipe_file: {table: "Notes"}
+    read_options:
+      lineterminator: "\n"
+    filters:
+      - column: "TaskId"
+        operator: "is_not_null"
+    dtypes:
+      TaskStartDate: "datetime"
+  - name: TaskTracking
+    alias: tt
+    pipe_file: {table: "TaskTracking"}
+    dtypes:
+      TaskExpectedCloseDate: "datetime"
+      TaskStartDate: "datetime"
+    filters:
+      - column: "TaskStatusFlag"
+        operator: "neq"
+        value: "D"
+  - name: TaskId
+    alias: ti
+    pipe_file: {table: "TaskId"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: task_staging
+    alias: t
+    staging: {table: "task"}
+    dtypes:
+      due_at: "datetime"
+  - name: user_note_staging
+    alias: un
+    staging: {table: "user_note"}
+    filters:
+      - column: ["loan_id", "CommentUserName"]
+        operator: "dedup"
+
+joins:
+  - left: {source: tt}
+    right: {source: n}
+    "on": 
+      - "tt.LoanNumber == n.LoanNumber"
+      - "tt.TaskId == n.TaskId"
+      - "tt.TaskStartDate == n.TaskStartDate"
+    how: left
+  - left: {source: tt}
+    right: {source: ti}
+    "on": ["tt.TaskId == ti.TaskId"]
+    how: left
+  - left: {source: tt}
+    right: {source: l}
+    "on": ["tt.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: tt}
+    right: {source: t}
+    "on": 
+      - "l.loan_id == t.loan_id"
+      - "ti.TaskIdDescription == t.name"
+      - "tt.TaskExpectedCloseDate == t.due_at"
+    how: inner
+  - left: {source: tt}
+    right: {source: un}
+    "on": 
+      - "l.loan_id == un.loan_id"
+      - "n.CommentUserName == un.CommentUserName"
+    how: left
+
+columns:
+  - target_column: task_comment_id
+    hash_columns: ["tt.LoanNumber", "tt.TaskId", "tt.TaskStartDate", "n.CommentDateTime", "task_comment"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: commented_at
+    expression: |
+      pd.to_datetime(n.CommentDateTime, format='mixed').dt.tz_localize('America/New_York', ambiguous=True, nonexistent='shift_forward').dt.tz_convert('UTC').dt.tz_localize(None)
+    transform: expression
+    dtype: string
+
+  - target_column: content
+    expression: n.CommentText.str.replace('\r', '', regex=False).str.replace('\n', ' ', regex=False).str.slice(0, 256)
+    transform: expression
+    dtype: string
+
+  - target_column: created_by_user_id
+    source: un.user_id
+    transform: identity
+    dtype: string
+
+  - target_column: task_id
+    source: t.task_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: t.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "task_comment"
+  entity_id_col: "task_comment_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+

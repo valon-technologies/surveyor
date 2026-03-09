@@ -1,0 +1,207 @@
+table: loan_at_origination_info
+version: 1
+primary_key: [loan_at_origination_info_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: Arm
+    alias: arm
+    pipe_file: {table: "Arm"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: property_valuation_staging
+    alias: pv
+    staging: {table: "property_valuation"}
+    filters:
+      - column: "valuation_purpose"
+        operator: "eq"
+        value: "LOAN_ORIGINATION"
+
+joins:
+  - left: {source: li}
+    right: {source: ed}
+    "on": ["li.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: arm}
+    "on": ["li.LoanNumber == arm.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: fi}
+    "on": ["li.LoanNumber == fi.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: li}
+    right: {source: pv}
+    "on": ["l.loan_id == pv.loan_id"]
+    how: left
+
+columns:
+  - target_column: loan_at_origination_info_id
+    hash_columns: ["li.LoanNumber", "l.loan_id", "loan_at_origination_info"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: application_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: first_payment_date
+    source: ed.FirstDueDate
+    transform: identity
+    dtype: date
+
+  - target_column: gnma_refinance_type
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: lender_origination_name
+    source: li.OriginatingLenderNumber
+    transform: identity
+    dtype: string
+
+  - target_column: lender_origination_nmls_id
+    source: li.OriginatingLenderLicNumber
+    transform: identity
+    dtype: string
+
+  - target_column: original_debt_service_ratio
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: original_debt_to_income_ratio
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: original_gross_monthly_income
+    source: []
+    transform: null
+    transform: identity
+    dtype: float
+
+  - target_column: original_interest_rate
+    expression: | 
+      np.select(
+        condlist=[
+          ((li.OriginalInterestRate.notna()) & (pd.to_numeric(li.OriginalInterestRate, errors='coerce') != 0)),
+          ((li.ArmOriginalInterestRate.notna()) & (pd.to_numeric(li.ArmOriginalInterestRate, errors='coerce') != 0))
+        ],
+        choicelist=[
+          pd.to_numeric(li.OriginalInterestRate, errors='coerce')*100.0,
+          pd.to_numeric(li.ArmOriginalInterestRate, errors='coerce')*100.0
+        ],
+        default=pd.to_numeric(li.AnnualInterestRate, errors='coerce')*100.0
+      )
+    transform: expression
+    dtype: float
+
+  - target_column: original_loan_amount
+    source: li.OriginalMortgageAmount
+    transform: identity
+    dtype: float
+
+  - target_column: original_ltv
+    source: li.OriginalLoanToOriginalValue
+    transform: identity
+    dtype: float
+
+  - target_column: original_maturity_date
+    source: ed.LoanMaturesDate
+    transform: identity
+    dtype: date
+
+  - target_column: original_occupancy_type
+    expression: | 
+      np.select(
+        condlist=[
+          fi.OriginalOccupancyStatusCode == '1',
+          fi.OriginalOccupancyStatusCode == '2',
+          fi.OriginalOccupancyStatusCode == '3'
+        ],
+        choicelist=[
+          'PRIMARY_RESIDENCE',
+          'SECOND_HOME',
+          'INVESTMENT'
+        ],
+        default='UNKNOWN'
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: original_payment_amount
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: original_pi
+    expression: |
+      np.select(
+        condlist=[
+          ((pd.to_numeric(li.OriginalPAndIAmount, errors='coerce') != 0) & (li.OriginalPAndIAmount.notna())),
+          ((pd.to_numeric(li.OriginalPAndIAmountExpanded, errors='coerce') != 0) & (li.OriginalPAndIAmountExpanded.notna())),
+        ],
+        choicelist=[
+          li.OriginalPAndIAmount,
+          li.OriginalPAndIAmountExpanded
+        ],
+        default=li.FirstPAndIAmount
+      )
+    transform: expression
+    dtype: float
+
+  - target_column: original_product_type
+    source: {literal: "FRM"}
+    transform: literal
+    dtype: string
+
+  - target_column: original_term
+    source: li.LoanTerm
+    transform: identity
+    dtype: int
+
+  - target_column: origination_date
+    source: ed.LoanClosingDate
+    transform: identity
+    dtype: date
+
+  - target_column: origination_debenture_rate
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: origination_total_debt_expense_ratio
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: property_valuation_id
+    source: pv.property_valuation_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_at_origination_info"
+  entity_id_col: "loan_at_origination_info_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true

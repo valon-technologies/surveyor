@@ -1,0 +1,89 @@
+table: borrower_phone_number_secondary
+version: 1
+primary_key: [borrower_phone_number_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+    filters:
+      - column: "SecondaryPhoneCode"
+        operator: "is_not_null"
+      - column: "SecondaryPhoneNumber"
+        operator: "is_not_null"
+  - name: borrower_to_loan_staging
+    alias: btl
+    staging: {table: "borrower_to_loan"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: btl}
+    right: {source: l}
+    "on": ["btl.loan_id == l.loan_id"]
+    how: left
+  - left: {source: btl}
+    right: {source: li}
+    "on": ["l.loan_number == li.LoanNumber"]
+    how: inner
+
+columns:
+  - target_column: borrower_phone_number_id
+    hash_columns: ["btl.borrower_id", "btl.loan_id", "li.LoanNumber", "BORROWER_PHONE_NUMBER_SECONDARY"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: btl.borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: confirmed_at
+    source: []
+    transform: null
+    dtype: datetime
+
+  - target_column: is_primary
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: phone_number
+    expression: |
+      np.where(
+        ((btl.is_primary == "True") & li.SecondaryPhoneCode.astype(str).str.strip().str.upper().str.startswith("B"))
+        |
+        ((btl.is_primary == "False") & li.SecondaryPhoneCode.astype(str).str.strip().str.upper().str.startswith("C")),
+        li.SecondaryPhoneNumber,
+        np.nan
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: phone_number_type
+    expression: |
+      np.where(
+        ((btl.is_primary == "True") & li.SecondaryPhoneCode.astype(str).str.strip().str.upper().str.startswith("B", na=False))
+        |
+        ((btl.is_primary == "False") & li.SecondaryPhoneCode.astype(str).str.strip().str.upper().str.startswith("C", na=False)),
+        li.SecondaryPhoneCode.astype(str).str.strip().str.upper().str.get(1).map({"C": "CELL", "H": "HOME", "W": "WORK"}),
+        np.nan
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: retrieval_source
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: verification_status
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: loan_id
+    source: btl.loan_id
+    transform: identity
+    dtype: string

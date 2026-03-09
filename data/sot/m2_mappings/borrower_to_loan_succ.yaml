@@ -1,0 +1,38 @@
+table: borrower_to_loan_succ
+version: 1
+primary_key: [borrower_to_loan_id]
+
+sources:
+  - name: borrower_succ
+    alias: bs
+    staging: {table: "borrower_succ"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  
+columns:
+  - target_column: borrower_to_loan_id
+    hash_columns: ["bs.loan_id", "bs.borrower_id", "BORROWER_TO_LOAN_SUCC"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: borrower_id
+    source: bs.borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: is_primary
+    source: {literal: "False"}
+    transform: literal
+    dtype: boolean
+
+  - target_column: loan_user_type
+    source: {literal: "SUCCESSOR_IN_INTEREST"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: bs.loan_id
+    transform: identity
+    dtype: string
+

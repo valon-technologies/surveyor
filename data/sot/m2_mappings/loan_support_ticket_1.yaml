@@ -1,0 +1,117 @@
+table: loan_support_ticket_1
+version: 1
+primary_key: [loan_support_ticket_id]
+
+sources:
+  - name: Notes
+    alias: n
+    pipe_file: {table: "Notes"}
+    read_options:
+      lineterminator: "\n"
+    filters:
+      - column: "TaskId"
+        operator: "is_null"
+      - column: "all"
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: user_staging
+    alias: u
+    staging: {table: "user_note"}
+    filters:
+      - column: ["CommentUserName", "loan_id"]
+        operator: "dedup"
+        keep: "last"
+
+joins:
+  - left: {source: n}
+    right: {source: l}
+    "on": ["n.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: n}
+    right: {source: u}
+    "on": 
+      - "n.CommentUserName == u.CommentUserName"
+      - "l.loan_id == u.loan_id"
+    how: left
+
+columns:
+  - target_column: loan_support_ticket_id
+    hash_columns: ["LoanNumber", "CommentDateTime", "CommentDate", "CommentTime", "CommentUserId", "CommentUserName", "CommentWorkstation", "CommentWorkstationDescription", "TaskId", "TaskIdDescription", "TaskStartDate", "TaskActualCloseDate", "CommentCode", "CommentCodeDescription", "CollectionsContactCode", "CollectionsContactCodeDescription", "CollectionsReasonCode", "CollectionsReasonCodeDescription", "CollectionsResponseCode", "CollectionsResponseCodeDescription", "CommentText", "loan_support_ticket"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: group_name
+    source: n.CommentWorkstationDescription
+    transform: identity
+    dtype: string
+
+  - target_column: process
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: ticket_status
+    source: {literal: "CLOSED"}
+    transform: literal
+    dtype: string
+
+  - target_column: subject
+    source: n.CommentCodeDescription
+    transform: identity
+    dtype: string
+
+  - target_column: subprocess
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: ticket_source
+    expression: |
+      np.select(
+        condlist=[
+          n.CommentText.str.contains(r'\b(phone|call|verbal)\b', case=False, na=False),
+          (n.CommentText.str.contains(r'\bemail\b', case=False, na=False)) | (n.CommentCodeDescription.str.contains(r'\bemail\b', case=False, na=False)),
+          n.CommentText.str.contains(r'\b(mail|letter)\b', case=False, na=False),
+        ],
+        choicelist=[
+          'CALL',
+          'EMAIL',
+          'OTHER'
+        ],
+        default='OTHER'
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: agent_user_id
+    source: u.user_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: comment
+    expression: |
+      pd.Series(np.where(
+        n.CommentText.notnull(),
+        n[["CommentWorkstationDescription", "CommentText"]].fillna("").agg(" ".join, axis=1).str.strip(),
+        n[["CommentWorkstationDescription", "CommentCodeDescription", "CollectionsContactCodeDescription", "CollectionsReasonCodeDescription", "CollectionsResponseCodeDescription"]].fillna("").agg(" ".join, axis=1).str.strip()
+      )).str.replace('\r', '', regex=False).str.replace('\n', ' ', regex=False)
+    transform: expression
+    dtype: string
+  
+  - target_column: CommentUserName
+    source: n.CommentUserName
+    transform: identity
+    dtype: string
+  
+  - target_column: CommentDateTime
+    source: n.CommentDateTime
+    transform: identity
+    dtype: string

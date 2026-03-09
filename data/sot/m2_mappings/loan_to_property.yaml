@@ -1,0 +1,56 @@
+table: loan_to_property
+version: 1
+primary_key: [loan_to_property_id]
+
+sources:
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: property_staging
+    alias: p
+    staging: {table: "property"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+
+joins:
+  - left: {source: l}
+    right: {source: p}
+    "on": ["l.loan_id == p.loan_id"]
+    how: left
+  - left: {source: l}
+    right: {source: fi}
+    "on": ["l.loan_number == fi.LoanNumber"]
+    how: left
+
+columns:
+  - target_column: loan_to_property_id
+    hash_columns: ["l.loan_id", "p.property_id", "loan_to_property"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: lien_position
+    expression: |
+      fi.HiType.map({
+        "1": "FIRST_LIEN",
+        "2": "SECOND_LIEN"
+      })
+    transform: expression
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+  - target_column: property_id
+    source: p.property_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_to_property"
+  entity_id_col: "loan_to_property_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

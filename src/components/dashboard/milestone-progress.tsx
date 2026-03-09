@@ -21,6 +21,10 @@ const STATUS_ORDER: MappingStatus[] = [
   "unmapped",
 ];
 
+/** Completed milestones with verified SOT mappings — display as a single "Mapped" bar */
+const SOT_MILESTONES = new Set(["M1", "M2"]);
+const SOT_COLOR = "#14b8a6"; // teal-500
+
 export function MilestoneProgress({ stats }: { stats: MilestoneStats[] }) {
   const hasAny = stats.some((s) => s.totalFields > 0);
   if (!hasAny) return null;
@@ -59,40 +63,63 @@ export function MilestoneProgress({ stats }: { stats: MilestoneStats[] }) {
                   {s.totalFields} fields
                 </span>
               </div>
-              <div className="flex h-2 rounded-full overflow-hidden bg-muted">
-                {STATUS_ORDER.map((status) => {
-                  const count = s.statusBreakdown[status] || 0;
-                  if (count === 0) return null;
-                  const pct = (count / s.totalFields) * 100;
-                  return (
+              {SOT_MILESTONES.has(s.milestone) ? (
+                <>
+                  <div className="flex h-2 rounded-full overflow-hidden bg-muted">
                     <div
-                      key={status}
                       className="h-full transition-all"
-                      style={{
-                        width: `${pct}%`,
-                        backgroundColor:
-                          MAPPING_STATUS_COLORS[status] || "#6b7280",
-                      }}
-                      title={`${MAPPING_STATUS_LABELS[status] || status}: ${count}`}
+                      style={{ width: "100%", backgroundColor: SOT_COLOR }}
+                      title={`Mapped (SOT): ${s.totalFields}`}
                     />
-                  );
-                })}
-              </div>
-              <div className="flex gap-3 text-[10px] text-muted-foreground mt-0.5">
-                {STATUS_ORDER.map((status) => {
-                  const count = s.statusBreakdown[status] || 0;
-                  if (count === 0) return null;
-                  return (
-                    <span key={status} className="flex items-center gap-1">
+                  </div>
+                  <div className="flex gap-3 text-[10px] text-muted-foreground mt-0.5">
+                    <span className="flex items-center gap-1">
                       <span
                         className="inline-block w-1.5 h-1.5 rounded-full"
-                        style={{ backgroundColor: MAPPING_STATUS_COLORS[status] || "#6b7280" }}
+                        style={{ backgroundColor: SOT_COLOR }}
                       />
-                      {count} {MAPPING_STATUS_LABELS[status] || status}
+                      {s.totalFields} Mapped (SOT)
                     </span>
-                  );
-                })}
-              </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+                    {STATUS_ORDER.map((status) => {
+                      const count = s.statusBreakdown[status] || 0;
+                      if (count === 0) return null;
+                      const pct = (count / s.totalFields) * 100;
+                      return (
+                        <div
+                          key={status}
+                          className="h-full transition-all"
+                          style={{
+                            width: `${pct}%`,
+                            backgroundColor:
+                              MAPPING_STATUS_COLORS[status] || "#6b7280",
+                          }}
+                          title={`${MAPPING_STATUS_LABELS[status] || status}: ${count}`}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-3 text-[10px] text-muted-foreground mt-0.5">
+                    {STATUS_ORDER.map((status) => {
+                      const count = s.statusBreakdown[status] || 0;
+                      if (count === 0) return null;
+                      return (
+                        <span key={status} className="flex items-center gap-1">
+                          <span
+                            className="inline-block w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: MAPPING_STATUS_COLORS[status] || "#6b7280" }}
+                          />
+                          {count} {MAPPING_STATUS_LABELS[status] || status}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           );
         })}

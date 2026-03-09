@@ -1,0 +1,93 @@
+table: property_valuation_origination
+version: 1
+primary_key: [property_valuation_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: EventDates
+    alias: ed
+    pipe_file: {table: "EventDates"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+
+joins:
+  - left: {source: li}
+    right: {source: ed}
+    "on": ["li.LoanNumber == ed.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+
+columns:
+  - target_column: property_valuation_id
+    hash_columns: ["li.LoanNumber", "l.loan_id", "ed.OriginalAppraisalDate", "property_valuation"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: completed_date
+    expression:  ed.OriginalAppraisalDate.fillna(ed.LoanClosingDate)
+    transform: expression
+    dtype: date
+
+  - target_column: effective_date
+    expression: ed.OriginalAppraisalDate.fillna(ed.LoanClosingDate)
+    transform: expression
+    dtype: date
+
+  - target_column: ordered_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: property_value
+    source: li.OriginalPropertyValueAmount
+    transform: identity
+    dtype: float
+
+  - target_column: substantial_improvements_amount
+    source: []
+    transform: null
+    dtype: float
+
+  - target_column: substantial_improvements_completion_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: valuation_method
+    expression: |
+      np.select(
+        condlist=[
+          li.OriginalAppraisalTypeCode.eq("APR"),
+          li.OriginalAppraisalTypeCode.eq("AVM"),
+          li.OriginalAppraisalTypeCode.eq("BPO")
+        ],
+        choicelist=[
+          "APPRAISAL",
+          "AVM",
+          "BPO",
+        ],
+        default="APPRAISAL"
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: valuation_purpose
+    source: {literal: "LOAN_ORIGINATION"}
+    transform: literal
+    dtype: string
+
+  - target_column: valuation_status
+    source: {literal: "COMPLETED"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string

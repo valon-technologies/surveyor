@@ -1,0 +1,105 @@
+table: foreclosure_sale
+version: 1
+primary_key: [foreclosure_sale_id]
+
+sources: 
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "FcStatusCode"
+        operator: "is_not_null"
+      - column: "FcSaleDate"
+        operator: "is_not_null"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: foreclosure_staging
+    alias: fs
+    staging: {table: "foreclosure"}
+  - name: Step 
+    alias: s
+    pipe_file: {table: "Step"}
+    dtypes:
+      ActualCompletionDate: "datetime"
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "BANK"
+      - column: "StepCode"
+        operator: "in"
+        value: ["F06", "429"]
+      - column: "ActualCompletionDate"
+        operator: "is_not_null"
+    sorting:
+      - column: "LoanNumber"
+        ascending: true
+      - column: "ActualCompletionDate"
+        ascending: false
+    computed_columns:
+      - column: "_is_F06_429"
+        expression: "StepCode.isin(['F06', '429'])"
+      - column: "_rank_F06_429"
+        expression: "np.where(_is_F06_429, df.groupby('LoanNumber')['_is_F06_429'].cumsum(), 0)"
+    post_groupby_filters:
+      - column: "_rank_F06_429"
+        operator: "expression"
+        expression: "(~_is_F06_429) | (_rank_F06_429 == 1)"
+
+joins:
+  - left: {source: dw}
+    right: {source: l}
+    "on": ["dw.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: dw}
+    right: {source: fs}
+    "on": ["l.loan_id == fs.loan_id"]
+    how: left
+
+columns: 
+  - target_column: foreclosure_sale_id
+    hash_columns: ["fs.foreclosure_id", "l.loan_id", "foreclosure_sale"]
+    transform: hash_id
+    dtype: string
+  
+  - target_column: foreclosure_id
+    source: fs.foreclosure_id
+    transform: identity
+    dtype: string
+  
+  - target_column: sale_amount
+    source: dw.FcSaleAmount
+    transform: identity
+    dtype: float
+
+  - target_column: sale_cancelled_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: sale_fund_expected_date
+    source: []
+    transform: null
+    dtype: date
+
+  - target_column: sale_fund_received_date
+    source: dw.FcFullSeTotalementDate
+    transform: identity
+    dtype: date
+
+  - target_column: sale_held_date
+    source: s.ActualCompletionDate
+    transform: identity
+    dtype: date
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "foreclosure_sale"
+  entity_id_col: "foreclosure_sale_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false
+

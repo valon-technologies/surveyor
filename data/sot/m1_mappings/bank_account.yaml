@@ -1,0 +1,105 @@
+table: bank_account
+version: 1
+primary_key: [bank_account_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: borrower_staging
+    alias: b
+    staging: {table: "borrower"}
+  - name: p1ld
+    alias: p1ld
+    pipe_file: {table: "P1LD"}
+
+joins:
+  - left: {source: li}
+    right: {source: fi}
+    "on": ["li.LoanNumber == fi.LoanNumber"]
+    how: left
+  - left: {source: li}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: li}
+    right: {source: p1ld}
+    "on": ["li.LoanNumber == p1ld.LoanNumber"]
+    how: inner
+
+columns:
+  - target_column: bank_account_id
+    hash_columns: ["l.loan_id", "li.LoanNumber", "li.DraftAccountNumber", "li.DraftRoutingTransitNumber", "BANK_ACCOUNT"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: account_holder_legal_name
+    source: p1ld.AccountName
+    transform: identity
+    dtype: string
+
+  - target_column: account_number
+    source: p1ld.AccountNumber
+    transform: identity
+    dtype: string
+
+  - target_column: account_type
+    expression: |
+      p1ld.AccountType.map({
+        "C": "CHECKING",
+        "S": "SAVINGS"
+      }).fillna('OTHER')
+    transform: expression
+    dtype: string
+
+  - target_column: account_usage_type
+    source: {"literal": "HOMEOWNER"}
+    transform: literal
+    dtype: string
+    
+  - target_column: bank_name
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: display_name
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: owner_id
+    source: []
+    transform: null
+    dtype: string
+
+  - target_column: owner_type
+    source: {literal: "BORROWER"}
+    transform: literal
+    dtype: string
+
+  - target_column: routing_number
+    expression: p1ld.RoutingTransitNumber.str.replace("-", "", regex=False)
+    transform: expression
+    dtype: string
+
+  - target_column: routing_number_type
+    source: {literal: "ABA"}
+    transform: literal
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "bank_account"
+  entity_id_col: "bank_account_id"
+  loan_id_col: "loan_id"  
+  loan_id_col_required: false

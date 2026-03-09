@@ -1,0 +1,127 @@
+table: portfolio
+version: 1
+primary_key: [portfolio_id]
+
+sources:
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: Investor
+    alias: iv
+    pipe_file: {table: "Investor"}
+    filters:
+      - column: "InvestorId"
+        operator: "dedup"
+        keep: "last"
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: servicing_client_staging
+    alias: sc
+    staging: {table: "servicing_client"}
+
+joins:
+  - left: {source: iv}
+    right: {source: li}
+    "on": 
+      - "iv.InvestorId == li.InvestorId"
+    how: left
+  - left: {source: iv}
+    right: {source: l}
+    "on": ["li.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: iv}
+    right: {source: sc}
+    "on": ["l.loan_id == sc.loan_id"]
+    how: left
+
+columns:
+  - target_column: portfolio_id
+    expression: 
+      np.select(
+        condlist=[
+          iv.InvestorId.eq("HN1"),
+          iv.InvestorId.eq("FN1"),
+          iv.InvestorId.eq("FNA"),
+        ],
+        choicelist=[
+          "PORTc0011c903a90fb504658b135bfab9a",
+          "PORT65fc9c4339409ddba4cad358d46091",
+          "PORT5f27ceeaf81e9802a6dbb097c75623"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: portfolio_name
+    expression: 
+      np.select(
+        condlist=[
+          iv.InvestorId.eq("HN1"),
+          iv.InvestorId.eq("FN1"),
+          iv.InvestorId.eq("FNA"),
+        ],
+        choicelist=[
+          "Seneca FHLMC S/A 154184",
+          "Seneca FNMA A/A 306590006",
+          "Seneca FNMA MBS S/S 306590006"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: remittance_type
+    expression: | 
+      np.select(
+        condlist=[
+          iv.ReconMethod.eq("139"),
+          iv.ReconMethod.eq("253"),
+          iv.ReconMethod.eq("540"),
+          iv.ReconMethod.eq("660"),
+          iv.ReconMethod.eq("759"),
+          iv.ReconMethod.eq("817")
+        ],
+        choicelist=[
+          "ACTUAL_ACTUAL",
+          "ACTUAL_ACTUAL",
+          "SCHEDULED_SCHEDULED",
+          "ACTUAL_ACTUAL",
+          "SCHEDULED_ACTUAL",
+          "SCHEDULED_SCHEDULED"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: investor_type
+    expression: |
+      iv.InvestorName.map({
+                "FREDDIE MAC": "FREDDIE",
+                "FANNIE MAE": "FANNIE"
+              })
+    transform: expression
+    dtype: string
+
+  - target_column: seller_servicer_number
+    source: iv.InvestorServicerNumber
+    transform: identity
+    dtype: string
+
+  - target_column: servicing_client_id
+    source: sc.servicing_client_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "portfolio"
+  entity_id_col: "portfolio_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: false

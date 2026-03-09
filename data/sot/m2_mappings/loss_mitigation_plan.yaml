@@ -1,0 +1,198 @@
+table: loss_mitigation_plan
+version: 1
+primary_key: [loss_mitigation_plan_id]
+
+sources:
+  - name: Step
+    alias: s
+    pipe_file: {table: "Step"}
+    filters:
+      - column: "Workstation"
+        operator: "eq"
+        value: "LSMT"
+    pivot:
+      pivot_index: ["LoanNumber"]
+      pivot_columns: ["StepCode"]
+      pivot_values: ["ActualCompletionDate", "ScheduledCompletionDate"]
+  - name: DefaultWorkstations
+    alias: dw
+    pipe_file: {table: "DefaultWorkstations"}
+    filters:
+      - column: "LossMitTypeCode"
+        operator: "is_not_null"
+      - column: "LossMitTypeCode"
+        operator: "neq"
+        value: "SOLI"
+  - name: LoanInfo
+    alias: li
+    pipe_file: {table: "LoanInfo"}
+  - name: loan_staging
+    alias: l
+    staging: {table: "loan"}
+  - name: StopsFlagsAndIndicators
+    alias: fi
+    pipe_file: {table: "StopsFlagsAndIndicators"}
+    computed_columns:
+      - column: "GseCode"
+        expression: |
+          df.GseCode.map({
+            "F": "FNMA",
+            "H": "FMCC"
+          })
+      - column: "GovernmentInsuringAgency"
+        expression: |
+          np.select(
+            condlist=[
+              (df.LoType=='1') | (df.LoType=='5'),
+              df.LoType=='2',
+              df.LoType=='7',
+              df.LoType=='9'
+            ],
+            choicelist=[
+              "FHA",
+              "VA",
+              "PIH",
+              "RHS",
+            ],
+            default=pd.NA
+          )
+      - column: "GseCode_join"
+        expression: "df.GseCode.fillna('__NULL__')"
+      - column: "GovernmentInsuringAgency_join"
+        expression: "df.GovernmentInsuringAgency.fillna('__NULL__')"
+  - name: LSMTPlanTypes
+    alias: lpt
+    pipe_file: {table: "LSMTPlanTypes"}
+    filters:
+      - column: "OtherAttributesComments"
+        operator: "is_null"
+    computed_columns:
+      - column: "GSE_join"
+        expression: "df.GSE.fillna('__NULL__')"
+      - column: "GovernmentInsuringAgency_join"
+        expression: "df.GovernmentInsuringAgency.fillna('__NULL__')"
+  - name: LossMitigation
+    alias: lm
+    pipe_file: {table: "LossMitigation"}
+  - name: loss_mitigation_application_staging
+    alias: lma
+    staging: {table: "loss_mitigation_application"}
+
+joins:
+  - left: {source: s}
+    right: {source: dw}
+    "on": ["s.LoanNumber == dw.LoanNumber"]
+    how: inner
+  - left: {source: s}
+    right: {source: li}
+    "on": ["s.LoanNumber == li.LoanNumber"]
+    how: left
+  - left: {source: s}
+    right: {source: fi}
+    "on": ["s.LoanNumber == fi.LoanNumber"]
+    how: left
+  - left: {source: s}
+    right: {source: l}
+    "on": ["s.LoanNumber == l.loan_number"]
+    how: left
+  - left: {source: s}
+    right: {source: lpt}
+    "on": 
+      - "dw.LossMitTypeCode == lpt.ACDCPlanEnum"
+      - "fi.GseCode_join == lpt.GSE_join"
+      - "fi.GovernmentInsuringAgency_join == lpt.GovernmentInsuringAgency_join"
+    how: left
+  - left: {source: s}
+    right: {source: lm}
+    "on": ["s.LoanNumber == lm.LoanNumber"]
+    how: left
+  - left: {source: s}
+    right: {source: lma}
+    "on": ["l.loan_id == lma.loan_id"]
+    how: left
+
+columns:
+  - target_column: loss_mitigation_plan_id
+    hash_columns: ["l.loan_id", "dw.LoanNumber", "loss_mitigation_plan"]
+    transform: hash_id
+    dtype: string
+
+  - target_column: accepted_date
+    expression: |
+      np.where(
+        dw.LossMitTypeCode == "TMOD",
+        lm.Trial1ReceivedDate,
+        lm.PlanStartedOrOfferedDate.fillna(lm.UnderwriterApprovedDate)
+      )
+    transform: expression
+    dtype: date
+
+  - target_column: activated_date
+    expression: lm.PlanStartedOrOfferedDate.fillna(lm.UnderwriterApprovedDate)
+    transform: expression
+    dtype: date
+
+  - target_column: cancelled_date
+    expression: dw.LossMitRemovalDate.where(dw.LossMitStatusCode.eq("R"), pd.NaT)
+    transform: expression
+    dtype: date
+
+  - target_column: completed_date
+    expression: |
+      (lambda get_col, pd: 
+        get_col('ActualCompletionDate_L66').fillna(
+          get_col('ActualCompletionDate_L88')).fillna(
+          get_col('ActualCompletionDate_L94'))
+      )((lambda df, pd: lambda col: df.get(col, pd.Series(pd.NaT, index=df.index)))(df, pd), pd)
+    transform: expression
+    dtype: date
+
+  - target_column: evaluated_date
+    source: lm.UnderwriterApprovedDate
+    transform: identity
+    dtype: date
+
+  - target_column: plan_type
+    source: lpt.VDSPlanType
+    transform: identity
+    dtype: string
+
+  - target_column: status
+    expression: |
+      np.select(
+        condlist=[
+          dw.LossMitStatusCode.eq("C"),
+          dw.LossMitStatusCode.eq("R"),
+          dw.LossMitStatusCode.eq("A")
+        ],
+        choicelist=[
+          "COMPLETED",
+          "CANCELLED_OTHER",
+          "ACTIVE"
+        ],
+        default=pd.NA
+      )
+    transform: expression
+    dtype: string
+
+  - target_column: subtype
+    source: lpt.VDSSubtype
+    transform: identity
+    dtype: string
+
+  - target_column: loss_mitigation_application_id
+    source: lma.loss_mitigation_application_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: l.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loss_mitigation_plan"
+  entity_id_col: "loss_mitigation_plan_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
+

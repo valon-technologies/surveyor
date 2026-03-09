@@ -1,0 +1,76 @@
+table: loan_support_call_1
+version: 1
+primary_key: [loan_support_call_id]
+
+sources:
+  - name: loan_support_call
+    alias: lsc
+    staging: {table: "loan_support_call"}
+
+columns:
+  - target_column: loan_support_call_id
+    source: lsc.loan_support_call_id
+    transform: identity
+    dtype: string
+
+  - target_column: borrower_id
+    source: lsc.borrower_id
+    transform: identity
+    dtype: string
+
+  - target_column: call_summary
+    source: lsc.call_summary
+    transform: identity
+    dtype: string
+
+  - target_column: call_direction
+    source: lsc.call_direction
+    transform: identity
+    dtype: string
+
+  - target_column: call_started_at
+    expression: |
+      pd.to_datetime(lsc.call_started_at, format='mixed').dt.tz_localize('America/New_York', ambiguous=True, nonexistent='shift_forward').dt.tz_convert('UTC').dt.tz_localize(None)
+    transform: expression
+    dtype: string
+
+  - target_column: call_disposition
+    source: lsc.call_disposition
+    transform: identity
+    dtype: string
+
+  - target_column: is_abandoned
+    source: lsc.is_abandoned
+    transform: identity
+    dtype: boolean
+
+  - target_column: queue_time_in_seconds
+    source: lsc.queue_time_in_seconds
+    transform: identity
+    dtype: int
+
+  - target_column: skill_name
+    source: lsc.skill_name
+    transform: identity
+    dtype: string
+
+  - target_column: talk_time_in_seconds
+    source: lsc.talk_time_in_seconds
+    transform: identity
+    dtype: int
+
+  - target_column: agent_user_id
+    source: lsc.agent_user_id
+    transform: identity
+    dtype: string
+
+  - target_column: loan_id
+    source: lsc.loan_id
+    transform: identity
+    dtype: string
+
+entity:
+  entity_type: "loan_support_call"
+  entity_id_col: "loan_support_call_id"
+  loan_id_col: "loan_id"
+  loan_id_col_required: true
