@@ -342,6 +342,22 @@ export function DiscussClient() {
         <div className="flex items-center gap-2">
           <Button
             size="sm"
+            variant="ghost"
+            onClick={() => {
+              const next = siblingNav?.nextFields?.[0];
+              if (next?.mappingId) {
+                router.push(`/mapping/discuss/${next.mappingId}`);
+              } else {
+                router.back();
+              }
+            }}
+            className="text-muted-foreground"
+            title="Skip — come back to this field later"
+          >
+            Skip
+          </Button>
+          <Button
+            size="sm"
             variant="outline"
             onClick={() => setShowPuntDialog(true)}
             className="text-muted-foreground hover:text-amber-600 hover:border-amber-400"
