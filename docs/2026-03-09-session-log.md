@@ -119,6 +119,20 @@ Demo prep + stakeholder demo + post-demo improvements. Shipped 30+ changes acros
 - **Clickable rows**: Entire mapping card navigates to discuss page (before this, only a small chevron arrow was clickable).
 - **Entity exclusion preserved**: "Not needed" / "Restore" buttons still available via entity metadata toggle.
 
+## Linear Ticket Tracking
+
+Established formal Linear ticketing workflow for Surveyor development. All edits tracked in the [Surveyor UX Feedback](https://linear.app/valon/project/surveyor-ux-feedback-411c9560909f) project under the Mapping team.
+
+**Created 24 tickets (MAP-819 through MAP-845)** across 4 priority tiers:
+- Tier 1 (Urgent/High): 4 tickets — app freezing, question-only submit, cross-queue bleed, filter persistence
+- Tier 2 (High/Medium): 4 tickets — FK field filter, revisit reviewed items, extract request import, source/transform contradiction
+- Tier 3 (Medium/Low): 6 tickets — Linear reference, claimed filter, notes auto-save, admin filtering, in-app generation, corrections UI
+- Tier 4 (Low): 10 tickets — reasoning quality, context routing, QA hints, email import, backfill, exclusion UX, BQ config, punt validation, rate limits, leaderboard
+
+**Consolidated 6 duplicates** (MAP-769, MAP-778, MAP-818, MAP-824, MAP-825, MAP-826) created by the feedback agent — canceled with references to canonical tickets.
+
+**Workflow going forward:** Update Linear tickets as work progresses. Mark In Progress when starting, Completed when deployed.
+
 ## Files Created (Additional)
 - `src/app/api/workspaces/[workspaceId]/mappings/batch-assign/route.ts`
 
