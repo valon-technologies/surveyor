@@ -181,7 +181,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       const mappings = await db
         .select({
           status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
-          cnt: count(),
+          cnt: sql<number>`COUNT(DISTINCT ${field.id})`,
         })
         .from(field)
         .leftJoin(
@@ -237,7 +237,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
     const rows = await db
       .select({
         status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
-        cnt: count(),
+        cnt: sql<number>`COUNT(DISTINCT ${field.id})`,
       })
       .from(field)
       .innerJoin(entity, eq(field.entityId, entity.id))
@@ -288,7 +288,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
   const allFieldStatuses = await db
     .select({
       status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
-      cnt: count(),
+      cnt: sql<number>`COUNT(DISTINCT ${field.id})`,
     })
     .from(field)
     .innerJoin(entity, eq(field.entityId, entity.id))
