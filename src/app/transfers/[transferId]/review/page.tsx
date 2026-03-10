@@ -129,7 +129,7 @@ export default function TransferReviewPage() {
     if (!cards) return [];
     return cards.filter((c) => {
       if (!showExcluded && excludedEntityIds.has(c.entityId)) return false;
-      if (hideSystemFields && /(_id|_sid)$/.test(c.targetFieldName) && c.status === "unmapped") return false;
+      if (hideSystemFields && (/(_id|_sid)$/.test(c.targetFieldName) || c.targetFieldName === "id") && c.status === "unmapped") return false;
       if (statusFilter !== "all" && c.status !== statusFilter) return false;
       if (confidenceFilter !== "all" && c.confidence !== confidenceFilter) return false;
       if (assigneeFilter === "mine" && c.assigneeId !== currentUserId) return false;
