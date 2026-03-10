@@ -38,7 +38,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     href: "/mapping",
-    label: "Mapping",
+    label: "SDT Mapping",
     icon: Map,
     children: [
       { href: "/", label: "Progress Summary" },
