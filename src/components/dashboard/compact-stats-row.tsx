@@ -12,7 +12,7 @@ export function CompactStatsRow({ stats, milestone }: { stats: DashboardStats; m
       <Sep />
       <Stat
         label="Coverage"
-        value={`${stats.coveragePercent}%`}
+        value={`${stats.coveragePercent.toFixed(2)}%`}
         sub={`${stats.mappedFields.toLocaleString()}/${stats.totalFields.toLocaleString()}`}
       />
       <Sep />

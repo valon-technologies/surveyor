@@ -451,7 +451,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
     totalFields,
     mappedFields,
     coveragePercent:
-      totalFields > 0 ? Math.round((mappedFields / totalFields) * 100) : 0,
+      totalFields > 0 ? Math.round(((mappedFields / totalFields) * 100) * 100) / 100 : 0,
     openQuestions: openQuestions?.cnt || 0,
     entities: entityStats,
     milestoneStats,
