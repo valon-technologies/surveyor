@@ -93,7 +93,7 @@ export function SotEntityListPanel({
       <div className="flex-1 overflow-y-auto p-1">
         {/* M1 Section */}
         <SectionHeader
-          label={`M1 Mappings (${m1Entities.length})`}
+          label={`M1 (${m1Entities.length} entities, ${m1Entities.reduce((s, e) => s + e.fieldCount, 0)} fields)`}
           collapsed={m1Collapsed}
           onToggle={() => setM1Collapsed(!m1Collapsed)}
         />
@@ -112,7 +112,7 @@ export function SotEntityListPanel({
 
         {/* M2 Section */}
         <SectionHeader
-          label={`M2 Mappings (${m2Entities.length})`}
+          label={`M2 (${m2Entities.length} entities, ${m2Entities.reduce((s, e) => s + e.fieldCount, 0)} fields)`}
           collapsed={m2Collapsed}
           onToggle={() => setM2Collapsed(!m2Collapsed)}
         />
