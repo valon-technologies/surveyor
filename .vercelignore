@@ -3,4 +3,5 @@
 *.db-shm
 scripts/
 /docs/
-/data/
+/data/transfers/
+/data/*.json
