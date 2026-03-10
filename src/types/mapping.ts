@@ -77,6 +77,7 @@ export interface MappingWithContext extends FieldMapping {
     dataType: string | null;
     entityId: string;
     entityName: string;
+    metadata?: Record<string, unknown> | null;
   };
   sourceField?: {
     id: string;

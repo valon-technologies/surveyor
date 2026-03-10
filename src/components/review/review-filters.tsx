@@ -21,6 +21,8 @@ export function ReviewFilters() {
     setStatusFilter,
     milestoneFilter,
     setMilestoneFilter,
+    assigneeFilter,
+    setAssigneeFilter,
     sortBy,
     setSortBy,
     sortOrder,
@@ -120,6 +122,16 @@ export function ReviewFilters() {
         value={entityFilter}
         onChange={(e) => setEntityFilter(e.target.value)}
         className="w-48"
+      />
+      <Select
+        options={[
+          { value: "all", label: "All Assignees" },
+          { value: "mine", label: "My Fields" },
+          { value: "unclaimed", label: "Unclaimed" },
+        ]}
+        value={assigneeFilter}
+        onChange={(e) => setAssigneeFilter(e.target.value as typeof assigneeFilter)}
+        className="w-36"
       />
       <div className="ml-auto flex items-center gap-2">
         <Select

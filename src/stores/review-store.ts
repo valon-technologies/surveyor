@@ -24,6 +24,9 @@ interface ReviewState {
   activeBatchRunId: string | null;
   setActiveBatchRunId: (id: string | null) => void;
 
+  assigneeFilter: "all" | "mine" | "unclaimed";
+  setAssigneeFilter: (v: "all" | "mine" | "unclaimed") => void;
+
   hideSystemFields: boolean;
   setHideSystemFields: (v: boolean) => void;
 
@@ -52,6 +55,9 @@ export const useReviewStore = create<ReviewState>((set) => ({
 
   activeBatchRunId: null,
   setActiveBatchRunId: (id) => set({ activeBatchRunId: id }),
+
+  assigneeFilter: "all",
+  setAssigneeFilter: (v) => set({ assigneeFilter: v }),
 
   hideSystemFields: true,
   setHideSystemFields: (v) => set({ hideSystemFields: v }),

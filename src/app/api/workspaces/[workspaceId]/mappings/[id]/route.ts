@@ -66,6 +66,7 @@ export const GET = withAuth(async (req, ctx, { userId, workspaceId, role }) => {
           dataType: targetField.dataType,
           entityId: targetField.entityId,
           entityName: targetEntity?.name,
+          metadata: targetField.metadata ?? null,
         }
       : null,
     sourceField,

@@ -155,6 +155,7 @@ export function DiscussClient() {
   }, [activeSessionId, messages, kickoffSent, isStreaming, aiReview]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derive mapping state for the right panel
+  const targetMeta = mapping?.targetField?.metadata as Record<string, unknown> | null | undefined;
   const mappingState = mapping
     ? {
         mappingType: mapping.mappingType ?? null,
@@ -169,6 +170,7 @@ export function DiscussClient() {
         reasoning: mapping.reasoning ?? null,
         confidence: mapping.confidence ?? null,
         notes: mapping.notes ?? null,
+        linearIssueId: (targetMeta?.linearIssueId as string) ?? null,
         sourceVerdict: mapping.sourceVerdict ?? null,
         sourceVerdictNotes: mapping.sourceVerdictNotes ?? null,
         transformVerdict: mapping.transformVerdict ?? null,
@@ -508,6 +510,13 @@ export function DiscussClient() {
                 "w-full text-xs rounded border bg-background px-2 py-1 resize-none",
                 "border-border focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
               )}
+              onBlur={() => {
+                const value = notesRef.current?.value?.trim() || null;
+                const existing = (mapping?.notes || "").split("--- Linear Reference ---")[0].trim() || null;
+                if (activeMappingId && value !== existing) {
+                  updateMapping.mutate({ id: activeMappingId, notes: value });
+                }
+              }}
             />
           </div>
 

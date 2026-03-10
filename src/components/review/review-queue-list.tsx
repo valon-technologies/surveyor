@@ -45,6 +45,7 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
     entityFilter,
     statusFilter,
     milestoneFilter,
+    assigneeFilter,
     hideSystemFields,
     sortBy,
     sortOrder,
@@ -64,9 +65,11 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
     return cards.filter((c) => {
       if (milestoneFilter !== "all" && c.milestone !== milestoneFilter) return false;
       if (hideSystemFields && /(_id|_sid)$/.test(c.targetFieldName) && c.status === "unmapped") return false;
+      if (assigneeFilter === "mine" && c.assigneeId !== currentUserId) return false;
+      if (assigneeFilter === "unclaimed" && c.assigneeId) return false;
       return true;
     });
-  }, [cards, milestoneFilter, hideSystemFields]);
+  }, [cards, milestoneFilter, hideSystemFields, assigneeFilter, currentUserId]);
 
   // Group cards by entity with hierarchical parent/child folding
   const entityGroups = useMemo<EntityGroupData[]>(() => {

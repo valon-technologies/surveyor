@@ -44,6 +44,7 @@ export default function TransferReviewPage() {
   const statusFilter = searchParams.get("status") || "all";
   const confidenceFilter = searchParams.get("confidence") || "all";
   const domainFilter = searchParams.get("entity") || "all";
+  const assigneeFilter = searchParams.get("assignee") || "all";
   const search = searchParams.get("q") || "";
   const showExcluded = searchParams.get("excluded") === "1";
   const hideSystemFields = searchParams.get("hideSystem") !== "0"; // default ON
@@ -62,6 +63,7 @@ export default function TransferReviewPage() {
   const setStatusFilter = (v: string) => setFilter("status", v);
   const setConfidenceFilter = (v: string) => setFilter("confidence", v);
   const setDomainFilter = (v: string) => setFilter("entity", v);
+  const setAssigneeFilter = (v: string) => setFilter("assignee", v);
   const setSearch = (v: string) => setFilter("q", v);
   const setShowExcluded = (v: boolean) => setFilter("excluded", v ? "1" : "0");
   const setHideSystemFields = (v: boolean) => setFilter("hideSystem", v ? "1" : "0");
@@ -130,6 +132,8 @@ export default function TransferReviewPage() {
       if (hideSystemFields && /(_id|_sid)$/.test(c.targetFieldName) && c.status === "unmapped") return false;
       if (statusFilter !== "all" && c.status !== statusFilter) return false;
       if (confidenceFilter !== "all" && c.confidence !== confidenceFilter) return false;
+      if (assigneeFilter === "mine" && c.assigneeId !== currentUserId) return false;
+      if (assigneeFilter === "unclaimed" && c.assigneeId) return false;
       if (domainFilter !== "all") {
         const domain = c.parentEntityName || c.entityName;
         if (domain !== domainFilter) return false;
@@ -144,7 +148,7 @@ export default function TransferReviewPage() {
       }
       return true;
     });
-  }, [cards, statusFilter, confidenceFilter, domainFilter, search, showExcluded, excludedEntityIds]);
+  }, [cards, statusFilter, confidenceFilter, domainFilter, assigneeFilter, currentUserId, search, showExcluded, excludedEntityIds]);
 
   // Status counts
   const statusCounts = useMemo(() => {
@@ -298,6 +302,15 @@ export default function TransferReviewPage() {
           {domains.map((d) => (
             <option key={d} value={d}>{d}</option>
           ))}
+        </select>
+        <select
+          value={assigneeFilter}
+          onChange={(e) => setAssigneeFilter(e.target.value)}
+          className="rounded-lg border px-3 py-1.5 text-sm bg-background"
+        >
+          <option value="all">All assignees</option>
+          <option value="mine">My fields</option>
+          <option value="unclaimed">Unclaimed</option>
         </select>
 
         <button

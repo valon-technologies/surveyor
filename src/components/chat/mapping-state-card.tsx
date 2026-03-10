@@ -20,6 +20,8 @@ export interface MappingState {
   reasoning: string | null;
   confidence: string | null;
   notes: string | null;
+  /** Linear issue identifier from field metadata (e.g. "MAP-830") */
+  linearIssueId?: string | null;
 }
 
 /** Human-readable labels for mapping-update keys */
@@ -106,14 +108,29 @@ export function MappingSummary({ targetFieldName, mapping }: MappingSummaryProps
           ) : (
             <span className="text-muted-foreground font-medium">Transform: direct (identity)</span>
           )}
-          {mapping.notes && mapping.notes.includes("Linear") && (
+          {/* Linear Reference: from notes delimiter (SDT) or field metadata (transfer mappings) */}
+          {mapping.notes && mapping.notes.includes("Linear") ? (
             <div className="mt-1 border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30 rounded px-2 py-1">
               <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Linear Reference</span>
               <pre className="text-[10px] text-purple-800 dark:text-purple-300 whitespace-pre-wrap mt-0.5">{
                 mapping.notes.split("--- Linear Reference ---\n")[1] || mapping.notes
               }</pre>
             </div>
-          )}
+          ) : mapping.linearIssueId ? (
+            <div className="mt-1 border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30 rounded px-2 py-1">
+              <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Linear Reference</span>
+              <div className="text-[10px] text-purple-800 dark:text-purple-300 mt-0.5">
+                <a
+                  href={`https://linear.app/valon/issue/${mapping.linearIssueId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-purple-600 dark:text-purple-400 hover:underline font-medium"
+                >
+                  {mapping.linearIssueId}
+                </a>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
