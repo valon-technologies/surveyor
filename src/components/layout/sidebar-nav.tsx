@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 import {
@@ -25,6 +26,7 @@ import {
 import { useQuestions } from "@/queries/question-queries";
 import { useTheme } from "./theme-provider";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
+import { api, workspacePath } from "@/lib/api-client";
 
 interface NavItem {
   href: string;
@@ -71,9 +73,7 @@ const navItems: NavItem[] = [
     href: "/transfers",
     label: "Servicing Transfers",
     icon: ArrowRightLeft,
-    children: [
-      { href: "/transfers", label: "All Transfers" },
-    ],
+    // children populated dynamically from API
   },
   { href: "/ground-truth", label: "Verified Mappings", icon: Scale },
   { href: "/admin", label: "Admin", icon: Shield, requiredRole: "owner" },
@@ -203,16 +203,47 @@ function NavItemRenderer({
   );
 }
 
+interface TransferListItem {
+  id: string;
+  name: string;
+  clientName: string | null;
+}
+
 export function SidebarNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const { role } = useWorkspace();
+  const { workspaceId, role } = useWorkspace();
   const { data: openQuestions } = useQuestions({ status: "open" });
   const { theme, toggle } = useTheme();
 
-  const visibleItems = navItems.filter(
-    (item) => !item.requiredRole || role === item.requiredRole,
-  );
+  const { data: transfers } = useQuery<TransferListItem[]>({
+    queryKey: ["transfers-sidebar", workspaceId],
+    queryFn: () => api.get(workspacePath(workspaceId, "transfers")),
+    enabled: !!workspaceId,
+    staleTime: 60_000,
+  });
+
+  const visibleItems = useMemo(() => {
+    const items = navItems.filter(
+      (item) => !item.requiredRole || role === item.requiredRole,
+    );
+    // Inject transfer portfolios as children of Servicing Transfers
+    if (transfers?.length) {
+      return items.map((item) => {
+        if (item.href === "/transfers") {
+          return {
+            ...item,
+            children: transfers.map((t) => ({
+              href: `/transfers/${t.id}/review`,
+              label: t.clientName || t.name,
+            })),
+          };
+        }
+        return item;
+      });
+    }
+    return items;
+  }, [role, transfers]);
 
   return (
     <aside className="w-56 border-r bg-sidebar h-screen flex flex-col shrink-0">
