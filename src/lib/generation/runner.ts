@@ -322,18 +322,33 @@ export async function startGeneration(
     )
     .map((l) => l.content);
 
-  // Include descriptions for relevant (skill-matched) tables; name+type only for others
-  // to keep prompt within token limits while giving the LLM full source visibility.
-  const sourceSchema = sourceEntities.map((se) => ({
-    entityName: se.name,
-    fields: sourceFields
+  // Include full field details for relevant tables, compact for others.
+  // Cap non-relevant source schema to prevent prompt-too-long errors.
+  const SOURCE_SCHEMA_TOKEN_CAP = 40_000;
+  const relevantSchema = sourceEntities
+    .filter((se) => relevantSourceIds.has(se.id))
+    .map((se) => ({
+      entityName: se.name,
+      fields: sourceFields
+        .filter((sf) => sf.entityId === se.id)
+        .map((sf) => ({ name: sf.name, dataType: sf.dataType, description: sf.description })),
+    }));
+
+  // For non-relevant tables: include name+type only, capped by token budget
+  let nonRelevantTokens = 0;
+  const nonRelevantSchema: typeof relevantSchema = [];
+  for (const se of sourceEntities) {
+    if (relevantSourceIds.has(se.id)) continue;
+    const fields = sourceFields
       .filter((sf) => sf.entityId === se.id)
-      .map((sf) => ({
-        name: sf.name,
-        dataType: sf.dataType,
-        description: relevantSourceIds.has(se.id) ? sf.description : null,
-      })),
-  }));
+      .map((sf) => ({ name: sf.name, dataType: sf.dataType, description: null }));
+    const estTokens = fields.reduce((sum, f) => sum + (f.name.length + (f.dataType?.length || 0) + 5) / 3.1, 0);
+    if (nonRelevantTokens + estTokens > SOURCE_SCHEMA_TOKEN_CAP) continue;
+    nonRelevantTokens += estTokens;
+    nonRelevantSchema.push({ entityName: se.name, fields });
+  }
+
+  const sourceSchema = [...relevantSchema, ...nonRelevantSchema];
 
   // Load production SOT mapping as generation context
   // Set EXCLUDE_SOT=1 to suppress SOT from generation context (for unbiased eval)
