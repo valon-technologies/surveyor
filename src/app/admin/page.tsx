@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button";
 import { BatchRunPanel } from "@/components/review/batch-run-panel";
 import { LinearSyncPanel } from "@/components/admin/linear-sync-panel";
 import { AnalyticsPanel } from "@/components/admin/analytics-panel";
+import { ClientQAPanel } from "@/components/admin/client-qa-panel";
 
-type Tab = "corrections" | "questions" | "generation" | "linear" | "analytics";
+type Tab = "corrections" | "questions" | "client-qa" | "generation" | "linear" | "analytics";
 type Workflow = "sdt" | "transfers";
 
 interface PendingLearning {
@@ -152,6 +153,17 @@ export default function AdminPage() {
         {workflow === "sdt" && (
           <>
             <button
+              onClick={() => setTab("client-qa")}
+              className={cn(
+                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+                tab === "client-qa"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Client Q&A
+            </button>
+            <button
               onClick={() => setTab("generation")}
               className={cn(
                 "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
@@ -248,6 +260,11 @@ export default function AdminPage() {
           }
           isPending={curateMutation.isPending}
         />
+      )}
+
+      {/* Client Q&A tab */}
+      {tab === "client-qa" && (
+        <ClientQAPanel />
       )}
 
       {/* Generation tab */}
