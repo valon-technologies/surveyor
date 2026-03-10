@@ -24,6 +24,9 @@ interface ReviewState {
   activeBatchRunId: string | null;
   setActiveBatchRunId: (id: string | null) => void;
 
+  hideSystemFields: boolean;
+  setHideSystemFields: (v: boolean) => void;
+
   collapsedEntityIds: string[];
   toggleEntityCollapsed: (entityId: string) => void;
 }
@@ -49,6 +52,9 @@ export const useReviewStore = create<ReviewState>((set) => ({
 
   activeBatchRunId: null,
   setActiveBatchRunId: (id) => set({ activeBatchRunId: id }),
+
+  hideSystemFields: true,
+  setHideSystemFields: (v) => set({ hideSystemFields: v }),
 
   collapsedEntityIds: [],
   toggleEntityCollapsed: (entityId) =>

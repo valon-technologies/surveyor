@@ -45,6 +45,7 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
     entityFilter,
     statusFilter,
     milestoneFilter,
+    hideSystemFields,
     sortBy,
     sortOrder,
   } = useReviewStore();
@@ -57,12 +58,15 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
     sortOrder,
   });
 
-  // Apply milestone filter client-side (API doesn't support it)
+  // Apply client-side filters (milestone + system fields)
   const filteredCards = useMemo(() => {
     if (!cards?.length) return cards;
-    if (milestoneFilter === "all") return cards;
-    return cards.filter((c) => c.milestone === milestoneFilter);
-  }, [cards, milestoneFilter]);
+    return cards.filter((c) => {
+      if (milestoneFilter !== "all" && c.milestone !== milestoneFilter) return false;
+      if (hideSystemFields && /(_id|_sid)$/.test(c.targetFieldName) && c.status === "unmapped") return false;
+      return true;
+    });
+  }, [cards, milestoneFilter, hideSystemFields]);
 
   // Group cards by entity with hierarchical parent/child folding
   const entityGroups = useMemo<EntityGroupData[]>(() => {

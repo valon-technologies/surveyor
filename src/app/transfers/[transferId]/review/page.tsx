@@ -46,6 +46,7 @@ export default function TransferReviewPage() {
   const domainFilter = searchParams.get("entity") || "all";
   const search = searchParams.get("q") || "";
   const showExcluded = searchParams.get("excluded") === "1";
+  const hideSystemFields = searchParams.get("hideSystem") !== "0"; // default ON
   const [distributeOpen, setDistributeOpen] = useState(false);
 
   const setFilter = useCallback((key: string, value: string) => {
@@ -63,6 +64,7 @@ export default function TransferReviewPage() {
   const setDomainFilter = (v: string) => setFilter("entity", v);
   const setSearch = (v: string) => setFilter("q", v);
   const setShowExcluded = (v: boolean) => setFilter("excluded", v ? "1" : "0");
+  const setHideSystemFields = (v: boolean) => setFilter("hideSystem", v ? "1" : "0");
 
   const claimMutation = useReassignMapping();
   const batchAssignMutation = useMutation({
@@ -125,6 +127,7 @@ export default function TransferReviewPage() {
     if (!cards) return [];
     return cards.filter((c) => {
       if (!showExcluded && excludedEntityIds.has(c.entityId)) return false;
+      if (hideSystemFields && /(_id|_sid)$/.test(c.targetFieldName) && c.status === "unmapped") return false;
       if (statusFilter !== "all" && c.status !== statusFilter) return false;
       if (confidenceFilter !== "all" && c.confidence !== confidenceFilter) return false;
       if (domainFilter !== "all") {
@@ -296,6 +299,17 @@ export default function TransferReviewPage() {
             <option key={d} value={d}>{d}</option>
           ))}
         </select>
+
+        <button
+          onClick={() => setHideSystemFields(!hideSystemFields)}
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+            hideSystemFields
+              ? "bg-blue-50 text-blue-700 border-blue-200"
+              : "bg-background text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {hideSystemFields ? "System fields hidden" : "Show system fields"}
+        </button>
 
         {excludedCount > 0 && (
           <button

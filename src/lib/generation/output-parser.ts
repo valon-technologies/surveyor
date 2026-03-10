@@ -508,7 +508,12 @@ export function parseGenerationOutput(
       ?? (finalConfidence !== "high" ? inferUncertaintyType(finalReviewComment, raw) : null);
 
     // Force unmapped if model claimed a mapping but no valid source was resolved
-    const effectivelyUnmapped = !sourceFieldId && !sourceEntityId && status !== "unmapped";
+    // Exception: derived fields with transform expressions referencing source columns
+    const hasDerivedTransform = !sourceFieldId && !sourceEntityId
+      && typeof raw.transform === "string"
+      && raw.transform.trim().length > 0
+      && /\w+\.\w+/.test(raw.transform);
+    const effectivelyUnmapped = !sourceFieldId && !sourceEntityId && status !== "unmapped" && !hasDerivedTransform;
 
     fieldMappings.push({
       targetFieldName: raw.targetFieldName,
@@ -745,9 +750,16 @@ export function parseYamlOutput(
     const transformStr = col.transform?.toLowerCase() ?? null;
     const isNull = transformStr === "null" || (Array.isArray(col.source) && col.source.length === 0);
 
+    // Derived fields: source may be [] but expression references real source columns
+    // (e.g., np.select with alias.ColumnName references). Treat these as real mappings.
+    const hasDerivedExpression = isNull
+      && typeof col.expression === "string"
+      && col.expression.trim().length > 0
+      && /\w+\.\w+/.test(col.expression);
+
     // Status
-    const status: MappingStatus = isNull ? "unmapped" : "unreviewed";
-    const mappingType = isNull ? null : yamlTransformToMappingType(transformStr, col);
+    const status: MappingStatus = (isNull && !hasDerivedExpression) ? "unmapped" : "unreviewed";
+    const mappingType = (isNull && !hasDerivedExpression) ? null : yamlTransformToMappingType(transformStr, col);
 
     // Resolve source entity and field
     let sourceEntityName: string | null = null;
@@ -857,7 +869,8 @@ export function parseYamlOutput(
       || (col.expression ? `Transform: ${col.expression.trim().slice(0, 100)}` : (sourceFieldName ? `Direct mapping from ${sourceEntityName}.${sourceFieldName}` : "No source match"));
 
     // Force unmapped if model claimed a mapping but no valid source was resolved
-    const effectivelyUnmapped = !sourceFieldId && !sourceEntityId && status !== "unmapped";
+    // Exception: derived fields with expressions referencing source columns are real mappings
+    const effectivelyUnmapped = !sourceFieldId && !sourceEntityId && status !== "unmapped" && !hasDerivedExpression;
 
     fieldMappings.push({
       targetFieldName: col.target_column,
