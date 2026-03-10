@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChatMessageList } from "@/components/chat/chat-message-list";
 import { ChatInput } from "@/components/chat/chat-input";
@@ -41,6 +41,7 @@ import { useReviewAnalytics } from "@/lib/analytics/use-review-analytics";
 export function DiscussClient() {
   const params = useParams<{ fieldMappingId: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fieldMappingId = params.fieldMappingId;
 
   // Track the "live" mapping ID — follows new versions after Apply (copy-on-write)
@@ -65,6 +66,19 @@ export function DiscussClient() {
   // Track whether user has applied an update this session
   const [hasApplied, setHasApplied] = useState(false);
   const notesRef = useRef<HTMLTextAreaElement>(null);
+
+  // Filtered queue navigation — reads ordered mapping IDs from sessionStorage
+  // (set by the review queue page when clicking into a discuss page)
+  const nextFromQueue = useMemo(() => {
+    try {
+      const stored = sessionStorage.getItem("reviewQueueOrder");
+      if (!stored) return null;
+      const ids: string[] = JSON.parse(stored);
+      const idx = ids.indexOf(fieldMappingId);
+      if (idx === -1 || idx >= ids.length - 1) return null;
+      return ids[idx + 1];
+    } catch { return null; }
+  }, [fieldMappingId]);
 
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [viewedPriorSessionId, setViewedPriorSessionId] = useState<string | null>(null);
@@ -353,11 +367,15 @@ export function DiscussClient() {
             size="sm"
             variant="ghost"
             onClick={() => {
-              const next = siblingNav?.nextFields?.[0];
-              if (next?.mappingId) {
-                router.push(`/mapping/discuss/${next.mappingId}`);
+              if (nextFromQueue) {
+                router.push(`/mapping/discuss/${nextFromQueue}`);
               } else {
-                router.back();
+                const next = siblingNav?.nextFields?.[0];
+                if (next?.mappingId) {
+                  router.push(`/mapping/discuss/${next.mappingId}`);
+                } else {
+                  router.back();
+                }
               }
             }}
             className="text-muted-foreground"
@@ -655,12 +673,17 @@ export function DiscussClient() {
                     updatePayload as unknown as Parameters<typeof updateMapping.mutate>[0],
                     {
                       onSuccess: () => {
-                        const next = siblingNav?.nextFields?.[0];
-                        if (next?.mappingId) {
-                          router.push(`/mapping/discuss/${next.mappingId}`);
+                        // Prefer filtered queue order (from review page), fall back to entity siblings
+                        if (nextFromQueue) {
+                          router.push(`/mapping/discuss/${nextFromQueue}`);
                         } else {
-                          const tid = mapping?.transferId;
-                          router.push(tid ? `/transfers/${tid}/review` : "/mapping");
+                          const next = siblingNav?.nextFields?.[0];
+                          if (next?.mappingId) {
+                            router.push(`/mapping/discuss/${next.mappingId}`);
+                          } else {
+                            const tid = mapping?.transferId;
+                            router.push(tid ? `/transfers/${tid}/review` : "/mapping");
+                          }
                         }
                       },
                     }
@@ -780,12 +803,16 @@ export function DiscussClient() {
                         onSuccess: () => {
                           setShowPuntDialog(false);
                           setPuntNote("");
-                          const tid = mapping?.transferId;
-                          const next = siblingNav?.nextFields?.[0];
-                          if (next?.mappingId) {
-                            router.push(`/mapping/discuss/${next.mappingId}`);
+                          if (nextFromQueue) {
+                            router.push(`/mapping/discuss/${nextFromQueue}`);
                           } else {
-                            router.push(tid ? `/transfers/${tid}/review` : "/mapping");
+                            const tid = mapping?.transferId;
+                            const next = siblingNav?.nextFields?.[0];
+                            if (next?.mappingId) {
+                              router.push(`/mapping/discuss/${next.mappingId}`);
+                            } else {
+                              router.push(tid ? `/transfers/${tid}/review` : "/mapping");
+                            }
                           }
                         },
                       }

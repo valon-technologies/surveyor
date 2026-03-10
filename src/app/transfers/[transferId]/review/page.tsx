@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -157,6 +157,13 @@ export default function TransferReviewPage() {
       counts[c.status] = (counts[c.status] || 0) + 1;
     }
     return counts;
+  }, [filtered]);
+
+  // Persist filtered queue order for discuss page navigation
+  useEffect(() => {
+    if (filtered.length > 0) {
+      sessionStorage.setItem("reviewQueueOrder", JSON.stringify(filtered.map((c) => c.id)));
+    }
   }, [filtered]);
 
   // Group by parent entity (same pattern as SDT ReviewQueueList)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useReviewQueue, useReassignMapping } from "@/queries/review-queries";
@@ -70,6 +70,13 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
       return true;
     });
   }, [cards, milestoneFilter, hideSystemFields, assigneeFilter, currentUserId]);
+
+  // Persist filtered queue order for discuss page navigation
+  useEffect(() => {
+    if (filteredCards?.length) {
+      sessionStorage.setItem("reviewQueueOrder", JSON.stringify(filteredCards.map((c) => c.id)));
+    }
+  }, [filteredCards]);
 
   // Group cards by entity with hierarchical parent/child folding
   const entityGroups = useMemo<EntityGroupData[]>(() => {
