@@ -215,7 +215,14 @@ export function DiscussClient() {
     if (!entityData?.fields || !mapping?.targetField?.id) return null;
 
     const currentFieldId = mapping.targetField.id;
-    const siblings = entityData.fields.filter((f) => f.id !== currentFieldId);
+    const currentTransferId = mapping.transferId ?? null;
+
+    // Filter siblings to same transfer (or same non-transfer context)
+    const siblings = entityData.fields.filter((f) => {
+      if (f.id === currentFieldId) return false;
+      const fTransferId = f.mapping?.transferId ?? null;
+      return fTransferId === currentTransferId;
+    });
 
     // Prioritize: unmapped first, then pending/low-confidence, skip accepted/excluded
     const actionable = siblings
@@ -575,7 +582,10 @@ export function DiscussClient() {
 
         {/* Submit review bar */}
         {(() => {
-          const canSubmit = !!sourceDecision && !!transformDecision && questionDecision;
+          // Allow submit if: (1) all three verdicts provided, OR (2) field is unmapped and a question decision was made
+          const isUnmapped = mappingState?.mappingType === null && !mappingState?.sourceEntityName;
+          const canSubmit = (!!sourceDecision && !!transformDecision && questionDecision)
+            || (isUnmapped && questionDecision);
           return (
             <div className="shrink-0 border-t border-blue-200 dark:border-blue-800 px-4 py-2.5 flex items-center justify-between bg-blue-50 dark:bg-blue-950/40">
               <div className="flex items-center gap-4 text-xs">

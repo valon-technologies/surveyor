@@ -115,6 +115,7 @@ export const GET = withAuth(async (_req, ctx, { workspaceId }) => {
             createdBy: mapping.createdBy,
             editedBy: mapping.editedBy,
             updatedAt: mapping.updatedAt,
+            transferId: mapping.transferId ?? null,
           }
         : null,
     });

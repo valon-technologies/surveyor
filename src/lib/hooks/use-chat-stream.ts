@@ -120,6 +120,9 @@ export function useChatStream(sessionId: string | null, options?: UseChatStreamO
       const controller = new AbortController();
       abortRef.current = controller;
 
+      // Auto-abort after 2 minutes to prevent indefinite hangs
+      const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
       try {
         const res = await fetch(
           `/api/workspaces/${workspaceId}/${apiPrefix}/${sessionId}/messages`,
@@ -239,20 +242,21 @@ export function useChatStream(sessionId: string | null, options?: UseChatStreamO
           }
         }
       } catch (error) {
-        if ((error as Error).name !== "AbortError") {
-          // Add error message
-          const errorMessage: ChatMessage = {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: "assistant",
-            content: `Error: ${(error as Error).message}`,
-            metadata: null,
-            createdAt: new Date().toISOString(),
-          };
-          setMessages((prev) => [...prev, errorMessage]);
-          setStreamingContent("");
-        }
+        const isAbort = (error as Error).name === "AbortError";
+        const errorMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          sessionId,
+          role: "assistant",
+          content: isAbort
+            ? "The AI assistant timed out. Please try again."
+            : `Error: ${(error as Error).message}`,
+          metadata: null,
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+        setStreamingContent("");
       } finally {
+        clearTimeout(timeoutId);
         setIsStreaming(false);
         setActiveToolCall(null);
         abortRef.current = null;

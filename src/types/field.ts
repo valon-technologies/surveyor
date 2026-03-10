@@ -35,5 +35,6 @@ export interface FieldWithMapping extends Field {
     createdBy: string;
     editedBy: string | null;
     updatedAt: string;
+    transferId: string | null;
   } | null;
 }

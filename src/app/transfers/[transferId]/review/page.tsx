@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
@@ -37,12 +37,32 @@ export default function TransferReviewPage() {
   const { addToast } = useToast();
   const queryClient = useQueryClient();
 
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [confidenceFilter, setConfidenceFilter] = useState<string>("all");
-  const [domainFilter, setDomainFilter] = useState<string>("all");
-  const [search, setSearch] = useState("");
-  const [showExcluded, setShowExcluded] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Persist filters in URL params
+  const statusFilter = searchParams.get("status") || "all";
+  const confidenceFilter = searchParams.get("confidence") || "all";
+  const domainFilter = searchParams.get("entity") || "all";
+  const search = searchParams.get("q") || "";
+  const showExcluded = searchParams.get("excluded") === "1";
   const [distributeOpen, setDistributeOpen] = useState(false);
+
+  const setFilter = useCallback((key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "all" || value === "" || value === "0") {
+      params.delete(key);
+    } else {
+      params.set(key, value);
+    }
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [searchParams, router]);
+
+  const setStatusFilter = (v: string) => setFilter("status", v);
+  const setConfidenceFilter = (v: string) => setFilter("confidence", v);
+  const setDomainFilter = (v: string) => setFilter("entity", v);
+  const setSearch = (v: string) => setFilter("q", v);
+  const setShowExcluded = (v: boolean) => setFilter("excluded", v ? "1" : "0");
 
   const claimMutation = useReassignMapping();
   const batchAssignMutation = useMutation({
