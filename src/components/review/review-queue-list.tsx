@@ -10,6 +10,7 @@ import { api, workspacePath } from "@/lib/api-client";
 import { EntityGroup } from "./entity-group";
 import { MILESTONE_LABELS, MILESTONE_COLORS, type Milestone } from "@/lib/constants";
 import type { ReviewCardData, ChildEntityGroup } from "@/types/review";
+import { isSystemField } from "@/lib/system-fields";
 
 interface ReviewQueueListProps {
   onPunt: (card: ReviewCardData) => void;
@@ -64,7 +65,7 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
     if (!cards?.length) return cards;
     return cards.filter((c) => {
       if (milestoneFilter !== "all" && c.milestone !== milestoneFilter) return false;
-      if (hideSystemFields && (/(_id|_sid)$/.test(c.targetFieldName) || c.targetFieldName === "id") && c.status === "unmapped") return false;
+      if (hideSystemFields && isSystemField(c.targetFieldName) && c.status === "unmapped") return false;
       if (assigneeFilter === "mine" && c.assigneeId !== currentUserId) return false;
       if (assigneeFilter === "unclaimed" && c.assigneeId) return false;
       return true;
