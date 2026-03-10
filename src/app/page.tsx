@@ -52,20 +52,7 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Progress Summary</h1>
-        <select
-          value={milestone}
-          onChange={(e) => setMilestone(e.target.value)}
-          className="rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          {MILESTONE_OPTIONS.map((m) => (
-            <option key={m} value={m}>
-              {m === "All" ? "All Milestones" : m}
-            </option>
-          ))}
-        </select>
-      </div>
+      <h1 className="text-2xl font-semibold tracking-tight">Progress Summary</h1>
 
       {/* Tab Bar */}
       <div className="flex gap-1 border-b">
@@ -86,7 +73,25 @@ export default function DashboardPage() {
       {/* Tab Content */}
       {tab === "overview" && (
         <div className="space-y-6">
-          <CompactStatsRow stats={stats} milestone={milestone === "All" ? undefined : milestone} />
+          {/* Milestone Coverage — unaffected by filter, always shows all */}
+          {stats.milestoneStats.length > 0 && (
+            <MilestoneProgress stats={stats.milestoneStats} />
+          )}
+
+          {/* Filtered stats bar with milestone dropdown */}
+          <CompactStatsRow
+            stats={stats}
+            milestone={milestone === "All" ? undefined : milestone}
+            milestoneFilter={milestone}
+            onMilestoneChange={setMilestone}
+            milestoneOptions={MILESTONE_OPTIONS as unknown as string[]}
+          />
+
+          {/* Status Distribution */}
+          {stats.totalEntities > 0 && (
+            <StatusDistribution stats={stats} />
+          )}
+
           <Leaderboard
             data={
               stats.leaderboard ?? {
@@ -99,18 +104,6 @@ export default function DashboardPage() {
 
           {stats.domainLeaders && stats.domainLeaders.length > 0 && (
             <DomainLeaders data={stats.domainLeaders} />
-          )}
-
-          {/* Milestone + Status Distribution */}
-          {(stats.milestoneStats.length > 0 || stats.totalEntities > 0) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {stats.milestoneStats.length > 0 && (
-                <MilestoneProgress stats={stats.milestoneStats} />
-              )}
-              {stats.totalEntities > 0 && (
-                <StatusDistribution stats={stats} />
-              )}
-            </div>
           )}
 
           {/* Entity Progress Table */}
