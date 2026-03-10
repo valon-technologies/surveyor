@@ -234,39 +234,30 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
 
   // Milestone stats
   const milestoneStats = await Promise.all(MILESTONES.map(async (m) => {
-    const rows = await db
-      .select({
-        status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
-        cnt: sql<number>`COUNT(DISTINCT ${field.id})`,
-      })
-      .from(field)
-      .innerJoin(entity, eq(field.entityId, entity.id))
-      .leftJoin(
-        fieldMapping,
-        and(
-          eq(fieldMapping.targetFieldId, field.id),
-          eq(fieldMapping.isLatest, true),
-          isNull(fieldMapping.transferId)
-        )
-      )
-      .where(
-        and(
-          eq(entity.workspaceId, workspaceId),
-          eq(entity.side, "target"),
-          eq(field.milestone, m),
-          assemblyParentIds.size > 0
-            ? sql`${entity.id} NOT IN (${sql.join([...assemblyParentIds].map(id => sql`${id}`), sql`, `)})`
-            : undefined
-        )
-      )
-      .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
-      ;
+    // Subquery: pick one status per field (avoids inflation from multiple mapping versions)
+    const excludeClause = assemblyParentIds.size > 0
+      ? sql`AND e.id NOT IN (${sql.join([...assemblyParentIds].map(id => sql`${id}`), sql`, `)})`
+      : sql``;
+    const rows = await db.execute(sql`
+      SELECT status, COUNT(*) as cnt FROM (
+        SELECT DISTINCT ON (f.id)
+          f.id,
+          COALESCE(fm.status, 'unmapped') as status
+        FROM field f
+        JOIN entity e ON e.id = f.entity_id AND e.side = 'target' AND e.workspace_id = ${workspaceId}
+        LEFT JOIN field_mapping fm ON fm.target_field_id = f.id AND fm.is_latest = true AND fm.transfer_id IS NULL
+        WHERE f.milestone = ${m} ${excludeClause}
+        ORDER BY f.id, fm.updated_at DESC NULLS LAST
+      ) sub
+      GROUP BY status
+    `) as { status: string; cnt: string }[];
 
     const statusBreakdown: Record<string, number> = {};
     let total = 0;
     for (const r of rows) {
-      statusBreakdown[r.status] = r.cnt;
-      total += r.cnt;
+      const count = parseInt(String(r.cnt), 10);
+      statusBreakdown[r.status] = count;
+      total += count;
     }
 
     const mapped = (statusBreakdown["accepted"] || 0) + (statusBreakdown["excluded"] || 0);
@@ -284,38 +275,28 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
   const totalFields = entityStats.reduce((sum, e) => sum + e.fieldCount, 0);
   const mappedFields = entityStats.reduce((sum, e) => sum + e.mappedCount, 0);
 
-  // Status distribution
-  const allFieldStatuses = await db
-    .select({
-      status: sql<string>`COALESCE(${fieldMapping.status}, 'unmapped')`,
-      cnt: sql<number>`COUNT(DISTINCT ${field.id})`,
-    })
-    .from(field)
-    .innerJoin(entity, eq(field.entityId, entity.id))
-    .leftJoin(
-      fieldMapping,
-      and(
-        eq(fieldMapping.targetFieldId, field.id),
-        eq(fieldMapping.isLatest, true),
-        isNull(fieldMapping.transferId)
-      )
-    )
-    .where(
-      and(
-        eq(entity.workspaceId, workspaceId),
-        eq(entity.side, "target"),
-        assemblyParentIds.size > 0
-          ? sql`${entity.id} NOT IN (${sql.join([...assemblyParentIds].map(id => sql`${id}`), sql`, `)})`
-          : undefined,
-        milestone ? eq(field.milestone, milestone) : undefined
-      )
-    )
-    .groupBy(sql`COALESCE(${fieldMapping.status}, 'unmapped')`)
-    ;
+  // Status distribution (same DISTINCT ON approach to avoid inflation)
+  const excludeParentsClause = assemblyParentIds.size > 0
+    ? sql`AND e.id NOT IN (${sql.join([...assemblyParentIds].map(id => sql`${id}`), sql`, `)})`
+    : sql``;
+  const milestoneClause = milestone ? sql`AND f.milestone = ${milestone}` : sql``;
+  const allFieldStatuses = await db.execute(sql`
+    SELECT status, COUNT(*) as cnt FROM (
+      SELECT DISTINCT ON (f.id)
+        f.id,
+        COALESCE(fm.status, 'unmapped') as status
+      FROM field f
+      JOIN entity e ON e.id = f.entity_id AND e.side = 'target' AND e.workspace_id = ${workspaceId}
+      LEFT JOIN field_mapping fm ON fm.target_field_id = f.id AND fm.is_latest = true AND fm.transfer_id IS NULL
+      WHERE true ${excludeParentsClause} ${milestoneClause}
+      ORDER BY f.id, fm.updated_at DESC NULLS LAST
+    ) sub
+    GROUP BY status
+  `) as { status: string; cnt: string }[];
 
   const statusDistribution: Record<string, number> = {};
   for (const r of allFieldStatuses) {
-    statusDistribution[r.status] = r.cnt;
+    statusDistribution[r.status] = parseInt(String(r.cnt), 10);
   }
 
   const openQuestions = (await db
