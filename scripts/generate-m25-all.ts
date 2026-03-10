@@ -150,7 +150,7 @@ async function main() {
 
       for (const m of mappings) {
         try {
-          await generateAiReview(m.id, WORKSPACE_ID);
+          await generateAiReview(WORKSPACE_ID, m.id);
           reviewCount++;
         } catch (err) {
           reviewErrors++;
