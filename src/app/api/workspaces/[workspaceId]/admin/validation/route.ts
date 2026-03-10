@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { learning, entity, field, fieldMapping } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull, isNotNull } from "drizzle-orm";
 import { rebuildEntityKnowledge } from "@/lib/generation/entity-knowledge";
 import { emitFeedbackEvent } from "@/lib/feedback/emit-event";
 

@@ -59,8 +59,12 @@ export default function AdminPage() {
     queryKey: ["admin", "validation", workspaceId],
     queryFn: () => api.get<PendingLearning[]>(`${basePath}/validation?status=pending`),
   });
-  // TODO: Add server-side workflow filter once learning table has transferId
-  const pendingLearnings = allPendingLearnings;
+  // Client-side workflow filter: "client" source = client Q&A, "review" = SDT/transfer review verdicts
+  // Transfer learnings aren't distinguishable from SDT yet, so show all for both workflows
+  const pendingLearnings = allPendingLearnings?.map((l) => ({
+    ...l,
+    isClientSource: l.source === "client",
+  }));
 
   const validateMutation = useMutation({
     mutationFn: (input: { learningId: string; action: "validate" | "reject" }) =>
@@ -75,7 +79,6 @@ export default function AdminPage() {
     queryKey: ["admin", "questions", workspaceId],
     queryFn: () => api.get<DraftQuestion[]>(`${basePath}/questions?status=draft`),
   });
-  // TODO: Add server-side workflow filter once question table has transferId
   const draftQuestions = allDraftQuestions;
 
   const curateMutation = useMutation({
@@ -217,6 +220,11 @@ export default function AdminPage() {
                     {l.entityName || "Unknown entity"}
                     {l.fieldName && `.${l.fieldName}`}
                   </span>
+                  {l.source === "client" && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 ml-2">
+                      Client answer
+                    </span>
+                  )}
                   <span className="text-[10px] text-muted-foreground ml-2">
                     {new Date(l.createdAt).toLocaleDateString()}
                   </span>
