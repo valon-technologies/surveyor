@@ -10,7 +10,7 @@
  */
 import { db } from "@/lib/db";
 import { fieldMapping, field, entity, context, mappingContext } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
 
 // Opus for reviews — highest quality, ensures source/transform consistency
@@ -73,6 +73,10 @@ export async function generateAiReview(
   const [mapping] = await db.select().from(fieldMapping)
     .where(eq(fieldMapping.id, mappingId)).limit(1);
   if (!mapping) return null;
+
+  // Skip AI review for transfer mappings — the review prompt is SDT-specific
+  // and would incorrectly suggest ACDC sources instead of flat file sources
+  if (mapping.transferId) return null;
 
   const [targetField] = await db.select().from(field)
     .where(eq(field.id, mapping.targetFieldId)).limit(1);
@@ -231,6 +235,7 @@ export async function generateEntityAiReviews(
     .where(and(
       eq(field.entityId, entityId),
       eq(fieldMapping.isLatest, true),
+      isNull(fieldMapping.transferId), // Skip transfer mappings — AI review is SDT-specific
     ));
 
   let reviewed = 0;
