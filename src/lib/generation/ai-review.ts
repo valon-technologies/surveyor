@@ -10,13 +10,14 @@
  */
 import { db } from "@/lib/db";
 import { fieldMapping, field, entity, context, mappingContext } from "@/lib/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
+import { transfer } from "@/lib/db/schema";
 import Anthropic from "@anthropic-ai/sdk";
 
 // Opus for reviews — highest quality, ensures source/transform consistency
 const REVIEW_MODEL = "claude-opus-4-6";
 
-const REVIEW_SYSTEM_PROMPT = `You are a senior data mapping expert reviewing a field-level mapping between a source system (ACDC/ServiceMac) and a target schema (VDS).
+const SDT_REVIEW_SYSTEM_PROMPT = `You are a senior data mapping expert reviewing a field-level mapping between a source system (ACDC/ServiceMac) and a target schema (VDS).
 
 Your job: review the current mapping and propose corrections if needed.
 
@@ -58,6 +59,47 @@ CITATIONS: When referencing a document, include its [ref:...] tag so reviewers c
 
 Be concise and decisive. Focus on source correctness first, then transform logic.`;
 
+const TRANSFER_REVIEW_SYSTEM_PROMPT = `You are a senior data mapping expert reviewing a field-level mapping between a client flat file and a target schema (VDS) for a servicing transfer.
+
+Your job: review the current mapping and propose corrections if needed.
+
+CRITICAL CONSTRAINT: Source fields MUST come from the client flat file ONLY. The flat file fields will be listed below. Do NOT propose ACDC tables, ServiceMac tables, or any source outside the flat file. If the current mapping references a source not in the flat file, flag it as incorrect.
+
+FORMATTING:
+- Do NOT use emojis. Use plain text markers:
+  - For corrections: use "(!) " prefix
+  - For blocked items: use "(X) " prefix
+
+CONSISTENCY RULES:
+- The sourceFieldName MUST be a field from the client flat file listed in the context.
+- If the transform references source fields, they must all come from the flat file.
+- If you propose changing the source, you MUST also update the transform accordingly.
+
+OUTPUT FORMAT:
+1. Brief analysis (2-4 sentences): is the source correct? Is the transform correct? Any questions?
+2. If you propose changes, include a fenced block:
+
+\`\`\`mapping-update
+{
+  "mappingType": "direct",
+  "sourceEntityName": "flat_file_name",
+  "sourceFieldName": "column_name",
+  "transform": null,
+  "defaultValue": null,
+  "enumMapping": null,
+  "reasoning": "Updated reasoning",
+  "confidence": "high",
+  "notes": null,
+  "question": null
+}
+\`\`\`
+
+3. If the current mapping looks correct, say so briefly and do NOT include a mapping-update block.
+
+CITATIONS: When referencing a document, include its [ref:...] tag so reviewers can trace your reasoning.
+
+Be concise and decisive. Focus on source correctness first — sources MUST be from the flat file.`;
+
 interface ReviewResult {
   proposedUpdate: Record<string, unknown> | null;
   reviewText: string;
@@ -74,9 +116,7 @@ export async function generateAiReview(
     .where(eq(fieldMapping.id, mappingId)).limit(1);
   if (!mapping) return null;
 
-  // Skip AI review for transfer mappings — the review prompt is SDT-specific
-  // and would incorrectly suggest ACDC sources instead of flat file sources
-  if (mapping.transferId) return null;
+  const isTransfer = !!mapping.transferId;
 
   const [targetField] = await db.select().from(field)
     .where(eq(field.id, mapping.targetFieldId)).limit(1);
@@ -156,6 +196,23 @@ export async function generateAiReview(
     }
   }
 
+  // For transfer mappings, load the flat file source fields
+  let transferSourceContext = "";
+  if (isTransfer && mapping.transferId) {
+    const [t] = await db.select({ sourceSchemaAssetId: transfer.sourceSchemaAssetId, name: transfer.name })
+      .from(transfer).where(eq(transfer.id, mapping.transferId)).limit(1);
+    if (t?.sourceSchemaAssetId) {
+      const sourceEntities = await db.select({ id: entity.id })
+        .from(entity).where(eq(entity.schemaAssetId, t.sourceSchemaAssetId));
+      if (sourceEntities.length > 0) {
+        const sourceFields = await db.select({ name: field.name, position: field.position })
+          .from(field).where(inArray(field.entityId, sourceEntities.map(e => e.id)));
+        const sorted = sourceFields.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+        transferSourceContext = `\n**Valid Source Fields (${t.name} flat file — ONLY these are valid sources):**\n${sorted.map(f => `[${f.position}] ${f.name}`).join("\n")}\n`;
+      }
+    }
+  }
+
   // Build the review prompt
   const userMessage = `Review this mapping:
 
@@ -169,7 +226,7 @@ export async function generateAiReview(
 - Transform: ${mapping.transform || "identity"}
 - Confidence: ${mapping.confidence || "unset"}
 - Reasoning: ${mapping.reasoning || "none"}
-
+${transferSourceContext}
 **Sibling Mappings (same entity):**
 ${siblingLines || "  (none)"}
 
@@ -177,13 +234,13 @@ ${ek?.content ? `[ref:ctx_${ek.id}] **Entity Knowledge (corrections from prior r
 
 Analyze and propose corrections if needed.`;
 
-  // Call Claude
+  // Call Claude — use transfer-aware prompt when applicable
   const client = new Anthropic();
 
   const response = await client.messages.create({
     model: REVIEW_MODEL,
     max_tokens: 2000,
-    system: REVIEW_SYSTEM_PROMPT,
+    system: isTransfer ? TRANSFER_REVIEW_SYSTEM_PROMPT : SDT_REVIEW_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userMessage }],
   });
 
@@ -235,7 +292,6 @@ export async function generateEntityAiReviews(
     .where(and(
       eq(field.entityId, entityId),
       eq(fieldMapping.isLatest, true),
-      isNull(fieldMapping.transferId), // Skip transfer mappings — AI review is SDT-specific
     ));
 
   let reviewed = 0;
