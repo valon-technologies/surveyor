@@ -371,6 +371,7 @@ export default function TransferReviewPage() {
               currentUserId={currentUserId}
               onClaim={(mappingId, assigneeId) => claimMutation.mutate({ mappingId, assigneeId })}
               onBatchAssign={(mappingIds, assigneeId) => batchAssignMutation.mutate({ mappingIds, assigneeId })}
+              onExcludeEntity={(eid, ename) => toggleEntityExclusion(eid, ename, true)}
             />
           ))}
           {entityGroups.length === 0 && !isLoading && (

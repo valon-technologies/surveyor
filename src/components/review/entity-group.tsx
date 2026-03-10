@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Component, MessageSquare } from "lucide-react";
+import { ChevronDown, ChevronRight, Component, MessageSquare, XCircle } from "lucide-react";
 import { ReviewCard } from "./review-card";
 import { cn } from "@/lib/utils";
 import { useReviewStore } from "@/stores/review-store";
@@ -57,6 +57,7 @@ interface EntityGroupProps {
   currentUserId?: string | null;
   onClaim?: (mappingId: string, assigneeId: string | null) => void;
   onBatchAssign?: (mappingIds: string[], assigneeId: string | null) => void;
+  onExcludeEntity?: (entityId: string, entityName: string) => void;
 }
 
 export function EntityGroup({
@@ -71,6 +72,7 @@ export function EntityGroup({
   currentUserId,
   onClaim,
   onBatchAssign,
+  onExcludeEntity,
 }: EntityGroupProps) {
   const router = useRouter();
   const { collapsedEntityIds, toggleEntityCollapsed } = useReviewStore();
@@ -209,6 +211,20 @@ export function EntityGroup({
         >
           <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
+
+        {/* Exclude entity from transfer review */}
+        {onExcludeEntity && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onExcludeEntity(entityId, entityName);
+            }}
+            className="shrink-0 p-1 rounded hover:bg-red-50 transition-colors"
+            title="Mark entity as not needed for this transfer"
+          >
+            <XCircle className="h-3.5 w-3.5 text-muted-foreground hover:text-red-500" />
+          </button>
+        )}
       </div>
 
       {/* Body — collapsible, default open */}
