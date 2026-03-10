@@ -64,9 +64,9 @@ export function StatusDistribution({ stats }: { stats: DashboardStats }) {
                     {MAPPING_STATUS_LABELS[status as MappingStatus] || status}
                   </span>
                 </div>
-                <span className="tabular-nums text-muted-foreground">
+                <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
                   <span className="font-medium text-foreground">{count}</span>
-                  <span className="ml-1.5">{pct}%</span>
+                  <span>{pct}%</span>
                 </span>
               </div>
             );
