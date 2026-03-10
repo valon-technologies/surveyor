@@ -90,10 +90,66 @@ Created 24 tickets (MAP-819–845) in [Surveyor UX Feedback](https://linear.app/
 | MAP-858 | Generate mappings for M3 VDS fields | High |
 | MAP-859 | Sync new M2.5 SDT fields from Linear (done) | Urgent |
 
+## Session 2: Generation, Scripts, Client Q&A, Demo Prep
+
+### Tickets Closed (13 total this session)
+MAP-768 (feedback loop — working as designed), MAP-830 (Linear reference), MAP-833 (client source badge), MAP-836 (reasoning quality), MAP-841 (entity exclusion button), MAP-843 (punt note required), MAP-845 (leaderboard empty), MAP-851, MAP-852, MAP-854, MAP-857 (client Q&A), MAP-859 (M2.5 sync), MAP-860 (transfer AI reviews)
+
+### M2.5 Gap Fill Generation
+- 225 gap fields across 37 entities identified
+- First attempt via batch runner failed: all 37 entities hit "prompt too long" (200K+) because source schema was 75K tokens unbounded
+- **No money spent** — API rejected all requests at 400 before processing
+- Fixed: capped non-relevant source schema at 40K tokens in runner.ts
+- Second attempt succeeded: ~20 entities generated, rest failed on stale "running" records (cleaned up)
+- 153 AI reviews generated, 0 errors
+
+### Batch Runner Bugs Fixed
+1. **Silent error swallowing** — entity failures now logged with error message
+2. **Mapping rollback on failure** — retired mappings restored if generation fails
+3. **Source schema cap** — non-relevant tables limited to 40K tokens
+
+### Unified Scripts (MAP-861)
+- `scripts/generate.ts` — SDT + transfer generation with --milestone, --gaps-only, --entity, --with-reviews, --transfer, --dry-run
+- `scripts/review.ts` — AI review pass with --milestone, --entity, --transfer, --all, --missing-only, --fix-acdc, --dry-run
+- Replaces 5+ ad-hoc scripts
+
+### Client Q&A Workflow (MAP-857)
+- Extracted `resolveQuestion()` shared helper from resolve API route
+- New admin "Client Q&A" tab (SDT only) with curation UI
+- Export selected questions as XLSX for client
+- Import completed XLSX with client answers → creates pending learnings
+- Client-sourced learnings get "Client answer" badge on Corrections tab
+
+### System Field Filter Expansion
+- Shared `isSystemField()` util catches: bare `id`, `_id`/`_sid` suffixes, `created_at`/`updated_at`/`deleted_at`
+- ~449 additional system fields now hidden by default
+- Entity exclusion X button added to transfer review queue headers
+
+### Transfer Review Sheet Export
+- `scripts/export-transfer-review-sheet.ts` — generates XLSX for offline transfer review
+- Pre-populated with AI mapping data, reviewer fills in verdicts/corrections
+- Generated Premier sheet (940 rows)
+
+### Coverage Inventory (post-generation)
+| Milestone | Fields | Mapped | AI Review | Accepted | Gap |
+|-----------|--------|--------|-----------|----------|-----|
+| M1 | 497 | 400 | 147 | 45 | 97 |
+| M2 | 200 | 148 | 56 | 19 | 52 |
+| M2.5 | 356 | 157 | 88 | 43 | 199 |
+
+### New Linear Issues
+| ID | Title | Priority |
+|-----|-------|----------|
+| MAP-861 | Standardize generation/review scripts (done) | High |
+| MAP-862 | Parse extract request forms into per-entity context docs | High |
+
 ## Scripts Created
 - `scripts/fix-transfer-ai-reviews.ts` — re-run corrupted transfer AI reviews
 - `scripts/import-new-m25-fields.ts` — import fields from Linear with parent-based entity resolution
 - `scripts/import-extract-forms.ts` — parse XLSX and import as context docs
+- `scripts/generate.ts` — unified generation CLI
+- `scripts/review.ts` — unified AI review CLI
+- `scripts/export-transfer-review-sheet.ts` — transfer review XLSX export
 
 ## Files Modified (Key)
 - `src/lib/hooks/use-chat-stream.ts` — timeout + error handling
