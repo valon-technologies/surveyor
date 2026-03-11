@@ -480,7 +480,7 @@ async function generateAssemblyEntity(
             workspaceId,
             schemaAssetId: parentEntity.schemaAssetId,
             name: compEntityName,
-            displayName: comp.description,
+            displayName: comp.name,
             side: "target",
             description: `Component of ${batch.entityName}: ${comp.description}`,
             parentEntityId: batch.entityId,
