@@ -49,9 +49,9 @@ export function BulkActionBar({
 
   const selectedArray = Array.from(selectedIds);
   const selectedCards = allCards.filter((c) => selectedIds.has(c.id));
-  const excludableCards = selectedCards.filter(
-    (c) => c.status !== "unreviewed" && c.status !== "unmapped" && c.status !== "excluded"
-  );
+  // Bulk exclude from the action bar allows all statuses except already-excluded
+  // (the act of selecting and excluding IS the review decision)
+  const excludableCards = selectedCards.filter((c) => c.status !== "excluded");
   const excludableIds = excludableCards.map((c) => c.id);
   const skippedCount = selectedIds.size - excludableIds.length;
 
