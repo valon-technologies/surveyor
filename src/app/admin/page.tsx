@@ -23,6 +23,7 @@ interface PendingLearning {
   content: string;
   source: string;
   validationStatus: string;
+  workflow: "sdt" | "transfer" | "client";
   createdAt: string;
 }
 
@@ -59,12 +60,12 @@ export default function AdminPage() {
     queryKey: ["admin", "validation", workspaceId],
     queryFn: () => api.get<PendingLearning[]>(`${basePath}/validation?status=pending`),
   });
-  // Client-side workflow filter: "client" source = client Q&A, "review" = SDT/transfer review verdicts
-  // Transfer learnings aren't distinguishable from SDT yet, so show all for both workflows
-  const pendingLearnings = allPendingLearnings?.map((l) => ({
-    ...l,
-    isClientSource: l.source === "client",
-  }));
+  // Filter learnings by selected workflow
+  const pendingLearnings = allPendingLearnings?.filter((l) => {
+    if (workflow === "sdt") return l.workflow === "sdt" || l.workflow === "client";
+    if (workflow === "transfers") return l.workflow === "transfer";
+    return true;
+  });
 
   const validateMutation = useMutation({
     mutationFn: (input: { learningId: string; action: "validate" | "reject" }) =>
@@ -220,9 +221,14 @@ export default function AdminPage() {
                     {l.entityName || "Unknown entity"}
                     {l.fieldName && `.${l.fieldName}`}
                   </span>
-                  {l.source === "client" && (
+                  {l.workflow === "client" && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 ml-2">
                       Client answer
+                    </span>
+                  )}
+                  {l.workflow === "transfer" && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 ml-2">
+                      Transfer
                     </span>
                   )}
                   <span className="text-[10px] text-muted-foreground ml-2">

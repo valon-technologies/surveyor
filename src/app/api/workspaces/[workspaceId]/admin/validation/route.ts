@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
 import { learning, entity, field, fieldMapping } from "@/lib/db/schema";
-import { eq, and, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, sql } from "drizzle-orm";
 import { rebuildEntityKnowledge } from "@/lib/generation/entity-knowledge";
 import { emitFeedbackEvent } from "@/lib/feedback/emit-event";
 
@@ -28,10 +28,31 @@ export const GET = withAuth(
       .orderBy(learning.createdAt)
       ;
 
+    // Determine workflow for each learning by checking if entity has transfer mappings
+    const entityIds = [...new Set(rows.map((r) => r.learning.entityId).filter(Boolean))] as string[];
+    const transferEntityIds = new Set<string>();
+    if (entityIds.length > 0) {
+      const transferEntities = await db
+        .select({ entityId: field.entityId })
+        .from(fieldMapping)
+        .innerJoin(field, eq(field.id, fieldMapping.targetFieldId))
+        .where(and(
+          isNotNull(fieldMapping.transferId),
+          eq(fieldMapping.isLatest, true),
+        ))
+        .groupBy(field.entityId);
+      for (const r of transferEntities) {
+        transferEntityIds.add(r.entityId);
+      }
+    }
+
     return NextResponse.json(
       rows.map((r) => ({
         ...r.learning,
         entityName: r.entityName,
+        workflow: r.learning.source === "client" ? "client"
+          : r.learning.entityId && transferEntityIds.has(r.learning.entityId) ? "transfer"
+          : "sdt",
       }))
     );
   },
