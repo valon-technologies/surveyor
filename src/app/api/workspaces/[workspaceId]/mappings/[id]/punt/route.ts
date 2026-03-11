@@ -47,51 +47,54 @@ export const POST = withAuth(
       .where(eq(fieldMapping.id, id))
       ;
 
-    // Auto-reassign to the least-loaded editor (excluding current assignee)
-    let newAssigneeId: string | null = null;
-    const members = await db
-      .select({ userId: userWorkspace.userId, role: userWorkspace.role })
-      .from(userWorkspace)
-      .where(
-        and(
-          eq(userWorkspace.workspaceId, workspaceId),
-          inArray(userWorkspace.role, ["editor", "owner"]),
-        )
-      );
+    // Assign to explicit user if specified, otherwise auto-assign to least-loaded editor
+    let newAssigneeId: string | null = parsed.data.assigneeId ?? null;
 
-    const candidates = members.filter((m) => m.userId !== mapping.assigneeId);
-
-    if (candidates.length > 0) {
-      // Count active assignments per candidate (non-terminal statuses)
-      const counts = await db
-        .select({
-          assigneeId: fieldMapping.assigneeId,
-          count: sql<number>`count(*)::int`,
-        })
-        .from(fieldMapping)
+    if (!newAssigneeId) {
+      const members = await db
+        .select({ userId: userWorkspace.userId, role: userWorkspace.role })
+        .from(userWorkspace)
         .where(
           and(
-            eq(fieldMapping.workspaceId, workspaceId),
-            eq(fieldMapping.isLatest, true),
-            inArray(
-              fieldMapping.assigneeId,
-              candidates.map((c) => c.userId)
-            ),
+            eq(userWorkspace.workspaceId, workspaceId),
+            inArray(userWorkspace.role, ["editor", "owner"]),
           )
-        )
-        .groupBy(fieldMapping.assigneeId);
+        );
 
-      const countMap: Record<string, number> = {};
-      for (const c of candidates) countMap[c.userId] = 0;
-      for (const row of counts) {
-        if (row.assigneeId) countMap[row.assigneeId] = row.count;
+      const candidates = members.filter((m) => m.userId !== mapping.assigneeId);
+
+      if (candidates.length > 0) {
+        const counts = await db
+          .select({
+            assigneeId: fieldMapping.assigneeId,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(fieldMapping)
+          .where(
+            and(
+              eq(fieldMapping.workspaceId, workspaceId),
+              eq(fieldMapping.isLatest, true),
+              inArray(
+                fieldMapping.assigneeId,
+                candidates.map((c) => c.userId)
+              ),
+            )
+          )
+          .groupBy(fieldMapping.assigneeId);
+
+        const countMap: Record<string, number> = {};
+        for (const c of candidates) countMap[c.userId] = 0;
+        for (const row of counts) {
+          if (row.assigneeId) countMap[row.assigneeId] = row.count;
+        }
+
+        newAssigneeId = candidates.reduce((best, cur) =>
+          (countMap[cur.userId] ?? 0) < (countMap[best.userId] ?? 0) ? cur : best
+        ).userId;
       }
+    }
 
-      // Pick least-loaded candidate
-      newAssigneeId = candidates.reduce((best, cur) =>
-        (countMap[cur.userId] ?? 0) < (countMap[best.userId] ?? 0) ? cur : best
-      ).userId;
-
+    if (newAssigneeId) {
       await db.update(fieldMapping)
         .set({ assigneeId: newAssigneeId, updatedAt: now })
         .where(eq(fieldMapping.id, id));

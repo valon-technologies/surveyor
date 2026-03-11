@@ -37,6 +37,7 @@ import {
 import { CitationMarkdown } from "@/components/context/citation-markdown";
 import { ContextUsedPanel } from "@/components/review/context-used-panel";
 import { useReviewAnalytics } from "@/lib/analytics/use-review-analytics";
+import { useWorkspaceMembers } from "@/queries/member-queries";
 
 export function DiscussClient() {
   const params = useParams<{ fieldMappingId: string }>();
@@ -55,6 +56,9 @@ export function DiscussClient() {
   const puntMutation = usePuntMapping();
   const [showPuntDialog, setShowPuntDialog] = useState(false);
   const [puntNote, setPuntNote] = useState("");
+  const [puntAssigneeId, setPuntAssigneeId] = useState<string>("auto");
+  const { data: members } = useWorkspaceMembers();
+  const assignableMembers = (members || []).filter((m) => m.role === "editor" || m.role === "owner");
 
   const { data: linkedQuestion } = useFieldMappingQuestion(fieldMappingId);
 
@@ -813,11 +817,25 @@ export function DiscussClient() {
             <div className="relative bg-background rounded-xl shadow-lg w-full max-w-md p-6 space-y-4">
               <h3 className="text-lg font-semibold">Punt Mapping</h3>
               <p className="text-sm text-muted-foreground">
-                Pass <strong>{entityName}.{targetFieldName}</strong> to another reviewer.
-                It will be auto-assigned to the least-loaded team member.
+                Delegate <strong>{entityName}.{targetFieldName}</strong> to another reviewer.
               </p>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Reason</label>
+                <label className="text-sm font-medium">Punt to</label>
+                <select
+                  value={puntAssigneeId}
+                  onChange={(e) => setPuntAssigneeId(e.target.value)}
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="auto">Auto-assign (least loaded)</option>
+                  {assignableMembers.map((m) => (
+                    <option key={m.userId} value={m.userId}>
+                      {m.name || m.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Note</label>
                 <textarea
                   className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   placeholder="Why are you punting this mapping?"
@@ -826,14 +844,14 @@ export function DiscussClient() {
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => { setShowPuntDialog(false); setPuntNote(""); }}>
+                <Button variant="outline" onClick={() => { setShowPuntDialog(false); setPuntNote(""); setPuntAssigneeId("auto"); }}>
                   Cancel
                 </Button>
                 <Button
                   onClick={() => {
                     if (!puntNote.trim()) return;
                     puntMutation.mutate(
-                      { mappingId: activeMappingId, note: puntNote.trim() },
+                      { mappingId: activeMappingId, note: puntNote.trim(), assigneeId: puntAssigneeId !== "auto" ? puntAssigneeId : undefined },
                       {
                         onSuccess: () => {
                           setShowPuntDialog(false);

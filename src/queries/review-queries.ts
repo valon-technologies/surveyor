@@ -132,6 +132,7 @@ export function usePuntMapping() {
       assignToSM?: boolean;
       questionText?: string;
       priority?: string;
+      assigneeId?: string;
     }) => api.post(`${basePath}/${mappingId}/punt`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["review-queue"] });

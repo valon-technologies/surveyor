@@ -10,6 +10,7 @@ export const puntMappingSchema = z.object({
   assignToSM: z.boolean().optional().default(false),
   questionText: z.string().optional(),
   priority: z.enum(QUESTION_PRIORITIES).optional().default("normal"),
+  assigneeId: z.string().optional(),
 });
 
 export const excludeMappingSchema = z.object({
