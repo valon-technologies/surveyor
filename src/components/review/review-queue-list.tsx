@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useReviewQueue, useReassignMapping } from "@/queries/review-queries";
+import { useReviewQueue, useReassignMapping, useBatchExclude } from "@/queries/review-queries";
+import { BulkActionBar } from "./bulk-action-bar";
 import { useReviewStore } from "@/stores/review-store";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { api, workspacePath } from "@/lib/api-client";
@@ -40,7 +41,26 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
       qc.invalidateQueries({ queryKey: ["review-queue"] });
     },
   });
+  const batchExcludeMutation = useBatchExclude();
   const currentUserId = (session?.user as { id?: string })?.id ?? null;
+
+  // Selection state for bulk actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+  const selectEntity = useCallback((ids: string[], selected: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) { if (selected) next.add(id); else next.delete(id); }
+      return next;
+    });
+  }, []);
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
   const {
     confidenceFilter,
@@ -85,6 +105,9 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
       return true;
     });
   }, [cards, milestoneFilter, hideSystemFields, assigneeFilter, currentUserId, searchQuery]);
+
+  // Clear selection when filters change
+  useEffect(() => { clearSelection(); }, [filteredCards]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist filtered queue order for discuss page navigation
   useEffect(() => {
@@ -319,8 +342,26 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
           currentUserId={currentUserId}
           onClaim={(mappingId, assigneeId) => claimMutation.mutate({ mappingId, assigneeId })}
           onBatchAssign={(mappingIds, assigneeId) => batchAssignMutation.mutate({ mappingIds, assigneeId })}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onSelectEntity={selectEntity}
         />
       ))}
+
+      {/* Bulk action bar */}
+      <BulkActionBar
+        selectedIds={selectedIds}
+        allCards={filteredCards}
+        currentUserId={currentUserId}
+        onBulkAssign={(ids, assigneeId) => {
+          batchAssignMutation.mutate({ mappingIds: ids, assigneeId }, { onSuccess: clearSelection });
+        }}
+        onBulkExclude={(ids, reason) => {
+          batchExcludeMutation.mutate({ mappingIds: ids, reason }, { onSuccess: clearSelection });
+        }}
+        onClearSelection={clearSelection}
+        isPending={batchAssignMutation.isPending || batchExcludeMutation.isPending}
+      />
     </div>
   );
 }

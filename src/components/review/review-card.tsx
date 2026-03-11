@@ -20,6 +20,8 @@ interface ReviewCardProps {
   onAcceptWithRipple?: (card: ReviewCardData) => void;
   currentUserId?: string | null;
   onClaim?: (mappingId: string, assigneeId: string | null) => void;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 function buildSqlPreview(card: ReviewCardData): string | null {
@@ -37,7 +39,7 @@ function buildSqlPreview(card: ReviewCardData): string | null {
   return `${target} ← ${src}`;
 }
 
-export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple, currentUserId, onClaim }: ReviewCardProps) {
+export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple, currentUserId, onClaim, isSelected, onToggleSelect }: ReviewCardProps) {
   const router = useRouter();
   const acceptMutation = useAcceptMapping();
   const undoMutation = useUndoReview();
@@ -45,12 +47,6 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple, curren
   const { data: members } = useWorkspaceMembers();
   const [expanded, setExpanded] = useState(false);
   const [assignDropdownOpen, setAssignDropdownOpen] = useState(false);
-  const [optimisticAssigneeId, setOptimisticAssigneeId] = useState<string | null | undefined>(undefined);
-
-  // Reset optimistic state when server data arrives
-  useEffect(() => {
-    setOptimisticAssigneeId(undefined);
-  }, [card.assigneeId]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -119,6 +115,7 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple, curren
     <div
       className={cn(
         "rounded-lg border transition-colors border-l-[3px]",
+        isSelected && "ring-2 ring-primary/20",
         isAccepted
           ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
           : isPunted
@@ -131,32 +128,16 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple, curren
     >
       {/* Header row */}
       <div className="flex items-center gap-3 px-3 py-2">
-        {/* Claim checkbox (optimistic) */}
-        {onClaim && currentUserId && (() => {
-          const effectiveAssigneeId = optimisticAssigneeId !== undefined ? optimisticAssigneeId : card.assigneeId;
-          const isMine = effectiveAssigneeId === currentUserId;
-          const claimedByOther = effectiveAssigneeId && effectiveAssigneeId !== currentUserId;
-          if (claimedByOther) {
-            return (
-              <span title={`Claimed by ${card.assigneeName}`} className="shrink-0">
-                <UserCheck className="h-3.5 w-3.5 text-amber-500" />
-              </span>
-            );
-          }
-          return (
-            <input
-              type="checkbox"
-              checked={!!isMine}
-              onChange={() => {
-                const newAssignee = isMine ? null : currentUserId;
-                setOptimisticAssigneeId(newAssignee);
-                onClaim(card.id, newAssignee);
-              }}
-              title={isMine ? "Release this field" : "Claim for review"}
-              className="h-3.5 w-3.5 rounded border-gray-300 text-primary cursor-pointer shrink-0"
-            />
-          );
-        })()}
+        {/* Selection checkbox */}
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={!!isSelected}
+            onChange={() => onToggleSelect(card.id)}
+            title="Select for bulk action"
+            className="h-3.5 w-3.5 rounded border-gray-300 text-primary cursor-pointer shrink-0"
+          />
+        )}
 
         {/* Expand toggle (for notes/punt note) */}
         {hasExpandableDetails ? (

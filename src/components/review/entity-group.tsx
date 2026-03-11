@@ -58,6 +58,9 @@ interface EntityGroupProps {
   onClaim?: (mappingId: string, assigneeId: string | null) => void;
   onBatchAssign?: (mappingIds: string[], assigneeId: string | null) => void;
   onExcludeEntity?: (entityId: string, entityName: string) => void;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onSelectEntity?: (ids: string[], selected: boolean) => void;
 }
 
 export function EntityGroup({
@@ -73,6 +76,9 @@ export function EntityGroup({
   onClaim,
   onBatchAssign,
   onExcludeEntity,
+  selectedIds,
+  onToggleSelect,
+  onSelectEntity,
 }: EntityGroupProps) {
   const router = useRouter();
   const { collapsedEntityIds, toggleEntityCollapsed } = useReviewStore();
@@ -129,21 +135,25 @@ export function EntityGroup({
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleEntityCollapsed(entityId); } }}
         className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors rounded-t-xl cursor-pointer"
       >
-        {/* Entity-level claim checkbox */}
-        {onBatchAssign && currentUserId && (
-          <input
-            type="checkbox"
-            checked={!!allClaimedByMe}
-            ref={(el) => { if (el) el.indeterminate = !!someClaimedByMe && !allClaimedByMe; }}
-            onChange={(e) => {
-              e.stopPropagation();
-              onBatchAssign(allCardIds, allClaimedByMe ? null : currentUserId);
-            }}
-            onClick={(e) => e.stopPropagation()}
-            title={allClaimedByMe ? "Release all fields" : "Claim all fields in this entity"}
+        {/* Entity-level selection checkbox */}
+        {onSelectEntity && selectedIds && (() => {
+          const allSelected = allCardIds.length > 0 && allCardIds.every((id) => selectedIds.has(id));
+          const someSelected = allCardIds.some((id) => selectedIds.has(id));
+          return (
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
+              onChange={(e) => {
+                e.stopPropagation();
+                onSelectEntity(allCardIds, !allSelected);
+              }}
+              onClick={(e) => e.stopPropagation()}
+            title={allSelected ? "Deselect all" : "Select all fields in this entity"}
             className="h-3.5 w-3.5 rounded border-gray-300 text-primary cursor-pointer shrink-0"
           />
-        )}
+          );
+        })()}
 
         {isCollapsed ? (
           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -240,6 +250,8 @@ export function EntityGroup({
               onAcceptWithRipple={onAcceptWithRipple}
               currentUserId={currentUserId}
               onClaim={onClaim}
+              isSelected={selectedIds?.has(card.id)}
+              onToggleSelect={onToggleSelect}
             />
           ))}
 
@@ -253,6 +265,8 @@ export function EntityGroup({
               onAcceptWithRipple={onAcceptWithRipple}
               currentUserId={currentUserId}
               onClaim={onClaim}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
             />
           ))}
         </div>
@@ -268,6 +282,8 @@ function ChildEntitySection({
   onAcceptWithRipple,
   currentUserId,
   onClaim,
+  selectedIds,
+  onToggleSelect,
 }: {
   child: ChildEntityGroup;
   onPunt: (card: ReviewCardData) => void;
@@ -275,6 +291,8 @@ function ChildEntitySection({
   onAcceptWithRipple?: (card: ReviewCardData) => void;
   currentUserId?: string | null;
   onClaim?: (mappingId: string, assigneeId: string | null) => void;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
 }) {
   const sorted = useMemo(() => sortCards(child.cards), [child.cards]);
 
@@ -296,6 +314,8 @@ function ChildEntitySection({
             onAcceptWithRipple={onAcceptWithRipple}
             currentUserId={currentUserId}
             onClaim={onClaim}
+            isSelected={selectedIds?.has(card.id)}
+            onToggleSelect={onToggleSelect}
           />
         ))}
       </div>

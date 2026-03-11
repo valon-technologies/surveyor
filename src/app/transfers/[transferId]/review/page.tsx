@@ -11,6 +11,7 @@ import { api, workspacePath } from "@/lib/api-client";
 import { ArrowLeft, Users, EyeOff, Eye, XCircle, ClipboardCheck } from "lucide-react";
 import { DistributeDialog } from "@/components/review/distribute-dialog";
 import { EntityGroup } from "@/components/review/entity-group";
+import { BulkActionBar } from "@/components/review/bulk-action-bar";
 import { useReassignMapping } from "@/queries/review-queries";
 import type { ReviewCardData, ChildEntityGroup } from "@/types/review";
 import type { MappingStatus } from "@/lib/constants";
@@ -79,7 +80,33 @@ export default function TransferReviewPage() {
     },
   });
 
+  const batchExcludeMutation = useMutation({
+    mutationFn: ({ mappingIds, reason }: { mappingIds: string[]; reason?: string }) =>
+      api.post(workspacePath(workspaceId, "mappings/batch-exclude"), { mappingIds, reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transfer-review-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["review-queue"] });
+    },
+  });
   const currentUserId = (session?.user as { id?: string })?.id ?? null;
+
+  // Selection state for bulk actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+  const selectEntity = useCallback((ids: string[], selected: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) { if (selected) next.add(id); else next.delete(id); }
+      return next;
+    });
+  }, []);
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
   const { data: transfer } = useQuery<TransferInfo>({
     queryKey: ["transfer", transferId],
@@ -382,6 +409,9 @@ export default function TransferReviewPage() {
               onClaim={(mappingId, assigneeId) => claimMutation.mutate({ mappingId, assigneeId })}
               onBatchAssign={(mappingIds, assigneeId) => batchAssignMutation.mutate({ mappingIds, assigneeId })}
               onExcludeEntity={(eid, ename) => toggleEntityExclusion(eid, ename, true)}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onSelectEntity={selectEntity}
             />
           ))}
           {entityGroups.length === 0 && !isLoading && (
@@ -398,6 +428,20 @@ export default function TransferReviewPage() {
           onClose={() => setDistributeOpen(false)}
         />
       )}
+
+      <BulkActionBar
+        selectedIds={selectedIds}
+        allCards={filtered}
+        currentUserId={currentUserId}
+        onBulkAssign={(ids, assigneeId) => {
+          batchAssignMutation.mutate({ mappingIds: ids, assigneeId }, { onSuccess: clearSelection });
+        }}
+        onBulkExclude={(ids, reason) => {
+          batchExcludeMutation.mutate({ mappingIds: ids, reason }, { onSuccess: clearSelection });
+        }}
+        onClearSelection={clearSelection}
+        isPending={batchAssignMutation.isPending || batchExcludeMutation.isPending}
+      />
     </div>
   );
 }
