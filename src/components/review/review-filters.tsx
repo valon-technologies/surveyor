@@ -133,18 +133,12 @@ export function ReviewFilters() {
         onChange={(e) => setAssigneeFilter(e.target.value as typeof assigneeFilter)}
         className="w-36"
       />
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto">
         <Select
           options={sortOptions}
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
           className="w-32"
-        />
-        <Select
-          options={orderOptions}
-          value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)}
-          className="w-28"
         />
       </div>
     </div>
