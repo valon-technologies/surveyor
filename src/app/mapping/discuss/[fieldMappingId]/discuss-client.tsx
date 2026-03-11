@@ -152,21 +152,8 @@ export function DiscussClient() {
     }
   }, [sessionData]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-send kickoff message to start the conversation
-  // Skip if a pre-generated AI review already exists — reviewer can chat on demand
-  useEffect(() => {
-    if (!activeSessionId || kickoffSent || isStreaming) return;
-    if (aiReview?.reviewText) return; // Pre-generated review available, don't auto-kick
-    // Only kick off if no user/assistant messages exist yet (fresh session)
-    const hasConversation = messages.some((m) => m.role !== "system");
-    if (hasConversation) return;
-
-    setKickoffSent(true);
-    sendMessage(
-      "Review this mapping and help me improve it. What questions do you have?",
-      { kickoff: true }
-    );
-  }, [activeSessionId, messages, kickoffSent, isStreaming, aiReview]); // eslint-disable-line react-hooks/exhaustive-deps
+  // LLM chat is on-demand only — reviewer must explicitly send a message to start a conversation.
+  // Pre-generated AI review text (if available) still displays statically.
 
   // Derive mapping state for the right panel
   const targetMeta = mapping?.targetField?.metadata as Record<string, unknown> | null | undefined;
@@ -327,17 +314,15 @@ export function DiscussClient() {
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
-            size="icon"
+            size="sm"
             onClick={() => {
-              if (window.history.length > 1) {
-                router.back();
-              } else {
-                const tid = mapping?.transferId;
-                router.push(tid ? `/transfers/${tid}/review` : "/mapping");
-              }
+              const tid = mapping?.transferId;
+              router.push(tid ? `/transfers/${tid}/review` : "/mapping");
             }}
+            className="text-muted-foreground hover:text-foreground"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Review Queue
           </Button>
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm">{entityName}.{targetFieldName}</span>
@@ -394,23 +379,29 @@ export function DiscussClient() {
             <SkipForward className="h-3.5 w-3.5 mr-1" />
             Punt
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              excludeMutation.mutate({ mappingId: activeMappingId }, {
-                onSuccess: () => {
-                  const tid = mapping?.transferId;
-                  router.push(tid ? `/transfers/${tid}/review` : "/mapping");
-                },
-              })
-            }
-            disabled={excludeMutation.isPending}
-            className="text-muted-foreground hover:text-destructive hover:border-destructive"
-          >
-            <Ban className="h-3.5 w-3.5 mr-1" />
-            Exclude
-          </Button>
+          {(() => {
+            const canExclude = mapping?.status && mapping.status !== "unreviewed" && mapping.status !== "unmapped";
+            return (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  excludeMutation.mutate({ mappingId: activeMappingId }, {
+                    onSuccess: () => {
+                      const tid = mapping?.transferId;
+                      router.push(tid ? `/transfers/${tid}/review` : "/mapping");
+                    },
+                  })
+                }
+                disabled={excludeMutation.isPending || !canExclude}
+                title={!canExclude ? "Field must be reviewed before it can be excluded" : undefined}
+                className="text-muted-foreground hover:text-destructive hover:border-destructive"
+              >
+                <Ban className="h-3.5 w-3.5 mr-1" />
+                Exclude
+              </Button>
+            );
+          })()}
         </div>
       </div>
 

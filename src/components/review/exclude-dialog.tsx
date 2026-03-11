@@ -159,6 +159,9 @@ export function ExcludeDialog({ card, onClose }: ExcludeDialogProps) {
     });
   };
 
+  // Only reviewed fields can be excluded (not unreviewed or unmapped)
+  const canExcludePrimary = card.status !== "unreviewed" && card.status !== "unmapped";
+
   const handleExclude = async () => {
     try {
       if (selectedIds.size === 0) {
@@ -168,9 +171,10 @@ export function ExcludeDialog({ card, onClose }: ExcludeDialogProps) {
           reason: reason.trim() || undefined,
         });
       } else {
-        // Batch exclude (includes the primary card)
+        // Batch exclude — filter out unreviewed/unmapped from selection
+        const allIds = [card.id, ...Array.from(selectedIds)];
         await batchMutation.mutateAsync({
-          mappingIds: [card.id, ...Array.from(selectedIds)],
+          mappingIds: allIds,
           reason: reason.trim() || undefined,
         });
       }
@@ -294,13 +298,16 @@ export function ExcludeDialog({ card, onClose }: ExcludeDialogProps) {
           <Button
             variant="destructive"
             onClick={handleExclude}
-            disabled={isPending}
+            disabled={isPending || !canExcludePrimary}
+            title={!canExcludePrimary ? "Field must be reviewed before it can be excluded" : undefined}
           >
             {isPending
               ? "Excluding..."
-              : totalToExclude > 1
-                ? `Exclude ${totalToExclude} fields`
-                : "Exclude"}
+              : !canExcludePrimary
+                ? "Review required first"
+                : totalToExclude > 1
+                  ? `Exclude ${totalToExclude} fields`
+                  : "Exclude"}
           </Button>
         </div>
 
