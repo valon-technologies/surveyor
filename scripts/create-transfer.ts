@@ -162,17 +162,31 @@ async function main() {
   const sourceFieldsPath = join(dir, "source-fields.csv");
 
   if (ext === ".xlsx" || ext === ".xls") {
-    // Excel file — use xlsx package
+    // Excel file — iterate ALL sheets, prefix field names with sheet slug for multi-sheet files
     const XLSX = require("xlsx");
     const wb = XLSX.readFile(sourcePath);
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const data: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-    const headers = (data[0] || []).map(String);
-    const dataRows = data.slice(1).map((row: unknown[]) => row.map(String));
-    console.log(`Excel: ${wb.SheetNames[0]} — ${headers.length} columns, ${dataRows.length} data rows`);
-    fields = parseRawData(headers, dataRows);
+    const multiSheet = wb.SheetNames.length > 1;
+
+    for (const sheetName of wb.SheetNames) {
+      const ws = wb.Sheets[sheetName];
+      const data: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      const headers = (data[0] || []).map(String);
+      const dataRows = data.slice(1).map((row: unknown[]) => row.map(String));
+      if (headers.length === 0) continue;
+
+      // For multi-sheet files, prefix field names with a sheet slug (e.g., "escrow_line_detail.FIELD")
+      const sheetSlug = sheetName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/(^_|_$)/g, "");
+      const sheetFields = parseRawData(headers, dataRows).map(f => ({
+        ...f,
+        fieldName: multiSheet ? `${sheetSlug}.${f.fieldName}` : f.fieldName,
+      }));
+
+      console.log(`Excel: ${sheetName} — ${headers.length} columns, ${dataRows.length} data rows → ${sheetFields.length} fields${multiSheet ? ` (prefix: ${sheetSlug})` : ""}`);
+      fields.push(...sheetFields);
+    }
+
     writeSourceFieldsCSV(fields, sourceFieldsPath);
-    console.log(`Generated: ${sourceFieldsPath}`);
+    console.log(`Generated: ${sourceFieldsPath} (${fields.length} total fields)`);
   } else if (ext === ".csv") {
     // CSV — detect if pre-parsed or raw data
     const raw = readFileSync(sourcePath, "utf-8");

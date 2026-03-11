@@ -172,3 +172,49 @@ position,field_name,sample_value
 170,MERSMIN,100072450016033000
 171,REGISTERED_WITH_MERS,Y
 172,MOM_LOAN_INDICATOR,Y
+172,pay_histories_file.RELEASE_ID,SMC020226A
+173,pay_histories_file.ACCOUNTNUMBER,1111111111
+174,pay_histories_file.NEW_SERVICER_LOAN_NUMBER,1111111111
+175,pay_histories_file.CMG_LOAN_NUMBER,1111111111
+176,pay_histories_file.POSTING_DATE,46003
+177,pay_histories_file.EFFECTIVE_DATE,45992
+178,pay_histories_file.PAID_TO_DATE,46023
+179,pay_histories_file.TRANSACTION_CODE,SR
+180,pay_histories_file.TRANSACTION_DESCRIPTION,Single Item Receipt
+181,pay_histories_file.TOTAL_AMOUNT,7688.44
+182,pay_histories_file.PRINCIPAL_AMOUNT,0
+183,pay_histories_file.INTEREST_AMOUNT,0
+184,pay_histories_file.ESCROW_AMOUNT,1193.57
+185,pay_histories_file.INSURANCE_AMOUNT,
+186,pay_histories_file.OTHER,6494.87
+187,pay_histories_file.TRANSFERID,SMC020226ASMC
+188,pay_histories_file.TELLER_ID,9990
+189,escrow_line_detail_file.RELEASE_ID,SMC020226A
+190,escrow_line_detail_file.LATEST_DATA_DATE_FLAG,Y
+191,escrow_line_detail_file.ACCOUNTNUMBER,1111111111
+192,escrow_line_detail_file.NEW_SERVICER_LOAN_NUMBER,1111111111
+193,escrow_line_detail_file.BUSINESSDATE,46053
+194,escrow_line_detail_file.ESCROW_LINE_STATUS,5
+195,escrow_line_detail_file.ESCROW_LINE_STATUS_TEXT,Escrowed
+196,escrow_line_detail_file.ESCROW_LINE_TYPE,24
+197,escrow_line_detail_file.EscrowLineType_Text,Hazard
+198,escrow_line_detail_file.ESCROW_LINE_TYPE_TEXT,Hazard Insurance
+199,escrow_line_detail_file.ESCROW_LINE_FREQUENCY,12
+200,escrow_line_detail_file.ESCROW_LINE_AMOUNT_DUE,790
+201,escrow_line_detail_file.ESCROW_LINE_NEXT_DUE_DATE,46433
+202,escrow_line_detail_file.ESCROW_LINE_EXPIRATION_DATE,46433
+203,escrow_line_detail_file.POLICY_NUM_TAX_ID_CERT,6152060000000
+204,escrow_line_detail_file.COMPANY_COUNTY_CODE,1588
+205,escrow_line_detail_file.AGENCY_TOWNSHIP_CODE,1
+206,escrow_line_detail_file.ADDRESS1,PREMIUM PROCESSING
+207,escrow_line_detail_file.ADDRESS2,PO BOX 660307
+208,escrow_line_detail_file.City_State,DALLAS TX
+209,escrow_line_detail_file.Zip,75266
+210,escrow_line_detail_file.COVERAGE_AMOUNT,110800
+211,escrow_line_detail_file.ESCROW_LINE_ACT_DEDUCTIBLE,500
+212,escrow_line_detail_file.ESCROW_LINE_LAST_PAID_DATE,2026-01-26T19:00:00
+213,escrow_line_detail_file.FORCE_PLACED_INSURANCE_FLAG,N
+214,escrow_line_detail_file.STATE_CODE,34
+215,escrow_line_detail_file.STATE_CODE_TEXT,NC North Carolina
+216,escrow_line_detail_file.SVC_RLS_RELEASE_ID,SMC020226A
+217,escrow_line_detail_file.SVC_RLS_PURCHASER_ID,SMC
