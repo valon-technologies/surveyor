@@ -45,6 +45,12 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple, curren
   const { data: members } = useWorkspaceMembers();
   const [expanded, setExpanded] = useState(false);
   const [assignDropdownOpen, setAssignDropdownOpen] = useState(false);
+  const [optimisticAssigneeId, setOptimisticAssigneeId] = useState<string | null | undefined>(undefined);
+
+  // Reset optimistic state when server data arrives
+  useEffect(() => {
+    setOptimisticAssigneeId(undefined);
+  }, [card.assigneeId]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -125,10 +131,11 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple, curren
     >
       {/* Header row */}
       <div className="flex items-center gap-3 px-3 py-2">
-        {/* Claim checkbox */}
+        {/* Claim checkbox (optimistic) */}
         {onClaim && currentUserId && (() => {
-          const isMine = card.assigneeId === currentUserId;
-          const claimedByOther = card.assigneeId && card.assigneeId !== currentUserId;
+          const effectiveAssigneeId = optimisticAssigneeId !== undefined ? optimisticAssigneeId : card.assigneeId;
+          const isMine = effectiveAssigneeId === currentUserId;
+          const claimedByOther = effectiveAssigneeId && effectiveAssigneeId !== currentUserId;
           if (claimedByOther) {
             return (
               <span title={`Claimed by ${card.assigneeName}`} className="shrink-0">
@@ -140,7 +147,11 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple, curren
             <input
               type="checkbox"
               checked={!!isMine}
-              onChange={() => onClaim(card.id, isMine ? null : currentUserId)}
+              onChange={() => {
+                const newAssignee = isMine ? null : currentUserId;
+                setOptimisticAssigneeId(newAssignee);
+                onClaim(card.id, newAssignee);
+              }}
               title={isMine ? "Release this field" : "Claim for review"}
               className="h-3.5 w-3.5 rounded border-gray-300 text-primary cursor-pointer shrink-0"
             />
@@ -265,6 +276,17 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple, curren
               title="Undo"
             >
               <Undo2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {card.status !== "excluded" && card.status !== "unreviewed" && card.status !== "unmapped" && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+              onClick={() => onExclude(card)}
+              title="Exclude from mapping"
+            >
+              <Ban className="h-3.5 w-3.5" />
             </Button>
           )}
           <Button
