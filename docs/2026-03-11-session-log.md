@@ -90,3 +90,28 @@ Massive productivity session: **18 tickets completed and deployed** to surveyor-
 
 ### Low Priority (14)
 MAP-834, MAP-835, MAP-837, MAP-838, MAP-839, MAP-840, MAP-842, MAP-844, MAP-849, MAP-850, MAP-853, MAP-879, MAP-883, MAP-884
+
+---
+
+## Late Session Additions
+
+### Additional Tickets Completed
+| Ticket | Feature | Commit |
+|---|---|---|
+| MAP-888 | Scope AI chat RAG tools to transfer source files (not ACDC) | `6e98531` |
+| MAP-865 | Extract chat learnings into admin validation queue | `7bfd5ef` |
+| MAP-864 | Fix entity displayName (was showing descriptions) | `3c3863e` |
+| MAP-862 | Parse extract forms into 174 per-entity Q&A context docs | `d4d2a0b` |
+| MAP-863 | Import Jacksonville onsite transcripts (5 files, 124K tokens) | `d4d2a0b` |
+| MAP-885 | Checkbox-driven bulk actions (select + floating action bar) | `1dab867` |
+| (fix) | Bulk exclude gate relaxed for action bar | `e28733f` |
+
+**Updated total: 18 tickets completed and deployed.**
+
+### MAP-856 Planning (In Progress)
+Plan written for source + transform accuracy measurement against M1/M2 SOT:
+- Port mapping-engine's `transform_evaluator.py` Opus-based eval to TypeScript
+- 4 metrics: source exact, source lenient, transform exact, transform lenient
+- ~$10-15 per full eval run across ~116 entities
+- Plan file: `~/.claude/plans/dazzling-wiggling-rain.md`
+- Next session: implement and run
