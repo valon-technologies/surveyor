@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/api-auth";
 import { db } from "@/lib/db";
-import { chatSession, chatMessage, entity, field, fieldMapping, workspace } from "@/lib/db/schema";
+import { chatSession, chatMessage, entity, field, fieldMapping, workspace, transfer } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod/v4";
 import { resolveProvider } from "@/lib/generation/provider-resolver";
@@ -287,6 +287,27 @@ export const POST = withAuth(
     const sessionEntityId = session.entityId || "";
     const sessionTargetFieldId = session.targetFieldId || "";
 
+    // Resolve transfer context for RAG tool scoping
+    let sessionTransferId: string | null = null;
+    let sessionTransferSourceAssetId: string | null = null;
+    if (session.fieldMappingId) {
+      const [mapping] = await db
+        .select({ transferId: fieldMapping.transferId })
+        .from(fieldMapping)
+        .where(eq(fieldMapping.id, session.fieldMappingId))
+        .limit(1);
+      if (mapping?.transferId) {
+        sessionTransferId = mapping.transferId;
+        // Load transfer's source schema asset for source field scoping
+        const [t] = await db
+          .select({ sourceSchemaAssetId: transfer.sourceSchemaAssetId })
+          .from(transfer)
+          .where(eq(transfer.id, mapping.transferId))
+          .limit(1);
+        sessionTransferSourceAssetId = t?.sourceSchemaAssetId ?? null;
+      }
+    }
+
     // Stream response via SSE
     const encoder = new TextEncoder();
 
@@ -548,7 +569,8 @@ export const POST = withAuth(
               } else if (tc.name === "search_source_schema") {
                 const result = await executeSourceSchemaSearch(
                   tc.input as unknown as SourceSchemaInput,
-                  workspaceId
+                  workspaceId,
+                  sessionTransferSourceAssetId
                 );
                 const llmContent = formatSourceSchemaForLLM(result);
                 toolResultTokenBudget -= llmContent.length;
@@ -608,7 +630,8 @@ export const POST = withAuth(
                   tc.input as unknown as SiblingMappingsInput,
                   workspaceId,
                   sessionEntityId,
-                  sessionTargetFieldId
+                  sessionTargetFieldId,
+                  sessionTransferId
                 );
                 const llmContent = formatSiblingMappingsForLLM(result);
                 toolResultTokenBudget -= llmContent.length;

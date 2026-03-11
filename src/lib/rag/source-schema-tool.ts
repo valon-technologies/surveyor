@@ -71,14 +71,19 @@ export function getSourceSchemaToolDefinition(): ToolDefinition {
 
 export async function executeSourceSchemaSearch(
   input: SourceSchemaInput,
-  workspaceId: string
+  workspaceId: string,
+  transferSourceAssetId?: string | null
 ): Promise<SourceSchemaResult> {
   const { query, tableName, dataType, limit: rawLimit } = input;
   const maxResults = Math.min(rawLimit || 20, 50);
   const queryLower = query.toLowerCase();
   const queryTokens = queryLower.split(/\s+/).filter(Boolean);
 
-  // Load all source entities + fields
+  // Load source entities — scoped to transfer's source schema when in transfer context
+  const conditions = [eq(entity.workspaceId, workspaceId), eq(entity.side, "source")];
+  if (transferSourceAssetId) {
+    conditions.push(eq(entity.schemaAssetId, transferSourceAssetId));
+  }
   const sourceEntities = await db
     .select({
       id: entity.id,
@@ -86,7 +91,7 @@ export async function executeSourceSchemaSearch(
       displayName: entity.displayName,
     })
     .from(entity)
-    .where(and(eq(entity.workspaceId, workspaceId), eq(entity.side, "source")))
+    .where(and(...conditions))
     ;
 
   if (sourceEntities.length === 0) {

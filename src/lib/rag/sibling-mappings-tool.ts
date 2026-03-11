@@ -87,7 +87,8 @@ export async function executeSiblingMappingLookup(
   input: SiblingMappingsInput,
   workspaceId: string,
   entityId: string,
-  targetFieldId: string
+  targetFieldId: string,
+  transferId?: string | null
 ): Promise<SiblingMappingsResult> {
   const { filter, searchTerm, limit: rawLimit } = input;
   const maxResults = Math.min(rawLimit || 30, 60);
@@ -101,11 +102,15 @@ export async function executeSiblingMappingLookup(
     )
     .filter((f) => f.id !== targetFieldId);
 
-  // Load latest mappings for this workspace
+  // Load latest mappings — scoped to same transfer when in transfer context
+  const mappingConditions = [eq(fieldMapping.workspaceId, workspaceId), eq(fieldMapping.isLatest, true)];
+  if (transferId) {
+    mappingConditions.push(eq(fieldMapping.transferId, transferId));
+  }
   const latestMappings = await db
     .select()
     .from(fieldMapping)
-    .where(and(eq(fieldMapping.workspaceId, workspaceId), eq(fieldMapping.isLatest, true)))
+    .where(and(...mappingConditions))
     ;
 
   // Load source entities for name resolution
