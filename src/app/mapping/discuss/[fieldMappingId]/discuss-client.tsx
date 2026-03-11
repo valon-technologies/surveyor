@@ -203,6 +203,7 @@ export function DiscussClient() {
   const [questionDecision, setQuestionDecision] = useState<boolean>(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [suggestionKey, setSuggestionKey] = useState(0);
+  const [hasNewQuestion, setHasNewQuestion] = useState(false);
 
   // Reset checkbox state when AI proposes a new update (live or pre-generated)
   useEffect(() => {
@@ -210,6 +211,7 @@ export function DiscussClient() {
       setSourceDecision(null);
       setTransformDecision(null);
       setQuestionDecision(false);
+      setHasNewQuestion(false);
       setSuggestionKey((k) => k + 1);
     }
   }, [effectiveUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -506,6 +508,7 @@ export function DiscussClient() {
                   suggestionApplied={false}
                   aiHasOpinion={aiHasReviewed}
                   onDecisionMade={() => setQuestionDecision(true)}
+                  onCreated={() => setHasNewQuestion(true)}
                 />
               ) : null}
             </div>
@@ -609,96 +612,137 @@ export function DiscussClient() {
 
         {/* Submit review bar */}
         {(() => {
-          // Allow submit if: (1) all three verdicts provided, OR (2) field is unmapped and a question decision was made
           const isUnmapped = mappingState?.mappingType === null && !mappingState?.sourceEntityName;
-          const canSubmit = (!!sourceDecision && !!transformDecision && questionDecision)
-            || (isUnmapped && questionDecision);
+          const allVerdictsComplete = !!sourceDecision && !!transformDecision && questionDecision;
+          const hasAnyAction = !!sourceDecision || !!transformDecision || hasNewQuestion;
+          const canSubmit = allVerdictsComplete || (isUnmapped && questionDecision) || hasAnyAction;
+          const submitStatus: MappingStatus = allVerdictsComplete ? "accepted" : "needs_discussion";
+          const submitLabel = allVerdictsComplete ? "Submit & Next" : "Flag & Next";
+
+          // Quick accept: AI reviewed, confirmed current mapping (no changes), no questions, reviewer hasn't started
+          const canQuickAccept = aiHasReviewed
+            && !effectiveUpdate
+            && !linkedQuestion
+            && !sourceDecision && !transformDecision
+            && !isUnmapped;
+
+          const navigateNext = () => {
+            if (nextFromQueue) {
+              router.push(`/mapping/discuss/${nextFromQueue}`);
+            } else {
+              const next = siblingNav?.nextFields?.[0];
+              if (next?.mappingId) {
+                router.push(`/mapping/discuss/${next.mappingId}`);
+              } else {
+                const tid = mapping?.transferId;
+                router.push(tid ? `/transfers/${tid}/review` : "/mapping");
+              }
+            }
+          };
+
+          const handleSubmit = async (quickAccept = false) => {
+            setReviewSubmitted(true);
+            const status: MappingStatus = quickAccept ? "accepted" : submitStatus;
+            trackSubmitted({ submitType: status, quickAccept });
+            if (!activeMappingId) return;
+
+            // Promote any pending_review questions for this field to draft (visible to admin)
+            try {
+              const { workspaceId: wsId } = mapping || {};
+              if (wsId) {
+                await fetch(`/api/workspaces/${wsId}/questions/promote`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ fieldMappingId }),
+                });
+              }
+            } catch {
+              // Non-critical — questions will stay pending_review
+            }
+
+            // Build update payload
+            const hasAiCorrection = effectiveUpdate && (sourceDecision === "wrong" || transformDecision === "wrong");
+            const notesValue = notesRef.current?.value?.trim() || null;
+            const updatePayload: Record<string, unknown> = { id: activeMappingId, status, notes: notesValue };
+
+            if (hasAiCorrection && effectiveUpdate) {
+              const patchData = { ...effectiveUpdate };
+              if (patchData.mappingType && !MAPPING_TYPES.includes(patchData.mappingType as typeof MAPPING_TYPES[number])) {
+                patchData.mappingType = "derived";
+              }
+              if (patchData.confidence && !CONFIDENCE_LEVELS.includes(patchData.confidence as typeof CONFIDENCE_LEVELS[number])) {
+                patchData.confidence = "medium";
+              }
+              delete patchData.question;
+              Object.assign(updatePayload, patchData);
+            }
+
+            updateMapping.mutate(
+              updatePayload as unknown as Parameters<typeof updateMapping.mutate>[0],
+              { onSuccess: navigateNext }
+            );
+          };
+
+          // Status dot helper
+          const dotState = (verdict: string | null, label: string, fallback: string) => {
+            if (verdict) return { color: "text-green-600", dot: "bg-green-500", text: verdict };
+            if (hasAnyAction) return { color: "text-muted-foreground", dot: "bg-muted-foreground/30", text: "skipped" };
+            return { color: "text-muted-foreground", dot: "bg-muted-foreground/30", text: fallback };
+          };
+          const srcDot = dotState(sourceDecision, "Source", "awaiting review");
+          const txDot = dotState(transformDecision, "Transform", "awaiting review");
+          const qResolved = questionDecision || hasNewQuestion;
+
           return (
             <div className="shrink-0 border-t border-blue-200 dark:border-blue-800 px-4 py-2.5 flex items-center justify-between bg-blue-50 dark:bg-blue-950/40">
               <div className="flex items-center gap-4 text-xs">
-                <span className={cn("flex items-center gap-1.5", sourceDecision ? "text-green-600" : "text-muted-foreground")}>
-                  <span className={cn("w-1.5 h-1.5 rounded-full", sourceDecision ? "bg-green-500" : "bg-muted-foreground/30")} />
-                  Source: {sourceDecision || "awaiting review"}
+                <span className={cn("flex items-center gap-1.5", srcDot.color)}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", srcDot.dot)} />
+                  Source: {srcDot.text}
                 </span>
-                <span className={cn("flex items-center gap-1.5", transformDecision ? "text-green-600" : "text-muted-foreground")}>
-                  <span className={cn("w-1.5 h-1.5 rounded-full", transformDecision ? "bg-green-500" : "bg-muted-foreground/30")} />
-                  Transform: {transformDecision || "awaiting review"}
+                <span className={cn("flex items-center gap-1.5", txDot.color)}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", txDot.dot)} />
+                  Transform: {txDot.text}
                 </span>
-                <span className={cn("flex items-center gap-1.5", questionDecision ? "text-green-600" : "text-muted-foreground")}>
-                  <span className={cn("w-1.5 h-1.5 rounded-full", questionDecision ? "bg-green-500" : "bg-muted-foreground/30")} />
-                  Question: {questionDecision ? "resolved" : "awaiting review"}
+                <span className={cn("flex items-center gap-1.5", qResolved ? "text-green-600" : "text-muted-foreground")}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", qResolved ? "bg-green-500" : "bg-muted-foreground/30")} />
+                  Question: {hasNewQuestion ? "asked" : questionDecision ? "resolved" : "awaiting review"}
                 </span>
               </div>
-              <Button
-                size="sm"
-                onClick={async () => {
-                  setReviewSubmitted(true);
-                  trackSubmitted();
-                  if (!activeMappingId) return;
-
-                  // Promote any pending_review questions for this field to draft (visible to admin)
-                  try {
-                    const { workspaceId: wsId } = mapping || {};
-                    if (wsId) {
-                      await fetch(`/api/workspaces/${wsId}/questions/promote`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ fieldMappingId }),
-                      });
-                    }
-                  } catch {
-                    // Non-critical — questions will stay pending_review
-                  }
-
-                  // Build update payload: if reviewer accepted AI suggestion, include the proposed changes
-                  const hasAiCorrection = effectiveUpdate && (sourceDecision === "wrong" || transformDecision === "wrong");
-                  const notesValue = notesRef.current?.value?.trim() || null;
-                  const updatePayload: Record<string, unknown> = { id: activeMappingId, status: "accepted", notes: notesValue };
-
-                  if (hasAiCorrection && effectiveUpdate) {
-                    // Include all proposed fields — the API will resolve names to IDs
-                    const patchData = { ...effectiveUpdate };
-                    if (patchData.mappingType && !MAPPING_TYPES.includes(patchData.mappingType as typeof MAPPING_TYPES[number])) {
-                      patchData.mappingType = "derived";
-                    }
-                    if (patchData.confidence && !CONFIDENCE_LEVELS.includes(patchData.confidence as typeof CONFIDENCE_LEVELS[number])) {
-                      patchData.confidence = "medium";
-                    }
-                    // Remove question field — not a mapping field
-                    delete patchData.question;
-                    Object.assign(updatePayload, patchData);
-                  }
-
-                  updateMapping.mutate(
-                    updatePayload as unknown as Parameters<typeof updateMapping.mutate>[0],
-                    {
-                      onSuccess: () => {
-                        // Prefer filtered queue order (from review page), fall back to entity siblings
-                        if (nextFromQueue) {
-                          router.push(`/mapping/discuss/${nextFromQueue}`);
-                        } else {
-                          const next = siblingNav?.nextFields?.[0];
-                          if (next?.mappingId) {
-                            router.push(`/mapping/discuss/${next.mappingId}`);
-                          } else {
-                            const tid = mapping?.transferId;
-                            router.push(tid ? `/transfers/${tid}/review` : "/mapping");
-                          }
-                        }
-                      },
-                    }
-                  );
-                }}
-                disabled={!canSubmit}
-                className={cn(
-                  "text-xs border",
-                  canSubmit
-                    ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
-                    : "bg-blue-200 text-blue-400 border-blue-300 cursor-not-allowed dark:bg-blue-950/30 dark:text-blue-700 dark:border-blue-800"
+              <div className="flex items-center gap-2">
+                {canQuickAccept && (
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      setSourceDecision("correct");
+                      setTransformDecision("correct");
+                      setQuestionDecision(true);
+                      trackSuggestionAccepted("source");
+                      trackSuggestionAccepted("transform");
+                      await handleSubmit(true);
+                    }}
+                    className="text-xs border bg-green-600 hover:bg-green-700 text-white border-green-600"
+                  >
+                    <Zap className="h-3.5 w-3.5 mr-1" />
+                    Accept & Next
+                  </Button>
                 )}
-              >
-                Submit Review & Next
-              </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleSubmit(false)}
+                  disabled={!canSubmit}
+                  className={cn(
+                    "text-xs border",
+                    !canSubmit
+                      ? "bg-blue-200 text-blue-400 border-blue-300 cursor-not-allowed dark:bg-blue-950/30 dark:text-blue-700 dark:border-blue-800"
+                      : allVerdictsComplete
+                        ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                        : "bg-violet-600 hover:bg-violet-700 text-white border-violet-600"
+                  )}
+                >
+                  {submitLabel}
+                </Button>
+              </div>
             </div>
           );
         })()}

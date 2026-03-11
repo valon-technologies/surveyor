@@ -42,10 +42,10 @@ export function useReviewAnalytics(fieldMappingId: string, entityId?: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fieldMappingId]);
 
-  const trackSubmitted = useCallback(() => {
+  const trackSubmitted = useCallback((properties?: Record<string, unknown>) => {
     submittedRef.current = true;
     const durationMs = Date.now() - startTimeRef.current;
-    track("review_submitted", { durationMs });
+    track("review_submitted", { durationMs, properties });
   }, [track]);
 
   const trackSuggestionAccepted = useCallback(
