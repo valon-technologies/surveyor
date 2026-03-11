@@ -112,13 +112,16 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple, curren
   return (
     <div
       className={cn(
-        "rounded-lg border transition-colors",
+        "rounded-lg border transition-colors border-l-[3px]",
         isAccepted
           ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
           : isPunted
             ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900"
-            : "bg-background border-border hover:border-foreground/20"
+            : card.status === "needs_discussion"
+              ? "bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900"
+              : "bg-background border-border hover:border-foreground/20"
       )}
+      style={{ borderLeftColor: MAPPING_STATUS_COLORS[card.status as MappingStatus] || "#d1d5db" }}
     >
       {/* Header row */}
       <div className="flex items-center gap-3 px-3 py-2">
@@ -184,18 +187,16 @@ export function ReviewCard({ card, onPunt, onExclude, onAcceptWithRipple, curren
           <Badge variant="outline" className="text-[10px] font-normal h-5">
             {mappingTypeLabel}
           </Badge>
-          {card.status !== "unmapped" && card.status !== "unreviewed" && (
-            <Badge
-              variant="outline"
-              className="text-[10px] h-5"
-              style={{
-                borderColor: MAPPING_STATUS_COLORS[card.status as MappingStatus],
-                color: MAPPING_STATUS_COLORS[card.status as MappingStatus],
-              }}
-            >
-              {MAPPING_STATUS_LABELS[card.status as MappingStatus] || card.status}
-            </Badge>
-          )}
+          <Badge
+            variant="outline"
+            className="text-[10px] h-5"
+            style={{
+              borderColor: MAPPING_STATUS_COLORS[card.status as MappingStatus],
+              color: MAPPING_STATUS_COLORS[card.status as MappingStatus],
+            }}
+          >
+            {MAPPING_STATUS_LABELS[card.status as MappingStatus] || card.status}
+          </Badge>
         </div>
 
         {/* Assignee chip */}
