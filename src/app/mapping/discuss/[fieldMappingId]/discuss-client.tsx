@@ -31,6 +31,7 @@ import { useChatStream } from "@/lib/hooks/use-chat-stream";
 import {
   ArrowLeft,
   Ban,
+  ClipboardCheck,
   SkipForward,
   Zap,
 } from "lucide-react";
@@ -327,6 +328,15 @@ export function DiscussClient() {
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
             Review Queue
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/mapping/my-verdicts")}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <ClipboardCheck className="h-4 w-4 mr-1" />
+            My Verdicts
           </Button>
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm">{entityName}.{targetFieldName}</span>

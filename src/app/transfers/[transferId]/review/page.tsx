@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useToast } from "@/components/ui/toast";
 import { api, workspacePath } from "@/lib/api-client";
-import { ArrowLeft, Users, EyeOff, Eye, XCircle } from "lucide-react";
+import { ArrowLeft, Users, EyeOff, Eye, XCircle, ClipboardCheck } from "lucide-react";
 import { DistributeDialog } from "@/components/review/distribute-dialog";
 import { EntityGroup } from "@/components/review/entity-group";
 import { useReassignMapping } from "@/queries/review-queries";
@@ -254,13 +254,22 @@ export default function TransferReviewPage() {
             )}
           </p>
         </div>
-        <button
-          onClick={() => setDistributeOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
-        >
-          <Users className="h-3.5 w-3.5" />
-          Distribute Fields
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/mapping/my-verdicts?transferId=${transferId}`}
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
+          >
+            <ClipboardCheck className="h-3.5 w-3.5" />
+            My Verdicts
+          </Link>
+          <button
+            onClick={() => setDistributeOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
+          >
+            <Users className="h-3.5 w-3.5" />
+            Distribute Fields
+          </button>
+        </div>
       </div>
 
       {/* Status summary */}

@@ -48,6 +48,7 @@ const navItems: NavItem[] = [
       { href: "/mapping/fields", label: "VDS Fields by Milestone" },
       { href: "/mapping/questions", label: "Questions from Human Review" },
       { href: "/docs", label: "Review Guide" },
+      { href: "/mapping/my-verdicts", label: "My Verdicts" },
     ],
   },
   {

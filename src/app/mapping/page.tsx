@@ -11,7 +11,8 @@ import { ExcludeDialog } from "@/components/review/exclude-dialog";
 import { RipplePanel } from "@/components/review/ripple-panel";
 import { Button } from "@/components/ui/button";
 import { useReviewStore } from "@/stores/review-store";
-import { Users } from "lucide-react";
+import { Users, ClipboardCheck } from "lucide-react";
+import Link from "next/link";
 import type { ReviewCardData } from "@/types/review";
 
 export default function MappingPage() {
@@ -39,14 +40,22 @@ export default function MappingPage() {
             Review AI-generated mappings: discuss, accept, or punt
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setDistributeOpen(true)}
-        >
-          <Users className="h-3.5 w-3.5" />
-          Distribute Fields
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href="/mapping/my-verdicts">
+            <Button variant="outline" size="sm">
+              <ClipboardCheck className="h-3.5 w-3.5" />
+              My Verdicts
+            </Button>
+          </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDistributeOpen(true)}
+          >
+            <Users className="h-3.5 w-3.5" />
+            Distribute Fields
+          </Button>
+        </div>
       </div>
 
       {/* TODO: Move BatchRunPanel to admin-only page */}

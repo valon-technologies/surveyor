@@ -39,5 +39,23 @@ export interface ChildEntityGroup {
   cards: ReviewCardData[];
 }
 
+export interface VerdictHistoryItem {
+  id: string;
+  targetFieldName: string;
+  targetFieldDataType: string | null;
+  entityName: string;
+  status: MappingStatus;
+  sourceVerdict: string | null;
+  transformVerdict: string | null;
+  sourceFieldName: string | null;
+  sourceEntityName: string | null;
+  transferId: string | null;
+  transferName: string | null;
+  mappingType: MappingType | null;
+  confidence: ConfidenceLevel | null;
+  notes: string | null;
+  updatedAt: string;
+}
+
 export type ReviewSortBy = "confidence" | "entityName" | "createdAt" | "targetFieldName";
 export type ReviewSortOrder = "asc" | "desc";

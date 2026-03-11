@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api-client";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
-import type { ReviewCardData } from "@/types/review";
+import type { ReviewCardData, VerdictHistoryItem } from "@/types/review";
 import type { ConfidenceLevel, MappingStatus } from "@/lib/constants";
 
 interface ReviewQueueFilters {
@@ -29,6 +29,14 @@ export function useReviewQueue(filters?: ReviewQueueFilters) {
   return useQuery({
     queryKey: ["review-queue", workspaceId, params],
     queryFn: () => api.get<ReviewCardData[]>(basePath, params),
+  });
+}
+
+export function useMyVerdicts() {
+  const { workspaceId } = useWorkspace();
+  return useQuery({
+    queryKey: ["my-verdicts", workspaceId],
+    queryFn: () => api.get<VerdictHistoryItem[]>(workspacePath(workspaceId, "my-verdicts")),
   });
 }
 
