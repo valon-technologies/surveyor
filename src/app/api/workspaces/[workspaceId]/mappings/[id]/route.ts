@@ -148,6 +148,29 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
     }
   }
 
+  // Assignment-only updates: in-place update (no copy-on-write version)
+  const isAssignmentOnly = updateData.assigneeId !== undefined
+    && updateData.status === undefined
+    && updateData.mappingType === undefined
+    && updateData.sourceEntityId === undefined
+    && updateData.sourceFieldId === undefined
+    && updateData.transform === undefined
+    && updateData.defaultValue === undefined
+    && updateData.confidence === undefined
+    && updateData.notes === undefined
+    && updateData.reasoning === undefined;
+
+  if (isAssignmentOnly) {
+    const [updated] = await db.update(fieldMapping)
+      .set({ assigneeId: updateData.assigneeId, updatedAt: new Date().toISOString() })
+      .where(and(eq(fieldMapping.id, id), eq(fieldMapping.workspaceId, workspaceId)))
+      .returning();
+    if (!updated) {
+      return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
+    }
+    return NextResponse.json(updated);
+  }
+
   // Transaction: read existing + mark-old + insert-new (prevents duplicate isLatest)
   const txResult = await withTransaction(async () => {
     const existing = (await db
