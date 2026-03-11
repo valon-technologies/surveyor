@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChatMessageList } from "@/components/chat/chat-message-list";
@@ -32,6 +33,7 @@ import {
   ArrowLeft,
   Ban,
   ClipboardCheck,
+  History,
   SkipForward,
   Zap,
 } from "lucide-react";
@@ -58,6 +60,39 @@ export function DiscussClient() {
   const [showPuntDialog, setShowPuntDialog] = useState(false);
   const [puntNote, setPuntNote] = useState("");
   const [puntAssigneeId, setPuntAssigneeId] = useState<string>("auto");
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const versionHistoryRef = useRef<HTMLDivElement>(null);
+
+  // Fetch mapping version history
+  const { data: versionHistory } = useQuery<Array<{
+    id: string; version: number; status: string; mappingType: string | null;
+    sourceFieldName?: string | null; transform?: string | null;
+    reasoning?: string | null; confidence?: string | null;
+    sourceVerdict?: string | null; sourceVerdictNotes?: string | null;
+    transformVerdict?: string | null; transformVerdictNotes?: string | null;
+    notes?: string | null; isLatest: boolean; createdBy: string; createdAt: string;
+    editedBy?: string | null; changeSummary?: string | null;
+  }>>({
+    queryKey: ["mapping-history", activeMappingId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${mapping?.workspaceId}/mappings/${activeMappingId}/history`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!mapping?.workspaceId && !!activeMappingId,
+  });
+
+  // Close version history on outside click
+  useEffect(() => {
+    if (!showVersionHistory) return;
+    function handleClick(e: MouseEvent) {
+      if (versionHistoryRef.current && !versionHistoryRef.current.contains(e.target as Node)) {
+        setShowVersionHistory(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showVersionHistory]);
   const { data: members } = useWorkspaceMembers();
   const assignableMembers = (members || []).filter((m) => m.role === "editor" || m.role === "owner");
 
@@ -362,6 +397,85 @@ export function DiscussClient() {
               </span>
             )}
           </div>
+          {/* Version history dropdown */}
+          {versionHistory && versionHistory.length > 1 && (
+            <div className="relative" ref={versionHistoryRef}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowVersionHistory(!showVersionHistory)}
+                className="text-muted-foreground hover:text-foreground gap-1"
+              >
+                <History className="h-3.5 w-3.5" />
+                <span className="text-xs">v{mapping?.version ?? 1} · {versionHistory.length} versions</span>
+              </Button>
+              {showVersionHistory && (
+                <div className="absolute top-full right-0 mt-1 z-50 bg-popover border rounded-lg shadow-lg w-96 max-h-80 overflow-y-auto">
+                  <div className="px-3 py-2 border-b text-xs font-medium text-muted-foreground">
+                    Mapping & Verdict History
+                  </div>
+                  {versionHistory.map((v) => (
+                    <div key={v.id} className={cn(
+                      "px-3 py-2.5 border-b last:border-0 text-sm",
+                      v.isLatest && "bg-blue-50/50 dark:bg-blue-950/20"
+                    )}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono text-xs text-muted-foreground">v{v.version}</span>
+                        <span className={cn(
+                          "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                          v.status === "accepted" ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400" :
+                          v.status === "needs_discussion" ? "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400" :
+                          v.status === "excluded" ? "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-400" :
+                          "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                        )}>
+                          {v.status}
+                        </span>
+                        {v.confidence && (
+                          <span className={cn(
+                            "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                            v.confidence === "high" ? "bg-green-100 text-green-700" :
+                            v.confidence === "medium" ? "bg-amber-100 text-amber-700" :
+                            "bg-red-100 text-red-700"
+                          )}>
+                            {v.confidence}
+                          </span>
+                        )}
+                        {v.isLatest && (
+                          <span className="text-[10px] text-blue-600 font-medium">current</span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground ml-auto">
+                          {new Date(v.createdAt).toLocaleDateString()} · {v.editedBy || v.createdBy}
+                        </span>
+                      </div>
+                      {v.sourceFieldName && (
+                        <div className="text-xs text-muted-foreground">
+                          Source: <span className="font-mono text-foreground/80">{v.sourceFieldName}</span>
+                          {v.transform && <span> · {v.transform}</span>}
+                        </div>
+                      )}
+                      {(v.sourceVerdict || v.transformVerdict) && (
+                        <div className="flex gap-3 mt-1 text-xs">
+                          {v.sourceVerdict && (
+                            <span className={v.sourceVerdict === "correct" ? "text-green-600" : "text-amber-600"}>
+                              Source: {v.sourceVerdict}
+                            </span>
+                          )}
+                          {v.transformVerdict && (
+                            <span className={v.transformVerdict === "correct" ? "text-green-600" : "text-amber-600"}>
+                              Transform: {v.transformVerdict}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {v.changeSummary && (
+                        <p className="text-[11px] text-muted-foreground mt-1">{v.changeSummary}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
