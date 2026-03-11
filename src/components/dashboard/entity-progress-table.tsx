@@ -87,7 +87,7 @@ export function EntityProgressTable({
       if (childIds.has(e.id)) continue; // skip children
 
       const children = (childMap.get(e.id) || []).sort((a, b) =>
-        (a.displayName || a.name).localeCompare(b.displayName || b.name)
+        a.name.localeCompare(b.name)
       );
 
       const allBreakdowns = [
@@ -224,7 +224,7 @@ function EntityGroupRows({ group }: { group: EntityGroupRow }) {
             href={`/mapping?entityId=${e.id}`}
             className="hover:underline underline-offset-2"
           >
-            {e.displayName || e.name}
+            {e.name}
           </Link>
         </td>
         <td className="text-right px-3 py-2 tabular-nums text-muted-foreground">
@@ -262,7 +262,7 @@ function EntityGroupRows({ group }: { group: EntityGroupRow }) {
               className="hover:underline underline-offset-2 text-muted-foreground text-xs inline-flex items-center gap-1.5"
             >
               <Component className="h-3 w-3 shrink-0" />
-              {child.displayName || child.name}
+              {child.name}
             </Link>
           </td>
           <td className="text-right px-3 py-1.5 tabular-nums text-muted-foreground text-xs">
