@@ -225,7 +225,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       unmappedCount: fields.length - mappedCount,
       coveragePercent:
         fields.length > 0
-          ? Math.round((mappedCount / fields.length) * 100)
+          ? parseFloat(((mappedCount / fields.length) * 100).toFixed(2))
           : 0,
       openQuestions: openQs?.cnt || 0,
       statusBreakdown: statusCounts,
@@ -266,7 +266,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
       milestone: m,
       totalFields: total,
       mappedFields: mapped,
-      coveragePercent: total > 0 ? Math.round((mapped / total) * 100) : 0,
+      coveragePercent: total > 0 ? parseFloat(((mapped / total) * 100).toFixed(2)) : 0,
       statusBreakdown,
     };
   }));
@@ -451,7 +451,7 @@ export const GET = withAuth(async (req, ctx, { workspaceId, userId }) => {
     totalFields,
     mappedFields,
     coveragePercent:
-      totalFields > 0 ? Math.round(((mappedFields / totalFields) * 100) * 100) / 100 : 0,
+      totalFields > 0 ? parseFloat(((mappedFields / totalFields) * 100).toFixed(2)) : 0,
     openQuestions: openQuestions?.cnt || 0,
     entities: entityStats,
     milestoneStats,
