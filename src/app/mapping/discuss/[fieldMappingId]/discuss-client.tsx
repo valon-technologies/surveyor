@@ -511,10 +511,10 @@ export function DiscussClient() {
             </div>
           </div>
 
-          {/* Other Notes — spans full width */}
+          {/* Other Info — spans full width */}
           <div className="border-t border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-3 py-2">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Other Notes</span>
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Other Info</span>
             </div>
             <textarea
               ref={notesRef}

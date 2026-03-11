@@ -51,7 +51,7 @@ OUTPUT FORMAT:
 }
 \`\`\`
 
-The "question" field should contain a structured follow-up question for the client when you need information to finalize the mapping. Set to null when no question is needed.
+The "question" field should contain a structured follow-up question for the client when you need information to finalize the mapping. Set to null ONLY when confidence is "high" and no ambiguity exists. If confidence is "medium" or "low", you MUST include a question that would help resolve the uncertainty.
 
 3. If the current mapping looks correct, say so briefly and do NOT include a mapping-update block.
 
@@ -95,6 +95,8 @@ OUTPUT FORMAT:
 \`\`\`
 
 3. If the current mapping looks correct, say so briefly and do NOT include a mapping-update block.
+
+The "question" field should contain a structured follow-up question for the client when you need information to finalize the mapping. Set to null ONLY when confidence is "high" and no ambiguity exists. If confidence is "medium" or "low", you MUST include a question that would help resolve the uncertainty.
 
 CITATIONS: When referencing a document, include its [ref:...] tag so reviewers can trace your reasoning.
 
