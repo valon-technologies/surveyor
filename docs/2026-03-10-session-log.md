@@ -137,11 +137,33 @@ MAP-768 (feedback loop — working as designed), MAP-830 (Linear reference), MAP
 | M2 | 200 | 148 | 56 | 19 | 52 |
 | M2.5 | 356 | 157 | 88 | 43 | 199 |
 
+### Demo Prep
+- Dashboard: fixed COUNT(DISTINCT) inflation, DISTINCT ON subquery for milestone bars, coverage % to 2 decimal places
+- Dashboard: moved milestone dropdown into stats bar, Milestone Coverage above it
+- Dashboard: entity progress table shows entity.name instead of description-as-displayName
+- Sidebar: renamed "Mapping" → "SDT Mapping"
+- Sidebar: transfer portfolios expand directly to review queues (dynamic from API)
+- Review cards: colored left border + status badge on every card (was hidden for unmapped/unreviewed)
+- Entity exclusion: "Not needed for ST" text button replaces X icon
+- System field filter: expanded to catch bare `id`, `created_at`, `updated_at`, `deleted_at` (~449 fields)
+- Removed ascending/descending sort dropdown from SDT queue
+- "Other Notes" → "Other Info" on discuss page
+- AI review prompt: questions required for medium/low confidence mappings
+- Vercel: manual deploy via `npm run deploy` (git integration disconnected)
+- SOT data: .vercelignore fixed to include data/sot/ (was excluded, breaking Verified Mappings)
+- SOT display: section headers show "M1 (108 entities, 1009 fields)" format
+
 ### New Linear Issues
 | ID | Title | Priority |
 |-----|-------|----------|
 | MAP-861 | Standardize generation/review scripts (done) | High |
 | MAP-862 | Parse extract request forms into per-entity context docs | High |
+| MAP-863 | Import Jacksonville onsite transcripts as context | High |
+| MAP-864 | Fix entity displayName containing descriptions (done) | Low |
+| MAP-865 | Extract learnings from AI chat sessions into admin queue | High |
+
+### Additional Tickets Closed (Session 2)
+MAP-768 (feedback loop — working as designed), MAP-830, MAP-833, MAP-836, MAP-841, MAP-843, MAP-845, MAP-851, MAP-852, MAP-854, MAP-857, MAP-859, MAP-860, MAP-864
 
 ## Scripts Created
 - `scripts/fix-transfer-ai-reviews.ts` — re-run corrupted transfer AI reviews
