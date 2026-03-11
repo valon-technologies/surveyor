@@ -48,6 +48,7 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
     milestoneFilter,
     assigneeFilter,
     hideSystemFields,
+    searchQuery,
     sortBy,
     sortOrder,
   } = useReviewStore();
@@ -60,7 +61,7 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
     sortOrder,
   });
 
-  // Apply client-side filters (milestone + system fields)
+  // Apply client-side filters (milestone + system fields + search)
   const filteredCards = useMemo(() => {
     if (!cards?.length) return cards;
     return cards.filter((c) => {
@@ -68,9 +69,20 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
       if (hideSystemFields && isSystemField(c.targetFieldName) && c.status === "unmapped") return false;
       if (assigneeFilter === "mine" && c.assigneeId !== currentUserId) return false;
       if (assigneeFilter === "unclaimed" && c.assigneeId) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        if (
+          !c.targetFieldName.toLowerCase().includes(q) &&
+          !c.entityName.toLowerCase().includes(q) &&
+          !(c.sourceFieldName || "").toLowerCase().includes(q) &&
+          !(c.sourceEntityName || "").toLowerCase().includes(q) &&
+          !(c.reasoning || "").toLowerCase().includes(q) &&
+          !(c.notes || "").toLowerCase().includes(q)
+        ) return false;
+      }
       return true;
     });
-  }, [cards, milestoneFilter, hideSystemFields, assigneeFilter, currentUserId]);
+  }, [cards, milestoneFilter, hideSystemFields, assigneeFilter, currentUserId, searchQuery]);
 
   // Persist filtered queue order for discuss page navigation
   useEffect(() => {

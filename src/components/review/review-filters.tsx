@@ -27,6 +27,8 @@ export function ReviewFilters() {
     setSortBy,
     sortOrder,
     setSortOrder,
+    searchQuery,
+    setSearchQuery,
   } = useReviewStore();
 
   // Fetch unfiltered queue to derive available facet values
@@ -99,6 +101,12 @@ export function ReviewFilters() {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <input
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder="Search fields..."
+        className="rounded-lg border px-3 py-1.5 text-sm bg-background w-56 border-border focus:outline-none focus:ring-1 focus:ring-ring"
+      />
       <Select
         options={confidenceOptions}
         value={confidenceFilter}

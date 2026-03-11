@@ -27,6 +27,9 @@ interface ReviewState {
   assigneeFilter: "all" | "mine" | "unclaimed";
   setAssigneeFilter: (v: "all" | "mine" | "unclaimed") => void;
 
+  searchQuery: string;
+  setSearchQuery: (v: string) => void;
+
   hideSystemFields: boolean;
   setHideSystemFields: (v: boolean) => void;
 
@@ -58,6 +61,9 @@ export const useReviewStore = create<ReviewState>((set) => ({
 
   assigneeFilter: "all",
   setAssigneeFilter: (v) => set({ assigneeFilter: v }),
+
+  searchQuery: "",
+  setSearchQuery: (v) => set({ searchQuery: v }),
 
   hideSystemFields: true,
   setHideSystemFields: (v) => set({ hideSystemFields: v }),
