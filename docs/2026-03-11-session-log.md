@@ -59,8 +59,31 @@ TypeScript build passes clean.
 
 ---
 
+---
+
+## All Tickets Completed This Session (11)
+
+| Ticket | Feature | Commit |
+|---|---|---|
+| MAP-877 | Submit button edge cases (Flag & Next, Quick Accept) | `2903bc3` |
+| MAP-878 | CMG multi-sheet source files + re-generation ($20) | `c42bb82` |
+| MAP-869 | Suppress auto LLM chat on discuss pages | `ef38a9d` |
+| MAP-871 | Gate exclusion to reviewed fields only | `ef38a9d` |
+| MAP-875 | Return to Review Queue button | `ef38a9d` |
+| MAP-876 | Fuzzy search on review queue | `10d7f63` |
+| MAP-873 | Punt to specific person with user picker | `6adf2b0` |
+| MAP-868 | My Verdicts page with navigation from all surfaces | `9216fda` |
+| MAP-872 | Workload summary by assignee at top of queue | `fd5e8a9` |
+| MAP-870 | Optimistic claim checkbox + field-level exclude button | `edfb236` |
+| (bug) | Assignment in-place update (not copy-on-write) | `60d8f84` |
+
 ### Additional Tickets Created
 | Ticket | Title | Priority |
 |---|---|---|
 | MAP-879 | Create staging instance separate from production | Low |
 | MAP-883 | Evaluate Tomato vs Vercel for Surveyor hosting | Low |
+| MAP-884 | Servicing Transfer VDS Entity/Field Exclusion | Low |
+
+### Linear Cleanup
+- MAP-866, MAP-867 → Completed (resolved by MAP-877)
+- MAP-880, MAP-881, MAP-882 → Canceled (duplicates from feedback agent)
