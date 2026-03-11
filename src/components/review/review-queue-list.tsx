@@ -11,6 +11,7 @@ import { EntityGroup } from "./entity-group";
 import { MILESTONE_LABELS, MILESTONE_COLORS, type Milestone } from "@/lib/constants";
 import type { ReviewCardData, ChildEntityGroup } from "@/types/review";
 import { isSystemField } from "@/lib/system-fields";
+import { cn } from "@/lib/utils";
 
 interface ReviewQueueListProps {
   onPunt: (card: ReviewCardData) => void;
@@ -47,6 +48,7 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
     statusFilter,
     milestoneFilter,
     assigneeFilter,
+    setAssigneeFilter,
     hideSystemFields,
     searchQuery,
     sortBy,
@@ -238,6 +240,70 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
           )}
         </div>
       </div>
+
+      {/* Workload by assignee */}
+      {(() => {
+        const workload = new Map<string, { name: string; userId: string; total: number; unreviewed: number; accepted: number }>();
+        let unassignedCount = 0;
+        let unassignedUnreviewed = 0;
+        for (const c of filteredCards) {
+          if (!c.assigneeId) {
+            unassignedCount++;
+            if (c.status === "unreviewed") unassignedUnreviewed++;
+            continue;
+          }
+          let entry = workload.get(c.assigneeId);
+          if (!entry) {
+            entry = { name: c.assigneeName || "Unknown", userId: c.assigneeId, total: 0, unreviewed: 0, accepted: 0 };
+            workload.set(c.assigneeId, entry);
+          }
+          entry.total++;
+          if (c.status === "unreviewed") entry.unreviewed++;
+          if (c.status === "accepted") entry.accepted++;
+        }
+        const entries = Array.from(workload.values()).sort((a, b) => b.unreviewed - a.unreviewed);
+        if (entries.length === 0 && unassignedCount === 0) return null;
+        return (
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-muted-foreground font-medium mr-1">Workload:</span>
+            {entries.map((e) => (
+              <button
+                key={e.userId}
+                onClick={() => setAssigneeFilter(assigneeFilter === "mine" && e.userId === currentUserId ? "all" : "mine")}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 border transition-colors",
+                  e.userId === currentUserId
+                    ? "border-blue-300 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-700"
+                    : "border-border hover:border-foreground/30"
+                )}
+              >
+                <span className="truncate max-w-[80px]">{e.name}</span>
+                <span className="font-medium">{e.total}</span>
+                {e.unreviewed > 0 && (
+                  <span className="text-blue-600">({e.unreviewed} to do)</span>
+                )}
+              </button>
+            ))}
+            {unassignedCount > 0 && (
+              <button
+                onClick={() => setAssigneeFilter(assigneeFilter === "unclaimed" ? "all" : "unclaimed")}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 border border-dashed transition-colors",
+                  assigneeFilter === "unclaimed"
+                    ? "border-foreground bg-foreground/5"
+                    : "border-muted-foreground/30 hover:border-foreground/30"
+                )}
+              >
+                <span className="text-muted-foreground">Unassigned</span>
+                <span className="font-medium">{unassignedCount}</span>
+                {unassignedUnreviewed > 0 && (
+                  <span className="text-blue-600">({unassignedUnreviewed} to do)</span>
+                )}
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {entityGroups.map((group) => (
         <EntityGroup
