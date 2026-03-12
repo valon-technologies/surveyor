@@ -2,7 +2,7 @@
 
 ## Summary
 
-Implemented MAP-856: Opus-based transform accuracy evaluation with enhanced SOT Accuracy UI. Fixed a transfer mapping bleed bug in the evaluator. Full eval run across 116 entities in progress (~$17).
+Two major items: MAP-856 (transform accuracy eval + SOT Accuracy UI) deployed. MAP-893 (context optimization) to fix generation failures — moved large docs to RAG-only, added primary context cap. Restored 90 retired M2.5 mappings and running gap-fill generation for remaining 105 fields.
 
 ---
 
@@ -11,13 +11,22 @@ Implemented MAP-856: Opus-based transform accuracy evaluation with enhanced SOT 
 | Ticket | Feature | Commit |
 |---|---|---|
 | MAP-856 | Opus transform accuracy eval + enhanced SOT Accuracy UI | `ea27cff` |
+| MAP-893 | Context optimization — RAG-only threshold + primary cap | `ab244c0` |
+
+## Tickets Created
+
+| Ticket | Title | Priority |
+|---|---|---|
+| MAP-890 | Create Remotion video for Surveyor | Medium |
+| MAP-891 | Updated roadmap for Surveyor | High |
+| MAP-892 | Users need a way to revert servicing transfer field exclusions | High |
+| MAP-893 | More efficient context management for generation | Medium |
 
 ## Linear Cleanup
 
 - MAP-889 → Canceled (duplicate of completed MAP-888: transfer chat ACDC bleed)
 - MAP-884 → Canceled (entity/field exclusion already implemented via metadata toggle + status)
-- MAP-890 → Created (Remotion video for Surveyor), Needs Implementation
-- MAP-856 → In Progress → deployed
+- MAP-856 → Completed
 
 ## Key Changes (MAP-856)
 
@@ -55,6 +64,47 @@ Implemented MAP-856: Opus-based transform accuracy evaluation with enhanced SOT 
   - `loan`: src 51.2%/79.1%, txfm 23.3%/67.4% (43 fields)
   - `loss_mitigation_loan_modification`: src 75.0%/75.0%, txfm 70.0%/95.0% (20 fields)
 
+## M2.5 Field Gap Fix
+
+**Problem:** Only 104/321 M2.5 fields visible in review queue.
+
+**Root causes:**
+- **Case 1 (107 fields):** Never generated — no fieldMapping records at all
+- **Case 2 (90 fields):** Had mappings, all retired (isLatest=false) by batch runner during re-generation when LLM omitted fields from output
+
+**Fixes applied:**
+1. Restored 90 retired mappings → `scripts/restore-retired-m25.ts` (instant, no cost)
+2. Context optimization (MAP-893) to fix generation failures:
+   - Docs >10K tokens moved to RAG-only (18 docs, 587K tokens removed from worst-case prompts)
+   - 40K soft cap on primary context (EK corrections prioritized)
+3. Gap-fill generation running for remaining 105 fields across 12 entities
+
+**M2.5 review queue progress:**
+- Started: 104 / 321
+- After restore of 90 retired mappings: 214
+- After context optimization + direct runner gap fill: **299 / 321**
+- Remaining 30 fields in 2 entities (`loss_mitigation_payment_deferral` 21, `foreclosure` 9) — retrying
+- `attempt_status` on `property_conveyance_attempt` confirmed generated
+
+**Key fix:** Rewrote `fill-m25-gaps.ts` to use direct `runGeneration()` with explicit `fieldIds` instead of the batch runner. The batch runner's `prepareEntityForRegeneration` retires ALL entity mappings before generating — when the LLM omits fields from output, the old mappings stay retired with no replacement. Direct runner avoids this by not retiring anything.
+
+**Issues found during gap fill:**
+- Batch runner retire-then-generate pattern causes collateral damage on partial LLM output (had to restore retired mappings 3 times)
+- `loss_mitigation_payment_deferral`: LLM parsed 4200 output tokens but no mappings resolved — possible output parser field name mismatch
+- `foreclosure`: stale generation lock from prior run prevented re-generation (cleared on next attempt)
+
+## Context Optimization (MAP-893)
+
+**Problem:** Generation hitting 1M+ input tokens → prompt-too-long failures (7 entities) + LLM field omission (6 entities)
+
+**Root cause:** 18 context docs over 10K tokens (587K total) packed into every prompt:
+- Extract requests: 103K, 50K, 33K
+- Jacksonville onsite transcripts: 5 docs, 19-37K each
+- Q&A docs: 44K, 43K, 19K
+- Regulatory/table docs: 19K, 17K, 16K, 11K
+
+**Fix:** Dynamic RAG-only threshold (10K tokens) + 40K primary context soft cap. Large docs still available via FTS5 search on demand.
+
 ## Investigation: CMG VDS Field Count (1,005 vs 2,816)
 
 **Not a bug — by design.** The `totalTargetFields: 1005` in CMG transfer stats reflects tier 1 domains only (default generation scope).
@@ -70,11 +120,13 @@ Tier 1 = "domains where a loan-level flat file plausibly provides data" — appr
 
 ---
 
-## Next Session TODO
+## Still TODO
 
 1. **Regenerate SDT mappings with `EXCLUDE_SOT=1`** — unbiased generation without SOT YAML as context
 2. **Re-run full eval** (`npx tsx scripts/run-sot-eval.ts --include-transform`) — get clean accuracy numbers
 3. Raise CMG VDS field count question (tier 1 vs all tiers)
+4. **MAP-892** — revert servicing transfer field exclusions UI
+5. **MAP-891** — updated Surveyor roadmap
 
 ---
 

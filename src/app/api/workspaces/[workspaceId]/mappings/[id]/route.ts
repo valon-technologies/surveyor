@@ -182,7 +182,18 @@ export const PATCH = withAuth(async (req, ctx, { userId, workspaceId, role }) =>
     if (!existing) return null;
 
     // Use client-provided status if explicitly set, otherwise auto-compute
-    const finalStatus = updateData.status ?? computeStatusOnSave(existing.status);
+    // Auto-unexclude: if field is excluded and reviewer is updating the mapping, restore it
+    let finalStatus = updateData.status ?? computeStatusOnSave(existing.status);
+    if (existing.status === "excluded" && finalStatus === "excluded" && !updateData.status) {
+      const hasMappingChange = updateData.sourceEntityId !== undefined
+        || updateData.sourceFieldId !== undefined
+        || updateData.transform !== undefined
+        || updateData.mappingType !== undefined;
+      if (hasMappingChange) {
+        finalStatus = "unreviewed";
+        (updateData as Record<string, unknown>).excludeReason = null;
+      }
+    }
 
     // Auto-assign the acting user when status changes to a reviewed state
     if (finalStatus !== existing.status && updateData.assigneeId === undefined) {

@@ -234,10 +234,13 @@ export function SidebarNav() {
         if (item.href === "/transfers") {
           return {
             ...item,
-            children: transfers.map((t) => ({
-              href: `/transfers/${t.id}/review`,
-              label: t.clientName || t.name,
-            })),
+            children: [
+              ...transfers.map((t) => ({
+                href: `/transfers/${t.id}/review`,
+                label: t.clientName || t.name,
+              })),
+              { href: "/transfers/exclusions", label: "VDS Exclusions" },
+            ],
           };
         }
         return item;
