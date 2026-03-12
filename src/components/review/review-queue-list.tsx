@@ -109,10 +109,11 @@ export function ReviewQueueList({ onPunt, onExclude, onAcceptWithRipple }: Revie
   // Clear selection when filters change
   useEffect(() => { clearSelection(); }, [filteredCards]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persist filtered queue order for discuss page navigation
+  // Persist filtered queue order for discuss page navigation (always exclude excluded items)
   useEffect(() => {
     if (filteredCards?.length) {
-      sessionStorage.setItem("reviewQueueOrder", JSON.stringify(filteredCards.map((c) => c.id)));
+      const navigable = filteredCards.filter((c) => c.status !== "excluded");
+      sessionStorage.setItem("reviewQueueOrder", JSON.stringify(navigable.map((c) => c.id)));
     }
   }, [filteredCards]);
 

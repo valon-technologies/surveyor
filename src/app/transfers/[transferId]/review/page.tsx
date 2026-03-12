@@ -187,10 +187,11 @@ export default function TransferReviewPage() {
     return counts;
   }, [filtered]);
 
-  // Persist filtered queue order for discuss page navigation
+  // Persist filtered queue order for discuss page navigation (always exclude excluded items)
   useEffect(() => {
     if (filtered.length > 0) {
-      sessionStorage.setItem("reviewQueueOrder", JSON.stringify(filtered.map((c) => c.id)));
+      const navigable = filtered.filter((c) => c.status !== "excluded");
+      sessionStorage.setItem("reviewQueueOrder", JSON.stringify(navigable.map((c) => c.id)));
     }
   }, [filtered]);
 

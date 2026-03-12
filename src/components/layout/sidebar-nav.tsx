@@ -228,25 +228,22 @@ export function SidebarNav() {
     const items = navItems.filter(
       (item) => !item.requiredRole || role === item.requiredRole,
     );
-    // Inject transfer portfolios as children of Servicing Transfers
-    if (transfers?.length) {
-      return items.map((item) => {
-        if (item.href === "/transfers") {
-          return {
-            ...item,
-            children: [
-              ...transfers.map((t) => ({
-                href: `/transfers/${t.id}/review`,
-                label: t.clientName || t.name,
-              })),
-              { href: "/transfers/exclusions", label: "VDS Exclusions" },
-            ],
-          };
-        }
-        return item;
-      });
-    }
-    return items;
+    // Inject transfer portfolios + VDS Exclusions as children of Servicing Transfers
+    return items.map((item) => {
+      if (item.href === "/transfers") {
+        return {
+          ...item,
+          children: [
+            ...(transfers || []).map((t) => ({
+              href: `/transfers/${t.id}/review`,
+              label: t.clientName || t.name,
+            })),
+            { href: "/transfers/exclusions", label: "VDS Exclusions" },
+          ],
+        };
+      }
+      return item;
+    });
   }, [role, transfers]);
 
   return (
