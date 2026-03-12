@@ -151,6 +151,11 @@ export async function assembleContext(
       // Skip contexts that are now embedded in system message or RAG-only
       if (SYSTEM_EMBEDDED_NAMES.has(ctx.name) || RAG_ONLY_NAMES.has(ctx.name)) continue;
 
+      // Large docs (>10K tokens) are RAG-only — retrieved via FTS5 on demand
+      const RAG_ONLY_THRESHOLD = 10_000;
+      const docTokens = ctx.tokenCount || estimateTokens(ctx.content);
+      if (docTokens > RAG_ONLY_THRESHOLD) continue;
+
       // Exclude the current entity's SOT to prevent cheating during eval
       if (excludeEntityName && ctx.name === `SOT > ${excludeEntityName} (M1)`) continue;
 
@@ -208,8 +213,9 @@ export async function assembleContext(
   for (const doc of foundationalDocs) {
     if (seenContextIds.has(doc.id) || !doc.content) continue;
     if (SYSTEM_EMBEDDED_NAMES.has(doc.name) || RAG_ONLY_NAMES.has(doc.name)) continue;
-    seenContextIds.add(doc.id);
     const tokenCount = doc.tokenCount || estimateTokens(doc.content);
+    if (tokenCount > 10_000) continue; // Large docs are RAG-only
+    seenContextIds.add(doc.id);
     supplementaryContexts.push({ id: doc.id, name: doc.name, content: doc.content, tokenCount });
   }
 
@@ -312,11 +318,33 @@ export async function assembleContext(
     }
   }
 
-  // Trim to fit budget: primary never dropped, then reference, then supplementary
+  // Soft cap on primary context: EK corrections get priority, excess demoted to reference
+  const PRIMARY_CONTEXT_CAP = 40_000;
+  let primaryTokens = 0;
+  const cappedPrimary: typeof primaryContexts = [];
+  // Sort: EK docs first (subcategory check via name), then others
+  const sortedPrimary = [...primaryContexts].sort((a, b) => {
+    const aIsEk = a.name.startsWith("Entity Knowledge");
+    const bIsEk = b.name.startsWith("Entity Knowledge");
+    if (aIsEk && !bIsEk) return -1;
+    if (!aIsEk && bIsEk) return 1;
+    return 0;
+  });
+  for (const c of sortedPrimary) {
+    if (primaryTokens + c.tokenCount <= PRIMARY_CONTEXT_CAP) {
+      cappedPrimary.push(c);
+      primaryTokens += c.tokenCount;
+    } else {
+      // Demote to reference tier
+      referenceContexts.unshift(c);
+    }
+  }
+
+  // Trim to fit budget: primary (capped) always included, then reference, then supplementary
   let totalTokens = 0;
 
-  // Primary always included
-  for (const c of primaryContexts) totalTokens += c.tokenCount;
+  // Primary always included (after cap)
+  for (const c of cappedPrimary) totalTokens += c.tokenCount;
 
   // Add reference until budget
   const keptReference: typeof referenceContexts = [];
@@ -338,7 +366,7 @@ export async function assembleContext(
 
   const result: AssembledContext = {
     skillsUsed: matched.map((s) => ({ id: s.id, name: s.name })),
-    primaryContexts,
+    primaryContexts: cappedPrimary,
     referenceContexts: keptReference,
     supplementaryContexts: keptSupplementary,
     totalTokens,
