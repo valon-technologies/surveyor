@@ -26,6 +26,10 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
       sourceLenientCount: sotEvaluation.sourceLenientCount,
       sourceExactPct: sotEvaluation.sourceExactPct,
       sourceLenientPct: sotEvaluation.sourceLenientPct,
+      transformExactCount: sotEvaluation.transformExactCount,
+      transformLenientCount: sotEvaluation.transformLenientCount,
+      transformExactPct: sotEvaluation.transformExactPct,
+      transformLenientPct: sotEvaluation.transformLenientPct,
       fieldResults: sotEvaluation.fieldResults,
       createdAt: sotEvaluation.createdAt,
     })

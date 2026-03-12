@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { sotEvaluation, entity, fieldMapping, field } from "@/lib/db/schema";
 import { eq, and, sql, desc, exists } from "drizzle-orm";
 import { evaluateEntityMappings } from "@/lib/evaluation/mapping-evaluator";
-import { listAvailableSotEntities } from "@/lib/evaluation/sot-loader";
+import { listAvailableSotEntities, getSotMilestoneMap } from "@/lib/evaluation/sot-loader";
 import { emitFeedbackEvent } from "@/lib/feedback/emit-event";
 
 // GET — List SOT evaluations with summary
@@ -38,6 +38,10 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
       sourceLenientCount: sotEvaluation.sourceLenientCount,
       sourceExactPct: sotEvaluation.sourceExactPct,
       sourceLenientPct: sotEvaluation.sourceLenientPct,
+      transformExactCount: sotEvaluation.transformExactCount,
+      transformLenientCount: sotEvaluation.transformLenientCount,
+      transformExactPct: sotEvaluation.transformExactPct,
+      transformLenientPct: sotEvaluation.transformLenientPct,
       createdAt: sotEvaluation.createdAt,
     })
     .from(sotEvaluation)
@@ -60,8 +64,9 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
     .where(eq(sotEvaluation.workspaceId, workspaceId))
     )[0];
 
-  // List entities that have SOT data available
+  // List entities that have SOT data available + milestone membership
   const availableEntities = await listAvailableSotEntities();
+  const milestoneMap = getSotMilestoneMap();
 
   return NextResponse.json({
     evaluations,
@@ -78,13 +83,14 @@ export const GET = withAuth(async (req, ctx, { workspaceId }) => {
       totalLenient: stats?.totalLenient || 0,
     },
     availableEntities,
+    milestoneMap,
   });
 });
 
 // POST — Trigger SOT evaluation for entity(ies)
-export const POST = withAuth(async (req, ctx, { workspaceId }) => {
+export const POST = withAuth(async (req, ctx, { workspaceId, userId }) => {
   const body = await req.json();
-  const { entityIds } = body as { entityIds?: string[] };
+  const { entityIds, includeTransform } = body as { entityIds?: string[]; includeTransform?: boolean };
 
   // Determine which entities to evaluate
   let targetEntities: { id: string; name: string }[];
@@ -130,6 +136,14 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
       ;
   }
 
+  // Resolve LLM provider if transform eval requested
+  let provider: import("@/lib/llm/provider").LLMProvider | undefined;
+  if (includeTransform) {
+    const { resolveProvider } = await import("@/lib/generation/provider-resolver");
+    const resolved = await resolveProvider(userId);
+    provider = resolved.provider;
+  }
+
   const results: Array<{
     entityId: string;
     entityName: string;
@@ -137,12 +151,17 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
     status: "completed" | "skipped" | "failed";
     sourceExactPct?: number;
     sourceLenientPct?: number;
+    transformExactPct?: number;
+    transformLenientPct?: number;
     error?: string;
   }> = [];
 
   for (const te of targetEntities) {
     try {
-      const evalResult = await evaluateEntityMappings(workspaceId, te.id);
+      const evalResult = await evaluateEntityMappings(workspaceId, te.id, {
+        includeTransform,
+        provider,
+      });
 
       if (!evalResult) {
         results.push({
@@ -168,6 +187,10 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
           sourceLenientCount: evalResult.sourceLenientCount,
           sourceExactPct: evalResult.sourceExactPct,
           sourceLenientPct: evalResult.sourceLenientPct,
+          transformExactCount: evalResult.transformExactCount ?? null,
+          transformLenientCount: evalResult.transformLenientCount ?? null,
+          transformExactPct: evalResult.transformExactPct ?? null,
+          transformLenientPct: evalResult.transformLenientPct ?? null,
           fieldResults: evalResult.fieldResults,
         })
         ;
@@ -210,6 +233,8 @@ export const POST = withAuth(async (req, ctx, { workspaceId }) => {
         status: "completed",
         sourceExactPct: evalResult.sourceExactPct,
         sourceLenientPct: evalResult.sourceLenientPct,
+        transformExactPct: evalResult.transformExactPct,
+        transformLenientPct: evalResult.transformLenientPct,
       });
     } catch (err) {
       results.push({

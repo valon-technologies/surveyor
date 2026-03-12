@@ -72,3 +72,23 @@ export function SourceMatchBadge({ matchType }: SourceMatchBadgeProps) {
     </span>
   );
 }
+
+const TRANSFORM_MATCH_COLORS: Record<string, string> = {
+  MATCH: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  PARTIAL: "bg-amber-100 text-amber-800 border-amber-200",
+  WRONG: "bg-red-100 text-red-800 border-red-200",
+  "N/A": "bg-gray-100 text-gray-600 border-gray-200",
+};
+
+export function TransformMatchBadge({ matchType }: { matchType: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
+        TRANSFORM_MATCH_COLORS[matchType] || "bg-gray-100 text-gray-600 border-gray-200",
+      )}
+    >
+      {matchType}
+    </span>
+  );
+}

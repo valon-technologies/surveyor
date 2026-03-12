@@ -22,6 +22,12 @@ export interface FieldSourceMatch {
   score: number;            // 1.0, 0.5, 0.25, 0.0
   genSources: string[];     // what Surveyor generated
   sotSources: string[];     // ground truth
+  // Transform eval (populated when includeTransform is true)
+  transformMatch?: import("./transform-evaluator").TransformMatchType;
+  transformSimilarity?: number;
+  transformExplanation?: string;
+  sotTransformSummary?: string;
+  genTransformSummary?: string;
 }
 
 // Table name variants that should normalize to the same canonical name
@@ -127,4 +133,57 @@ function hasOverlap(a: Set<string>, b: Set<string>): boolean {
  */
 export function isScorable(matchType: SourceMatchType): boolean {
   return matchType !== "NO_SOT" && matchType !== "SOT_NULL";
+}
+
+// ─── Transform Capping ─────────────────────────────────────
+
+import type { TransformMatchType } from "./transform-evaluator";
+
+/**
+ * Cap for transform_match based on source match quality.
+ * When source is wrong, transform can't be better than a threshold.
+ */
+const TRANSFORM_CAP: Record<SourceMatchType, TransformMatchType | null> = {
+  EXACT: null,        // no cap
+  SUBSET: "PARTIAL",  // cap to PARTIAL max
+  SUPERSET: "PARTIAL",
+  OVERLAP: "PARTIAL",
+  DISJOINT: "WRONG",  // force to WRONG
+  NO_GEN: null,
+  BOTH_NULL: null,
+  SOT_NULL: "WRONG",
+  NO_SOT: null,
+};
+
+const TRANSFORM_RANK: Record<TransformMatchType, number> = {
+  "N/A": 0,
+  WRONG: 1,
+  PARTIAL: 2,
+  MATCH: 3,
+};
+
+/**
+ * Apply source-based capping to a transform match result.
+ * Returns the capped transform match and similarity.
+ */
+export function capTransformMatch(
+  sourceMatch: SourceMatchType,
+  transformMatch: TransformMatchType,
+  similarity: number,
+): { transformMatch: TransformMatchType; similarity: number } {
+  const cap = TRANSFORM_CAP[sourceMatch];
+  if (!cap) return { transformMatch, similarity };
+
+  const capRank = TRANSFORM_RANK[cap];
+  const matchRank = TRANSFORM_RANK[transformMatch];
+
+  if (matchRank > capRank) {
+    const cappedSimilarity =
+      cap === "WRONG" ? Math.min(similarity, 0.25) :
+      cap === "PARTIAL" ? Math.min(similarity, 0.5) :
+      similarity;
+    return { transformMatch: cap, similarity: cappedSimilarity };
+  }
+
+  return { transformMatch, similarity };
 }

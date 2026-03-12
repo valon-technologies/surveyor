@@ -15,6 +15,10 @@ export interface SotEvaluationSummary {
   sourceLenientCount: number;
   sourceExactPct: number;
   sourceLenientPct: number;
+  transformExactCount: number | null;
+  transformLenientCount: number | null;
+  transformExactPct: number | null;
+  transformLenientPct: number | null;
   createdAt: string;
 }
 
@@ -33,6 +37,7 @@ interface SotEvaluationsResponse {
     totalLenient: number;
   };
   availableEntities: string[];
+  milestoneMap: Record<string, ("m1" | "m2")[]>;
 }
 
 interface RunEvalResponse {
@@ -44,6 +49,8 @@ interface RunEvalResponse {
     status: "completed" | "skipped" | "failed";
     sourceExactPct?: number;
     sourceLenientPct?: number;
+    transformExactPct?: number;
+    transformLenientPct?: number;
     error?: string;
   }>;
 }

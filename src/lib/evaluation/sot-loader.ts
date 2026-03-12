@@ -141,3 +141,38 @@ export function listAvailableSotEntities(): string[] {
 
   return [...names].sort();
 }
+
+/**
+ * Get SOT milestone membership for all entities.
+ * Returns a map of entityName → milestones ("m1", "m2", or both).
+ */
+export function getSotMilestoneMap(): Record<string, ("m1" | "m2")[]> {
+  const result: Record<string, ("m1" | "m2")[]> = {};
+  const sotDir = path.resolve("data/sot");
+
+  for (const milestone of ["m1", "m2"] as const) {
+    const dirName = milestone === "m1" ? "m1_mappings" : "m2_mappings";
+    const dirPath = path.join(sotDir, dirName);
+    if (!fs.existsSync(dirPath)) continue;
+
+    for (const f of fs.readdirSync(dirPath)) {
+      if (!f.endsWith(".yaml")) continue;
+      const name = f.replace(".yaml", "");
+      if (!result[name]) result[name] = [];
+      result[name].push(milestone);
+    }
+  }
+
+  // Eval JSONs are M1
+  const evalDir = getEvalDir();
+  if (fs.existsSync(evalDir)) {
+    for (const f of fs.readdirSync(evalDir)) {
+      if (!f.endsWith(".json")) continue;
+      const name = f.replace(".json", "");
+      if (!result[name]) result[name] = [];
+      if (!result[name].includes("m1")) result[name].push("m1");
+    }
+  }
+
+  return result;
+}

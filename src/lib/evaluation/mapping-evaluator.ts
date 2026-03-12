@@ -5,9 +5,11 @@
 
 import { db } from "@/lib/db";
 import { entity, field, fieldMapping } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { loadSotForEntity } from "./sot-loader";
-import { matchSources, isScorable, type FieldSourceMatch, type SourceMatchType } from "./source-matcher";
+import { matchSources, isScorable, capTransformMatch, type FieldSourceMatch, type SourceMatchType } from "./source-matcher";
+import { evaluateTransforms, loadSotYamlChain, type GenMappingInput, type TransformFieldResult } from "./transform-evaluator";
+import type { LLMProvider } from "@/lib/llm/provider";
 
 export interface MappingEvaluation {
   entityId: string;
@@ -19,6 +21,11 @@ export interface MappingEvaluation {
   sourceLenientCount: number;   // EXACT + BOTH_NULL + SUBSET + SUPERSET + OVERLAP
   sourceExactPct: number;
   sourceLenientPct: number;
+  // Transform eval (populated when includeTransform is true)
+  transformExactCount?: number;
+  transformLenientCount?: number;
+  transformExactPct?: number;
+  transformLenientPct?: number;
   fieldResults: FieldSourceMatch[];
 }
 
@@ -32,6 +39,7 @@ export interface MappingEvaluation {
 export async function evaluateEntityMappings(
   workspaceId: string,
   entityId: string,
+  options?: { includeTransform?: boolean; provider?: LLMProvider },
 ): Promise<MappingEvaluation | null> {
   // 1. Load the target entity
   const targetEntity = (await db
@@ -70,7 +78,7 @@ export async function evaluateEntityMappings(
     );
   }
 
-  // 5. Load latest field mappings with source entity/field names resolved (flat entity path)
+  // 5. Load latest SDT field mappings (transferId IS NULL) with source entity/field names resolved
   const latestMappings = (await db
     .select({
       targetFieldId: fieldMapping.targetFieldId,
@@ -85,6 +93,7 @@ export async function evaluateEntityMappings(
       and(
         eq(fieldMapping.workspaceId, workspaceId),
         eq(fieldMapping.isLatest, true),
+        isNull(fieldMapping.transferId),
       )
     )
     )
@@ -169,7 +178,7 @@ export async function evaluateEntityMappings(
     });
   }
 
-  // 6. Compute aggregate scores
+  // 6. Compute aggregate source scores
   const scorableResults = fieldResults.filter((r) => isScorable(r.matchType));
   const scoredFields = scorableResults.length;
   const sourceExactCount = scorableResults.filter(
@@ -191,7 +200,7 @@ export async function evaluateEntityMappings(
     ? Math.round((sourceLenientCount / scoredFields) * 1000) / 10
     : 0;
 
-  return {
+  const result: MappingEvaluation = {
     entityId,
     entityName: targetEntity.name,
     generationId,
@@ -203,6 +212,13 @@ export async function evaluateEntityMappings(
     sourceLenientPct,
     fieldResults,
   };
+
+  // 7. Optional transform evaluation via Opus
+  if (options?.includeTransform && options.provider) {
+    await runTransformEval(result, targetEntity.name, mappingByTargetFieldId, targetFields, entityNameById, fieldNameById, options.provider);
+  }
+
+  return result;
 }
 
 /**
@@ -250,6 +266,7 @@ async function evaluateAssemblyEntity(
         and(
           eq(fieldMapping.workspaceId, workspaceId),
           eq(fieldMapping.isLatest, true),
+          isNull(fieldMapping.transferId),
         )
       )
       )
@@ -337,6 +354,76 @@ async function evaluateAssemblyEntity(
     sourceLenientPct,
     fieldResults,
   };
+}
+
+/**
+ * Run Opus-based transform evaluation and merge results into the MappingEvaluation.
+ * Mutates `result.fieldResults` in place to add transform data, and sets transform metrics.
+ */
+async function runTransformEval(
+  result: MappingEvaluation,
+  entityName: string,
+  mappingByTargetFieldId: Map<string, { sourceEntityId: string | null; sourceFieldId: string | null; transform: string | null }>,
+  targetFields: { id: string; name: string }[],
+  entityNameById: Map<string, string>,
+  fieldNameById: Map<string, string>,
+  provider: LLMProvider,
+) {
+  const sotYaml = loadSotYamlChain(entityName);
+  if (!sotYaml) return;
+
+  // Build GenMappingInput array
+  const genMappings: GenMappingInput[] = [];
+  for (const tf of targetFields) {
+    const mapping = mappingByTargetFieldId.get(tf.id);
+    const sourceEntity = mapping?.sourceEntityId ? entityNameById.get(mapping.sourceEntityId) ?? "" : "";
+    const sourceField = mapping?.sourceFieldId ? fieldNameById.get(mapping.sourceFieldId) ?? "" : "";
+    genMappings.push({
+      targetField: tf.name,
+      sourceEntity,
+      sourceField,
+      transform: mapping?.transform ?? null,
+      mappingType: sourceEntity ? "mapped" : "unmapped",
+    });
+  }
+
+  const transformResults = await evaluateTransforms(entityName, genMappings, sotYaml, provider);
+
+  // Build lookup by field name
+  const transformByField = new Map(transformResults.map((r) => [r.field, r]));
+
+  // Merge into fieldResults with source-based capping
+  let transformExactCount = 0;
+  let transformLenientCount = 0;
+  let transformScoredFields = 0;
+
+  for (const fr of result.fieldResults) {
+    const tr = transformByField.get(fr.field);
+    if (!tr) continue;
+
+    // Apply source-based capping
+    const capped = capTransformMatch(fr.matchType, tr.transformMatch, tr.transformSimilarity);
+
+    fr.transformMatch = capped.transformMatch;
+    fr.transformSimilarity = capped.similarity;
+    fr.transformExplanation = tr.explanation;
+    fr.sotTransformSummary = tr.sotSummary;
+    fr.genTransformSummary = tr.candidateSummary;
+
+    // Score (exclude N/A from counts)
+    if (capped.transformMatch !== "N/A" && isScorable(fr.matchType)) {
+      transformScoredFields++;
+      if (capped.transformMatch === "MATCH") transformExactCount++;
+      if (capped.transformMatch === "MATCH" || capped.transformMatch === "PARTIAL") transformLenientCount++;
+    }
+  }
+
+  if (transformScoredFields > 0) {
+    result.transformExactCount = transformExactCount;
+    result.transformLenientCount = transformLenientCount;
+    result.transformExactPct = Math.round((transformExactCount / transformScoredFields) * 1000) / 10;
+    result.transformLenientPct = Math.round((transformLenientCount / transformScoredFields) * 1000) / 10;
+  }
 }
 
 /**
