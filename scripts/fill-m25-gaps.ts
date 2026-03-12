@@ -87,74 +87,84 @@ async function main() {
     process.exit(0);
   }
 
-  console.log(`\nStarting generation...\n`);
+  console.log(`\nStarting generation (direct per-entity, no retire)...\n`);
 
-  // Use the batch runner with "unmapped" status filter — since gap fields have
-  // no mapping records, they'll be picked up as unmapped.
-  // But the batch runner needs existing mapping records to know what's eligible...
-  // Actually, the batch runner looks at fields and checks if they have mappings.
-  // Fields WITHOUT mappings are treated as unmapped and included.
-  const batchInput = {
-    workspaceId: WORKSPACE_ID,
-    userId: USER_ID,
-    preferredProvider: "claude" as const,
-    outputFormat: "yaml" as const,
-    enableStructureClassification: true,
-    entityIds: gapEntityIds,
-    includeStatuses: ["unmapped"] as any,
-    milestone: "M2.5",
-  };
+  // Use runGeneration directly with explicit fieldIds — this avoids the batch runner's
+  // prepareEntityForRegeneration which retires ALL entity mappings before generating,
+  // causing collateral damage when the LLM omits fields from its output.
+  const { runGeneration } = await import("../src/lib/generation/runner");
+  const { fieldMapping: fmSchema } = await import("../src/lib/db/schema");
 
-  const { batchRunId, entities: batches, totalFields } = await createBatchRun(batchInput);
+  let totalCreated = 0;
+  let totalErrors = 0;
 
-  console.log(`Batch run ${batchRunId}: ${batches.length} entities, ${totalFields} eligible fields\n`);
+  for (const [eId, fieldIds] of gapByEntity.entries()) {
+    const e = entityById.get(eId);
+    const name = e?.displayName || e?.name || eId;
+    console.log(`  ${name} (${fieldIds.length} fields)...`);
 
-  if (totalFields === 0) {
-    console.log("No eligible fields found. The batch runner may not pick up fields without existing mapping records.");
-    console.log("Trying alternative: generating per-entity with explicit field IDs...\n");
+    try {
+      const result = await runGeneration({
+        workspaceId: WORKSPACE_ID,
+        userId: USER_ID,
+        entityId: eId,
+        generationType: "field_mapping",
+        outputFormat: "yaml",
+        preferredProvider: "claude",
+        fieldIds,
+      });
 
-    // Alternative: use the runner directly for each entity with explicit field IDs
-    const { startGeneration, executeGeneration, saveMappingsAndQuestions } = await import("../src/lib/generation/runner");
-
-    let totalCreated = 0;
-    let totalErrors = 0;
-
-    for (const [eId, fieldIds] of gapByEntity.entries()) {
-      const e = entityById.get(eId);
-      const name = e?.displayName || e?.name || eId;
-      console.log(`  ${name} (${fieldIds.length} fields)...`);
-
-      try {
-        const { startResult, prepared } = await startGeneration({
-          workspaceId: WORKSPACE_ID,
-          userId: USER_ID,
-          entityId: eId,
-          generationType: "field_mapping",
-          outputFormat: "yaml",
-          preferredProvider: "claude",
-          fieldIds,
-        });
-
-        if (startResult.status === "skipped") {
-          console.log(`    Skipped: ${startResult.reason}`);
-          continue;
-        }
-
-        const genResult = await executeGeneration(prepared);
-        const saved = await saveMappingsAndQuestions(prepared, WORKSPACE_ID);
-        totalCreated += saved.mappingsCreated;
-        console.log(`    Created ${saved.mappingsCreated} mappings`);
-      } catch (err) {
-        console.error(`    Error: ${err instanceof Error ? err.message : err}`);
+      if (result.status === "failed") {
+        console.error(`    Failed: ${result.error}`);
         totalErrors++;
+        continue;
       }
-    }
 
-    console.log(`\nDone. Created ${totalCreated} mappings, ${totalErrors} errors.`);
-  } else {
-    await executeBatchRun(batchRunId, batches, batchInput);
-    console.log(`\nBatch run complete.`);
+      // Persist field mappings from parsed output
+      const parsed = result.parsedOutput;
+      if (parsed?.fieldMappings?.length) {
+        let created = 0;
+        for (const fm of parsed.fieldMappings) {
+          if (!fm.targetFieldId) continue;
+          // Skip if this field already has an isLatest mapping (don't overwrite)
+          const existing = await db.select({ id: fmSchema.id })
+            .from(fmSchema)
+            .where(and(
+              eq(fmSchema.targetFieldId, fm.targetFieldId),
+              eq(fmSchema.isLatest, true),
+              isNull(fmSchema.transferId),
+            ))
+            .limit(1);
+          if (existing.length > 0) continue;
+
+          await db.insert(fmSchema).values({
+            workspaceId: WORKSPACE_ID,
+            targetFieldId: fm.targetFieldId,
+            sourceEntityId: fm.sourceEntityId || null,
+            sourceFieldId: fm.sourceFieldId || null,
+            status: fm.status || "unreviewed",
+            mappingType: fm.mappingType || "mapped",
+            transform: fm.transform || null,
+            reasoning: fm.reasoning || null,
+            confidence: fm.confidence || null,
+            generationId: result.generationId,
+            isLatest: true,
+            createdBy: "llm",
+          });
+          created++;
+        }
+        totalCreated += created;
+        console.log(`    Created ${created} mappings (${parsed.fieldMappings.length} parsed, ${result.inputTokens}in/${result.outputTokens}out)`);
+      } else {
+        console.log(`    No mappings in output (${result.inputTokens}in/${result.outputTokens}out)`);
+      }
+    } catch (err) {
+      console.error(`    Error: ${err instanceof Error ? err.message : err}`);
+      totalErrors++;
+    }
   }
+
+  console.log(`\nDone. Created ${totalCreated} mappings, ${totalErrors} errors.`);
 
   // Pass 2: AI reviews
   if (SKIP_REVIEW) {
